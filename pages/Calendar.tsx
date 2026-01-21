@@ -344,7 +344,7 @@ export const Calendar: React.FC = () => {
                   value={newPostContent}
                   onChange={(e) => setNewPostContent(e.target.value)}
                   placeholder="What do you want to post?"
-                  className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none min-h-[100px] text-slate-800"
+                  className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none min-h-[100px] bg-white text-slate-900 placeholder:text-slate-400"
                 ></textarea>
               </div>
 
