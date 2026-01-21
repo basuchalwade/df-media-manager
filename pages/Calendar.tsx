@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon, X, Clock, CheckCircle, ChevronDown, Image as ImageIcon, Trash2 } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon, X, Clock, CheckCircle, ChevronDown, Image as ImageIcon, Trash2, ChevronUp } from 'lucide-react';
 import { store } from '../services/mockStore';
 import { Post, Platform, PostStatus, MediaItem } from '../types';
 import { PlatformIcon } from '../components/PlatformIcon';
@@ -12,10 +12,15 @@ export const Calendar: React.FC = () => {
   
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [newPostContent, setNewPostContent] = useState('');
-  const [newPostTime, setNewPostTime] = useState('09:00');
+  
+  // Custom Time State
+  const [timeState, setTimeState] = useState({ hour: '09', minute: '00', period: 'AM' });
+  const [isTimeOpen, setIsTimeOpen] = useState(false);
+
+  // Platform Dropdown State
   const [selectedPlatform, setSelectedPlatform] = useState<Platform>(Platform.Twitter);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   
   // Media State
   const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(null);
@@ -50,13 +55,23 @@ export const Calendar: React.FC = () => {
     setNewPostContent('');
     setSelectedMedia(null);
     setIsDropdownOpen(false);
+    setTimeState({ hour: '09', minute: '00', period: 'AM' }); // Reset time default
   };
 
   const handleQuickSchedule = async () => {
-    if (!selectedDate || !newPostContent) return;
+    // Allow scheduling if there is content OR media
+    if (!selectedDate || (!newPostContent && !selectedMedia)) return;
 
-    // Construct ISO string with selected time
-    const [hours, minutes] = newPostTime.split(':').map(Number);
+    // Convert 12h time to 24h for Date object
+    let hours = parseInt(timeState.hour);
+    const minutes = parseInt(timeState.minute);
+    
+    if (timeState.period === 'PM' && hours !== 12) {
+      hours += 12;
+    } else if (timeState.period === 'AM' && hours === 12) {
+      hours = 0;
+    }
+
     const scheduledDateTime = new Date(selectedDate);
     scheduledDateTime.setHours(hours, minutes, 0, 0);
 
@@ -70,10 +85,15 @@ export const Calendar: React.FC = () => {
       mediaUrl: selectedMedia?.url,
     };
 
-    await store.addPost(newPost);
-    await loadPosts();
-    setIsModalOpen(false);
-    alert('Post scheduled successfully!');
+    try {
+      await store.addPost(newPost);
+      await loadPosts();
+      setIsModalOpen(false);
+      alert('Post scheduled successfully!');
+    } catch (error) {
+      console.error("Failed to schedule post:", error);
+      alert("Failed to schedule post. Please try again.");
+    }
   };
 
   const getPostsForDay = (day: number) => {
@@ -154,6 +174,10 @@ export const Calendar: React.FC = () => {
     return cells;
   };
 
+  // Generate Time Options
+  const hours = Array.from({ length: 12 }, (_, i) => (i + 1).toString().padStart(2, '0'));
+  const minutes = Array.from({ length: 12 }, (_, i) => (i * 5).toString().padStart(2, '0'));
+
   return (
     <div className="h-full flex flex-col">
       <header className="flex items-center justify-between mb-6">
@@ -195,8 +219,8 @@ export const Calendar: React.FC = () => {
       {/* Quick Schedule Modal */}
       {isModalOpen && selectedDate && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50 shrink-0">
               <h3 className="font-bold text-lg text-slate-900 flex items-center gap-2">
                 <Clock className="w-5 h-5 text-blue-600" />
                 Schedule Post
@@ -206,43 +230,87 @@ export const Calendar: React.FC = () => {
               </button>
             </div>
             
-            <div className="p-6 space-y-4">
+            <div className="p-6 space-y-4 overflow-y-auto flex-1 custom-scrollbar">
               <div>
                 <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Date</label>
-                <div className="font-medium text-slate-900 bg-slate-100 px-3 py-2 rounded-lg border border-slate-200">
+                <div className="font-medium text-slate-900 bg-slate-100 px-3 py-2.5 rounded-lg border border-slate-200">
                    {selectedDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <div>
+                {/* Custom Time Picker */}
+                <div className="relative">
                    <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Time</label>
-                   <input 
-                     type="time" 
-                     value={newPostTime}
-                     onChange={(e) => setNewPostTime(e.target.value)}
-                     className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                   />
+                   <button
+                     type="button"
+                     onClick={() => setIsTimeOpen(!isTimeOpen)}
+                     className="w-full bg-slate-800 text-white p-2.5 rounded-lg border border-slate-700 flex items-center justify-between hover:bg-slate-700 transition-colors focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                   >
+                     <span className="font-mono text-lg tracking-wide">
+                        {timeState.hour}:{timeState.minute} <span className="text-slate-400 text-sm">{timeState.period}</span>
+                     </span>
+                     <Clock className="w-4 h-4 text-slate-400" />
+                   </button>
+                   
+                   {isTimeOpen && (
+                     <div className="absolute z-50 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-xl p-2 grid grid-cols-3 gap-1 animate-in fade-in zoom-in-95">
+                        <div className="max-h-32 overflow-y-auto custom-scrollbar">
+                          {hours.map(h => (
+                            <div 
+                              key={h} 
+                              onClick={() => setTimeState(prev => ({...prev, hour: h}))}
+                              className={`text-center py-1 rounded cursor-pointer text-sm ${timeState.hour === h ? 'bg-blue-100 text-blue-700 font-bold' : 'text-slate-700 hover:bg-slate-50'}`}
+                            >
+                              {h}
+                            </div>
+                          ))}
+                        </div>
+                        <div className="max-h-32 overflow-y-auto custom-scrollbar border-l border-r border-slate-100">
+                          {minutes.map(m => (
+                            <div 
+                              key={m} 
+                              onClick={() => setTimeState(prev => ({...prev, minute: m}))}
+                              className={`text-center py-1 rounded cursor-pointer text-sm ${timeState.minute === m ? 'bg-blue-100 text-blue-700 font-bold' : 'text-slate-700 hover:bg-slate-50'}`}
+                            >
+                              {m}
+                            </div>
+                          ))}
+                        </div>
+                        <div className="flex flex-col gap-1">
+                           {['AM', 'PM'].map(p => (
+                             <div 
+                               key={p} 
+                               onClick={() => {
+                                 setTimeState(prev => ({...prev, period: p}));
+                                 setIsTimeOpen(false);
+                               }}
+                               className={`flex-1 flex items-center justify-center rounded cursor-pointer text-xs font-bold ${timeState.period === p ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                             >
+                               {p}
+                             </div>
+                           ))}
+                        </div>
+                     </div>
+                   )}
                 </div>
+
                 <div>
                    <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Platform</label>
                    <div className="relative">
-                     {/* Custom Select Trigger */}
                      <button
                        type="button"
                        onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                       className="w-full pl-9 p-2 text-left border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white flex items-center justify-between"
+                       className="w-full pl-9 p-2.5 text-left border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white flex items-center justify-between"
                      >
                        <span className="text-slate-900 text-sm font-medium truncate">{selectedPlatform}</span>
                        <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
                      </button>
 
-                     {/* Icon Overlay */}
                      <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
                         <PlatformIcon platform={selectedPlatform} size={16} />
                      </div>
 
-                     {/* Custom Dropdown Menu */}
                      {isDropdownOpen && (
                        <div className="absolute z-10 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-xl max-h-48 overflow-y-auto animate-in fade-in zoom-in-95 duration-100">
                          {Object.values(Platform).map(p => (
@@ -276,7 +344,7 @@ export const Calendar: React.FC = () => {
                   value={newPostContent}
                   onChange={(e) => setNewPostContent(e.target.value)}
                   placeholder="What do you want to post?"
-                  className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none min-h-[100px]"
+                  className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none min-h-[100px] text-slate-800"
                 ></textarea>
               </div>
 
@@ -314,15 +382,17 @@ export const Calendar: React.FC = () => {
                    </button>
                  )}
               </div>
+            </div>
 
-              <button 
-                onClick={handleQuickSchedule}
-                disabled={!newPostContent}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <CheckCircle className="w-4 h-4" />
-                Confirm Schedule
-              </button>
+            <div className="p-4 border-t border-slate-100 bg-slate-50 shrink-0">
+               <button 
+                 onClick={handleQuickSchedule}
+                 disabled={!newPostContent && !selectedMedia}
+                 className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-blue-900/10"
+               >
+                 <CheckCircle className="w-4 h-4" />
+                 Confirm Schedule
+               </button>
             </div>
           </div>
         </div>
