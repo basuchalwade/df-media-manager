@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Sparkles, Send, Calendar as CalendarIcon, RotateCcw, Image as ImageIcon, ChevronDown, CheckCircle, Briefcase, Smile, Rocket, GraduationCap, X, FileVideo, Clock, Save, AlertCircle, Check, Zap, Eye, Copy } from 'lucide-react';
 import { generatePostContent } from '../services/geminiService';
 import { store } from '../services/mockStore';
@@ -37,6 +37,7 @@ export const CreatorStudio: React.FC = () => {
   const [scheduledDate, setScheduledDate] = useState<Date>(new Date());
   const [timeState, setTimeState] = useState({ hour: '09', minute: '00', period: 'AM' });
   const [isTimePickerOpen, setIsTimePickerOpen] = useState(false);
+  const dateInputRef = useRef<HTMLInputElement>(null);
 
   // --- Automation State ---
   const [autoEngage, setAutoEngage] = useState(false);
@@ -363,18 +364,33 @@ export const CreatorStudio: React.FC = () => {
 
               {scheduleMode === 'later' && (
                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-in slide-in-from-top-2">
-                    <div className="relative flex items-center bg-gray-50 rounded-xl p-3 border border-gray-200 group">
-                       <CalendarIcon className="w-5 h-5 text-gray-400 mr-3 group-hover:text-blue-500 transition-colors" />
+                    <div className="relative flex items-center bg-gray-50 rounded-xl p-3 border border-gray-200 group hover:border-blue-300 transition-colors">
+                       <CalendarIcon className="w-5 h-5 text-gray-400 mr-3 group-hover:text-blue-500 transition-colors pointer-events-none" />
+                       
+                       <span className="text-sm font-bold text-gray-900 pointer-events-none">
+                          {scheduledDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                       </span>
+
+                       {/* Overlayed Input for Full Clickability */}
                        <input 
+                          ref={dateInputRef}
                           type="date"
                           value={getFormattedDateValue(scheduledDate)}
                           onChange={(e) => {
                              if(e.target.value) {
                                 const parts = e.target.value.split('-').map(Number);
-                                setScheduledDate(new Date(parts[0], parts[1]-1, parts[2]));
+                                // Set to noon to avoid any timezone rolling issues (00:00 -> 23:00 prev day)
+                                setScheduledDate(new Date(parts[0], parts[1]-1, parts[2], 12, 0, 0));
                              }
                           }}
-                          className="bg-transparent text-sm font-bold text-gray-900 w-full outline-none"
+                          onClick={(e) => {
+                            try {
+                              e.currentTarget.showPicker();
+                            } catch (err) {
+                              // Fallback is default behavior
+                            }
+                          }}
+                          className="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10"
                        />
                     </div>
                     
