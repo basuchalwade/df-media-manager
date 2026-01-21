@@ -363,8 +363,8 @@ export const Calendar: React.FC = () => {
 
   // Character Count Logic
   const charCount = newPostContent.length;
-  const maxChars = Math.min(...selectedPlatforms.map(p => PLATFORM_LIMITS[p] || 5000));
-  const isOverLimit = charCount > maxChars;
+  // Calculate if any platform is over limit for disable logic
+  const isOverLimit = selectedPlatforms.some(p => charCount > (PLATFORM_LIMITS[p] || 5000));
 
   // Format date for date input (YYYY-MM-DD)
   const getFormattedDateValue = (date: Date) => {
@@ -373,6 +373,11 @@ export const Calendar: React.FC = () => {
     const d = date.getDate().toString().padStart(2, '0');
     return `${y}-${m}-${d}`;
   };
+
+  // Preview Truncation Logic
+  const previewLimit = PLATFORM_LIMITS[previewPlatform] || 500;
+  const displayContent = newPostContent ? newPostContent.slice(0, previewLimit) : '';
+  const isTruncated = newPostContent.length > previewLimit;
 
   return (
     <div className="h-full flex flex-col gap-6 animate-in fade-in duration-700">
@@ -870,7 +875,7 @@ export const Calendar: React.FC = () => {
                       <section className="space-y-3">
                          <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">When</label>
                          <div className="flex flex-col sm:flex-row gap-4">
-                            <div className="relative flex-1 bg-gray-50 rounded-2xl p-4 flex items-center gap-3 border border-transparent hover:border-gray-200 transition-colors group cursor-pointer">
+                            <label className="relative flex-1 bg-gray-50 rounded-2xl p-4 flex items-center gap-3 border border-transparent hover:border-gray-200 transition-colors group cursor-pointer">
                                <CalendarIcon className="w-5 h-5 text-gray-400 group-hover:text-blue-500 pointer-events-none" />
                                <span className="font-semibold text-gray-900 pointer-events-none">{selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
                                <input 
@@ -884,8 +889,13 @@ export const Calendar: React.FC = () => {
                                         setSelectedDate(newDate);
                                      }
                                   }}
+                                  onClick={(e) => {
+                                    try {
+                                      e.currentTarget.showPicker();
+                                    } catch (err) {}
+                                  }}
                                />
-                            </div>
+                            </label>
                             <div className="relative flex-1">
                                <button 
                                   onClick={() => setIsTimePickerOpen(!isTimePickerOpen)}
@@ -964,9 +974,33 @@ export const Calendar: React.FC = () => {
                       <section className="space-y-3">
                          <div className="flex justify-between items-end">
                             <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">What</label>
-                            <span className={`text-[10px] font-bold ${isOverLimit ? 'text-red-500' : 'text-gray-400'}`}>
-                              {charCount} / {maxChars} chars
-                            </span>
+                            <div className="flex flex-wrap justify-end gap-1.5">
+                               {selectedPlatforms.map(p => {
+                                  const limit = PLATFORM_LIMITS[p];
+                                  const count = newPostContent.length;
+                                  const isOver = count > limit;
+                                  const isClose = count > limit * 0.9;
+                                  
+                                  return (
+                                     <div key={p} className={`
+                                        flex items-center gap-1.5 px-2 py-1 rounded-md border text-[10px] font-bold transition-colors
+                                        ${isOver 
+                                          ? 'bg-red-50 border-red-100 text-red-600' 
+                                          : isClose 
+                                             ? 'bg-orange-50 border-orange-100 text-orange-600'
+                                             : 'bg-white border-gray-200 text-gray-500'}
+                                     `}>
+                                        <PlatformIcon platform={p} size={10} />
+                                        <span>{count}/{limit}</span>
+                                        {isOver ? (
+                                          <AlertCircle className="w-3 h-3" />
+                                        ) : (
+                                          <CheckCircle className="w-3 h-3 text-green-500/50" />
+                                        )}
+                                     </div>
+                                  );
+                               })}
+                            </div>
                          </div>
                          <div className="relative">
                             <textarea
@@ -1084,8 +1118,9 @@ export const Calendar: React.FC = () => {
                                      <span className="font-bold text-sm text-slate-900 truncate">Your Brand</span>
                                      <span className="text-xs text-slate-500">@brand • Now</span>
                                   </div>
-                                  <p className="text-sm text-slate-800 whitespace-pre-wrap mb-3 leading-relaxed">
-                                     {newPostContent || <span className="text-slate-300 italic">Start typing to preview...</span>}
+                                  <p className="text-sm text-slate-800 whitespace-pre-wrap mb-3 leading-relaxed break-words">
+                                     {displayContent || <span className="text-slate-300 italic">Start typing to preview...</span>}
+                                     {isTruncated && <span className="text-red-500 font-bold ml-1" title={`Text truncated at ${previewLimit} chars based on ${previewPlatform} limit`}>...</span>}
                                   </p>
                                   
                                   {selectedMedia && (

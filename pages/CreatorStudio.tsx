@@ -161,6 +161,11 @@ export const CreatorStudio: React.FC = () => {
     return `${y}-${m}-${d}`;
   };
 
+  // Preview Truncation Logic
+  const previewLimit = PLATFORM_LIMITS[previewPlatform] || 500;
+  const displayContent = content ? content.slice(0, previewLimit) : '';
+  const isTruncated = content.length > previewLimit;
+
   return (
     <div className="h-full flex flex-col gap-6 animate-in fade-in duration-500 pb-10">
       
@@ -266,9 +271,35 @@ export const CreatorStudio: React.FC = () => {
               <div className="flex-1 min-h-[200px] flex flex-col relative">
                  <div className="flex justify-between items-end mb-2">
                     <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Post Content</label>
-                    <span className={`text-[10px] font-bold ${validationErrors.length > 0 ? 'text-red-500' : 'text-gray-400'}`}>
-                       {content.length} chars
-                    </span>
+                    
+                    {/* Character Counters */}
+                    <div className="flex flex-wrap justify-end gap-1.5">
+                       {selectedPlatforms.map(p => {
+                          const limit = PLATFORM_LIMITS[p];
+                          const count = content.length;
+                          const isOver = count > limit;
+                          const isClose = count > limit * 0.9;
+                          
+                          return (
+                             <div key={p} className={`
+                                flex items-center gap-1.5 px-2 py-1 rounded-md border text-[10px] font-bold transition-colors
+                                ${isOver 
+                                  ? 'bg-red-50 border-red-100 text-red-600' 
+                                  : isClose 
+                                     ? 'bg-orange-50 border-orange-100 text-orange-600'
+                                     : 'bg-white border-gray-200 text-gray-500'}
+                             `}>
+                                <PlatformIcon platform={p} size={10} />
+                                <span>{count}/{limit}</span>
+                                {isOver ? (
+                                  <AlertCircle className="w-3 h-3" />
+                                ) : (
+                                  <Check className="w-3 h-3 text-green-500" />
+                                )}
+                             </div>
+                          );
+                       })}
+                    </div>
                  </div>
                  <textarea
                     value={content}
@@ -364,7 +395,7 @@ export const CreatorStudio: React.FC = () => {
 
               {scheduleMode === 'later' && (
                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-in slide-in-from-top-2">
-                    <div className="relative flex items-center bg-gray-50 rounded-xl p-3 border border-gray-200 group hover:border-blue-300 transition-colors">
+                    <label className="relative flex items-center bg-gray-50 rounded-xl p-3 border border-gray-200 group hover:border-blue-300 transition-colors cursor-pointer">
                        <CalendarIcon className="w-5 h-5 text-gray-400 mr-3 group-hover:text-blue-500 transition-colors pointer-events-none" />
                        
                        <span className="text-sm font-bold text-gray-900 pointer-events-none">
@@ -375,6 +406,7 @@ export const CreatorStudio: React.FC = () => {
                        <input 
                           ref={dateInputRef}
                           type="date"
+                          min={getFormattedDateValue(new Date())}
                           value={getFormattedDateValue(scheduledDate)}
                           onChange={(e) => {
                              if(e.target.value) {
@@ -392,7 +424,7 @@ export const CreatorStudio: React.FC = () => {
                           }}
                           className="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10"
                        />
-                    </div>
+                    </label>
                     
                     <div className="relative">
                        <button 
@@ -506,8 +538,9 @@ export const CreatorStudio: React.FC = () => {
 
                     {/* Body */}
                     <div className="px-5 py-3">
-                       <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">
-                          {content || <span className="text-gray-300 italic">Start typing to see your preview here...</span>}
+                       <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap break-words">
+                          {displayContent || <span className="text-gray-300 italic">Start typing to see your preview here...</span>}
+                          {isTruncated && <span className="text-red-500 font-bold ml-1" title={`Text truncated at ${previewLimit} chars based on ${previewPlatform} limit`}>...</span>}
                        </p>
                     </div>
 
