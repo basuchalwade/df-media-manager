@@ -769,6 +769,24 @@ export const Calendar: React.FC = () => {
                      </button>
                    ))}
                  </div>
+                 
+                 {/* Status Filter Row - Added per request */}
+                 <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar items-center pl-6">
+                    {['All', ...Object.values(PostStatus)].map(status => (
+                        <button
+                            key={status}
+                            onClick={() => setFilterStatus(status as PostStatus | 'All')}
+                            className={`
+                                px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider border transition-all whitespace-nowrap
+                                ${filterStatus === status 
+                                    ? 'bg-slate-800 text-white border-slate-800 shadow-md' 
+                                    : 'bg-white text-slate-500 border-gray-100 hover:bg-gray-50'}
+                            `}
+                        >
+                            {status}
+                        </button>
+                    ))}
+                 </div>
               </div>
            </div>
 
