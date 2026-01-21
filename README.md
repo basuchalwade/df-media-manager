@@ -33,12 +33,12 @@ PostMaster follows a modern client-server architecture designed for scalability 
 
 ```mermaid
 graph TD
-    User[User Browser] -->|HTTP/HTTPS| Nginx[Nginx Reverse Proxy]
-    Nginx -->|Static Files| Frontend[React App (Port 3000)]
-    Nginx -->|API Requests| Backend[FastAPI Backend (Port 8000)]
-    Backend -->|Query/Write| DB[(SQLite/Postgres)]
-    Backend -->|Generate Content| Gemini[Google Gemini API]
-    Backend -->|Post Content| Socials[Social Media APIs]
+    User["User Browser"] -->|HTTP/HTTPS| Nginx["Nginx Reverse Proxy"]
+    Nginx -->|Static Files| Frontend["React App (Port 3000)"]
+    Nginx -->|API Requests| Backend["FastAPI Backend (Port 8000)"]
+    Backend -->|Query/Write| DB[("SQLite/Postgres")]
+    Backend -->|Generate Content| Gemini["Google Gemini API"]
+    Backend -->|Post Content| Socials["Social Media APIs"]
 ```
 
 ---
