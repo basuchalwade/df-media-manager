@@ -356,6 +356,14 @@ export const Calendar: React.FC = () => {
   const maxChars = Math.min(...selectedPlatforms.map(p => PLATFORM_LIMITS[p] || 5000));
   const isOverLimit = charCount > maxChars;
 
+  // Format date for date input (YYYY-MM-DD)
+  const getFormattedDateValue = (date: Date) => {
+    const y = date.getFullYear();
+    const m = (date.getMonth() + 1).toString().padStart(2, '0');
+    const d = date.getDate().toString().padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  };
+
   return (
     <div className="h-full flex flex-col gap-6 animate-in fade-in duration-700">
       
@@ -833,7 +841,7 @@ export const Calendar: React.FC = () => {
                 </div>
               ) : (
                 // --- EDIT / CREATE VIEW ---
-                <div className="flex flex-col lg:flex-row h-full overflow-hidden">
+                <div className="flex flex-col lg:flex-row flex-1 min-h-0 overflow-hidden">
                    {/* Left Column: Edit Form */}
                    <div className="flex-1 overflow-y-auto custom-scrollbar p-8 space-y-8 lg:border-r border-gray-100">
                       
@@ -841,9 +849,21 @@ export const Calendar: React.FC = () => {
                       <section className="space-y-3">
                          <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">When</label>
                          <div className="flex flex-col sm:flex-row gap-4">
-                            <div className="flex-1 bg-gray-50 rounded-2xl p-4 flex items-center gap-3 border border-transparent hover:border-gray-200 transition-colors group">
-                               <CalendarIcon className="w-5 h-5 text-gray-400 group-hover:text-blue-500" />
-                               <span className="font-semibold text-gray-900">{selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                            <div className="relative flex-1 bg-gray-50 rounded-2xl p-4 flex items-center gap-3 border border-transparent hover:border-gray-200 transition-colors group cursor-pointer">
+                               <CalendarIcon className="w-5 h-5 text-gray-400 group-hover:text-blue-500 pointer-events-none" />
+                               <span className="font-semibold text-gray-900 pointer-events-none">{selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                               <input 
+                                  type="date"
+                                  className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                                  value={getFormattedDateValue(selectedDate)}
+                                  onChange={(e) => {
+                                     if (e.target.value) {
+                                        const parts = e.target.value.split('-').map(Number);
+                                        const newDate = new Date(parts[0], parts[1] - 1, parts[2]);
+                                        setSelectedDate(newDate);
+                                     }
+                                  }}
+                               />
                             </div>
                             <div className="relative flex-1">
                                <button 
