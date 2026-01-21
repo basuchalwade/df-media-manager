@@ -4,9 +4,10 @@ import {
   ChevronDown, Image as ImageIcon, Trash2, Zap, Copy, Filter, Eye, Heart, 
   MessageCircle, Share, MoreHorizontal, AlertTriangle, LayoutList, Grid3X3,
   Bot, RefreshCw, ArrowRight, Globe, BarChart3, AlertCircle, CheckCircle,
-  MessageSquare, Repeat, Heart as HeartOutline, Share2, Bookmark, Send
+  MessageSquare, Repeat, Heart as HeartOutline, Share2, Bookmark, Send, Layers, Smile, Hash
 } from 'lucide-react';
 import { store } from '../services/mockStore';
+import { generateHashtags } from '../services/geminiService';
 import { Post, Platform, PostStatus, MediaItem, BotType } from '../types';
 import { PlatformIcon } from '../components/PlatformIcon';
 import { MediaPicker } from '../components/MediaPicker';
@@ -29,6 +30,13 @@ const TIMEZONES = [
   { label: 'UTC+0 (GMT)', value: 'Europe/London' },
   { label: 'UTC+5:30 (IST)', value: 'Asia/Kolkata' },
 ];
+
+const EMOJI_CATEGORIES = {
+  'Popular': ['🚀', '🔥', '✨', '💡', '📈', '💪', '🎯', '🤖', '👀', '✅', '⚠️', '🎉'],
+  'Faces': ['😀', '😂', '😎', '🤔', '🤯', '😍', '🥳', '🥶', '🤡', '🤠', '🤐', '🫠'],
+  'Objects': ['📱', '💻', '📷', '🎥', '🎙️', '⌚', '🔋', '🔌', '🧰', '🔭', '📡', '💾'],
+  'Symbols': ['🔴', '🟢', '🔵', '💯', '💢', '💫', '💥', '💦', '💤', '💭', '📣', '🔔']
+};
 
 const getStatusStyle = (status: PostStatus) => {
   switch (status) {
@@ -72,17 +80,27 @@ export const Calendar: React.FC = () => {
   
   // Form State
   const [newPostContent, setNewPostContent] = useState('');
-  const [newPostTitle, setNewPostTitle] = useState(''); // Added title state
+  const [newPostTitle, setNewPostTitle] = useState(''); 
+  const [youtubeThumbnail, setYoutubeThumbnail] = useState<MediaItem | null>(null);
+  const [isCarousel, setIsCarousel] = useState(false);
   const [timeState, setTimeState] = useState({ hour: '09', minute: '00', period: 'AM' });
   const [selectedPlatforms, setSelectedPlatforms] = useState<Platform[]>([Platform.Twitter]);
   const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(null);
   const [autoEngage, setAutoEngage] = useState(false);
   
+  // Tools State
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [showHashtags, setShowHashtags] = useState(false);
+  const [currentEmojiCategory, setCurrentEmojiCategory] = useState('Popular');
+  const [suggestedHashtags, setSuggestedHashtags] = useState<string[]>(['#Trend', '#New', '#Update', '#Growth', '#Tech']);
+  const [isTagsLoading, setIsTagsLoading] = useState(false);
+
   // Preview State
   const [previewPlatform, setPreviewPlatform] = useState<Platform>(Platform.Twitter);
 
   // UI State
   const [isMediaPickerOpen, setIsMediaPickerOpen] = useState(false);
+  const [mediaPickerMode, setMediaPickerMode] = useState<'main' | 'thumbnail'>('main');
   const [isTimePickerOpen, setIsTimePickerOpen] = useState(false);
 
   useEffect(() => {
@@ -112,6 +130,8 @@ export const Calendar: React.FC = () => {
   const resetForm = () => {
     setNewPostContent('');
     setNewPostTitle('');
+    setYoutubeThumbnail(null);
+    setIsCarousel(false);
     setSelectedMedia(null);
     setAutoEngage(false);
     setEditingPost(null);
@@ -132,6 +152,14 @@ export const Calendar: React.FC = () => {
     setEditingPost(post);
     setNewPostContent(post.content);
     setNewPostTitle(post.title || '');
+    if(post.thumbnailUrl) {
+       setYoutubeThumbnail({
+          id: 'mock-thumb', name: 'Thumbnail', type: 'image', url: post.thumbnailUrl, size: 0, createdAt: ''
+       });
+    } else {
+       setYoutubeThumbnail(null);
+    }
+    setIsCarousel(post.isCarousel || false);
     setSelectedPlatforms(post.platforms);
     setPreviewPlatform(post.platforms[0] || Platform.Twitter);
     
@@ -160,6 +188,35 @@ export const Calendar: React.FC = () => {
     setTimeState({ hour: hours.toString().padStart(2, '0'), minute: minutes, period });
     setSelectedDate(new Date(date.getFullYear(), date.getMonth(), date.getDate()));
     setIsModalOpen(true);
+  };
+
+  const handleMediaPickerOpen = (mode: 'main' | 'thumbnail') => {
+    setMediaPickerMode(mode);
+    setIsMediaPickerOpen(true);
+  };
+
+  const handleMediaSelect = (item: MediaItem) => {
+    if (mediaPickerMode === 'main') {
+      setSelectedMedia(item);
+    } else {
+      if (item.type !== 'image') {
+        alert("Thumbnail must be an image.");
+        return;
+      }
+      setYoutubeThumbnail(item);
+    }
+  };
+
+  // --- Tool Handlers ---
+  const handleInsertText = (text: string) => {
+    setNewPostContent(prev => prev + (prev.length > 0 ? ' ' : '') + text);
+  };
+
+  const handleFetchHashtags = async () => {
+    setIsTagsLoading(true);
+    const tags = await generateHashtags("General", newPostContent);
+    setSuggestedHashtags(tags);
+    setIsTagsLoading(false);
   };
 
   // --- Drag & Drop Handlers ---
@@ -222,30 +279,6 @@ export const Calendar: React.FC = () => {
     }
   };
 
-  const handleDuplicatePost = async (e: React.MouseEvent, post: Post) => {
-    e.stopPropagation();
-    e.preventDefault();
-    const newPost = {
-      ...post,
-      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      content: `(Copy) ${post.content}`,
-      status: PostStatus.Draft,
-      scheduledFor: post.scheduledFor 
-    };
-    await store.addPost(newPost);
-    await loadPosts();
-  };
-
-  const handleMoveToTomorrow = async (e: React.MouseEvent, post: Post) => {
-    e.stopPropagation();
-    e.preventDefault();
-    const current = new Date(post.scheduledFor);
-    current.setDate(current.getDate() + 1);
-    const updatedPost = { ...post, scheduledFor: current.toISOString() };
-    await store.updatePost(updatedPost);
-    await loadPosts();
-  };
-
   const handleSavePost = async () => {
     if (!newPostContent && !selectedMedia) return;
 
@@ -259,6 +292,9 @@ export const Calendar: React.FC = () => {
     const postData: Post = {
       id: editingPost ? editingPost.id : `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       title: newPostTitle,
+      description: newPostContent, // Default content to desc for consistency
+      thumbnailUrl: youtubeThumbnail?.url,
+      isCarousel,
       content: newPostContent,
       platforms: selectedPlatforms,
       scheduledFor: scheduledDateTime.toISOString(),
@@ -312,16 +348,6 @@ export const Calendar: React.FC = () => {
 
   const charCount = newPostContent.length;
   const isOverLimit = selectedPlatforms.some(p => charCount > (PLATFORM_LIMITS[p] || 5000));
-  const getFormattedDateValue = (date: Date) => {
-    const y = date.getFullYear();
-    const m = (date.getMonth() + 1).toString().padStart(2, '0');
-    const d = date.getDate().toString().padStart(2, '0');
-    return `${y}-${m}-${d}`;
-  };
-
-  // Preview Truncation
-  const previewLimit = PLATFORM_LIMITS[previewPlatform] || 500;
-  const displayContent = newPostContent ? newPostContent.slice(0, previewLimit) : '';
 
   // Render Logic for specific platforms (Synced with CreatorStudio)
   const renderPreviewContent = () => {
@@ -349,7 +375,7 @@ export const Calendar: React.FC = () => {
                    <span className="text-gray-500">2h</span>
                 </div>
                 <div className="mt-1 text-[15px] text-gray-900 leading-normal whitespace-pre-wrap break-words">
-                   {displayContent || <span className="text-gray-300">Your post text...</span>}
+                   {newPostContent.slice(0, 280) || <span className="text-gray-300">Your post text...</span>}
                 </div>
                 {selectedMedia && <div className="mt-3 rounded-2xl overflow-hidden border border-gray-100">{commonMedia}</div>}
                 
@@ -379,11 +405,16 @@ export const Calendar: React.FC = () => {
                <MoreHorizontal className="w-5 h-5 text-gray-600" />
             </div>
             
-            <div className="aspect-square bg-gray-100">
+            <div className="aspect-square bg-gray-100 relative">
                {selectedMedia ? (
                  selectedMedia.type === 'image' ? <img src={selectedMedia.url} className="w-full h-full object-cover" /> : <video src={selectedMedia.url} className="w-full h-full object-cover" />
                ) : (
                  <div className="w-full h-full flex items-center justify-center text-gray-300 bg-gray-50">No Media</div>
+               )}
+               {isCarousel && (
+                  <div className="absolute top-2 right-2 bg-black/60 rounded-full p-1.5">
+                     <Layers className="w-4 h-4 text-white" />
+                  </div>
                )}
             </div>
 
@@ -399,7 +430,7 @@ export const Calendar: React.FC = () => {
                <div className="font-semibold text-sm mb-1">1,234 likes</div>
                <div className="text-sm">
                   <span className="font-semibold mr-2">your_brand</span>
-                  <span className="whitespace-pre-wrap">{displayContent}</span>
+                  <span className="whitespace-pre-wrap">{newPostContent.slice(0, 2200)}</span>
                </div>
             </div>
           </div>
@@ -417,7 +448,7 @@ export const Calendar: React.FC = () => {
                 </div>
              </div>
              <div className="px-4 pb-2 text-sm text-gray-900 whitespace-pre-wrap break-words">
-                {displayContent}
+                {newPostContent.slice(0, 3000)}
              </div>
              {selectedMedia && <div className="w-full">{commonMedia}</div>}
              <div className="px-4 py-2 border-t border-gray-100 flex justify-between">
@@ -433,11 +464,17 @@ export const Calendar: React.FC = () => {
       case Platform.YouTube:
         return (
           <div className="bg-white h-full flex flex-col">
-             <div className="aspect-video bg-black w-full flex items-center justify-center">
+             <div className="aspect-video bg-black w-full flex items-center justify-center relative">
                 {selectedMedia ? (
                    selectedMedia.type === 'image' ? <img src={selectedMedia.url} className="w-full h-full object-cover opacity-80" /> : <video src={selectedMedia.url} className="w-full h-full object-cover" />
                 ) : (
                    <div className="text-gray-500">Video Player</div>
+                )}
+                {/* Thumbnail Overlay */}
+                {youtubeThumbnail && (
+                   <div className="absolute bottom-2 right-2 w-24 aspect-video bg-black border border-white rounded shadow-lg overflow-hidden z-20">
+                      <img src={youtubeThumbnail.url} className="w-full h-full object-cover" alt="Thumb" />
+                   </div>
                 )}
              </div>
              <div className="p-4">
@@ -455,7 +492,7 @@ export const Calendar: React.FC = () => {
                 <div className="bg-gray-100 rounded-xl p-3 text-sm text-gray-700 whitespace-pre-wrap">
                    <span className="font-semibold">15K views • 2 hours ago</span>
                    <br />
-                   {displayContent}
+                   {newPostContent.slice(0, 5000)}
                 </div>
              </div>
           </div>
@@ -471,7 +508,7 @@ export const Calendar: React.FC = () => {
                   <div className="text-xs text-gray-500">Just now</div>
                </div>
              </div>
-             <div className="mb-3 text-sm text-gray-800 whitespace-pre-wrap">{displayContent}</div>
+             <div className="mb-3 text-sm text-gray-800 whitespace-pre-wrap">{newPostContent}</div>
              {selectedMedia && <div className="rounded-lg overflow-hidden border border-gray-100">{commonMedia}</div>}
              <div className="flex justify-between mt-3 pt-3 border-t border-gray-100 text-gray-500 text-sm font-semibold">
                 <span>Like</span>
@@ -757,16 +794,54 @@ export const Calendar: React.FC = () => {
                     
                     {/* YouTube Title Field */}
                     {selectedPlatforms.includes(Platform.YouTube) && (
-                       <section className="space-y-3">
-                          <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Video Title</label>
-                          <input 
-                             type="text"
-                             value={newPostTitle}
-                             onChange={(e) => setNewPostTitle(e.target.value)}
-                             placeholder="YouTube video title"
-                             className="w-full bg-gray-50 rounded-xl px-4 py-3 text-sm font-bold text-gray-900"
-                          />
-                       </section>
+                       <div className="space-y-4 bg-red-50 p-4 rounded-xl border border-red-100">
+                           <div className="flex items-center gap-2 text-red-700 font-bold text-xs uppercase tracking-wider mb-1">
+                              <PlatformIcon platform={Platform.YouTube} size={14} /> YouTube Settings
+                           </div>
+                           <div>
+                              <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Video Title</label>
+                              <input 
+                                 type="text"
+                                 value={newPostTitle}
+                                 onChange={(e) => setNewPostTitle(e.target.value)}
+                                 placeholder="YouTube video title"
+                                 className="w-full bg-white rounded-xl px-4 py-3 text-sm font-bold text-gray-900 border border-red-200 focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                              />
+                           </div>
+                           <div>
+                              <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 block">Thumbnail</label>
+                              {youtubeThumbnail ? (
+                                 <div className="relative w-40 aspect-video rounded-lg overflow-hidden group border border-gray-200">
+                                    <img src={youtubeThumbnail.url} className="w-full h-full object-cover" />
+                                    <button onClick={() => setYoutubeThumbnail(null)} className="absolute top-1 right-1 p-1 bg-black/50 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
+                                       <X className="w-3 h-3" />
+                                    </button>
+                                 </div>
+                              ) : (
+                                 <button onClick={() => handleMediaPickerOpen('thumbnail')} className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg text-xs font-bold text-gray-600 hover:bg-gray-50">
+                                    <ImageIcon className="w-4 h-4" /> Select Thumbnail
+                                 </button>
+                              )}
+                           </div>
+                       </div>
+                    )}
+                    
+                    {/* Instagram Carousel Option */}
+                    {selectedPlatforms.includes(Platform.Instagram) && (
+                        <div className="mt-3 flex items-center gap-4">
+                           <div className="text-xs text-orange-600 bg-orange-50 px-3 py-2 rounded-lg inline-flex items-center gap-2 font-medium">
+                              <AlertCircle className="w-3 h-3" /> Best ratio: 1:1 or 4:5
+                           </div>
+                           <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-gray-700 hover:text-black">
+                              <input 
+                                type="checkbox" 
+                                checked={isCarousel} 
+                                onChange={(e) => setIsCarousel(e.target.checked)} 
+                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                              />
+                              Post as Carousel
+                           </label>
+                        </div>
                     )}
 
                     <section className="space-y-3">
@@ -779,13 +854,79 @@ export const Calendar: React.FC = () => {
                           className="w-full bg-gray-50 rounded-2xl p-4 text-gray-900 placeholder:text-gray-400 border-none focus:ring-2 focus:ring-blue-500/20"
                        />
                        
+                       {/* Toolbar */}
+                       <div className="flex justify-between items-center bg-white/80 backdrop-blur-sm p-1 rounded-xl border border-gray-100 shadow-sm mt-2">
+                           <div className="flex gap-1">
+                               <button onClick={() => handleMediaPickerOpen('main')} className="p-2 hover:bg-gray-100 rounded-lg text-gray-500 hover:text-blue-600 transition-colors" title="Add Media">
+                                   <ImageIcon className="w-4 h-4" />
+                               </button>
+                               
+                               {/* Emoji Picker */}
+                               <div className="relative">
+                                   <button onClick={() => { setShowEmojiPicker(!showEmojiPicker); setShowHashtags(false); }} className="p-2 hover:bg-gray-100 rounded-lg text-gray-500 hover:text-yellow-500 transition-colors" title="Add Emoji">
+                                       <Smile className="w-4 h-4" />
+                                   </button>
+                                   {showEmojiPicker && (
+                                       <div className="absolute bottom-full left-0 mb-3 bg-white shadow-xl border border-gray-100 rounded-xl overflow-hidden z-20 w-64 animate-in zoom-in-95 duration-150">
+                                           <div className="flex border-b border-gray-100 bg-gray-50">
+                                              {Object.keys(EMOJI_CATEGORIES).map(cat => (
+                                                 <button 
+                                                   key={cat} 
+                                                   onClick={() => setCurrentEmojiCategory(cat)}
+                                                   className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-wide ${currentEmojiCategory === cat ? 'text-black bg-white border-b-2 border-black' : 'text-gray-400 hover:text-gray-600'}`}
+                                                 >
+                                                    {cat}
+                                                 </button>
+                                              ))}
+                                           </div>
+                                           <div className="p-3 grid grid-cols-6 gap-2 bg-white max-h-40 overflow-y-auto custom-scrollbar">
+                                               {EMOJI_CATEGORIES[currentEmojiCategory as keyof typeof EMOJI_CATEGORIES].map(e => (
+                                                  <button key={e} onClick={() => { handleInsertText(e); setShowEmojiPicker(false); }} className="hover:bg-gray-100 p-1.5 rounded text-xl flex items-center justify-center transition-colors">
+                                                     {e}
+                                                  </button>
+                                               ))}
+                                           </div>
+                                       </div>
+                                   )}
+                               </div>
+                               
+                               {/* Hashtag Generator */}
+                               <div className="relative">
+                                   <button onClick={() => { setShowHashtags(!showHashtags); setShowEmojiPicker(false); }} className="p-2 hover:bg-gray-100 rounded-lg text-gray-500 hover:text-blue-500 transition-colors" title="Smart Hashtags">
+                                       <Hash className="w-4 h-4" />
+                                   </button>
+                                   {showHashtags && (
+                                       <div className="absolute bottom-full left-0 mb-3 bg-white shadow-xl border border-gray-100 rounded-xl overflow-hidden z-20 w-64 animate-in zoom-in-95 duration-150">
+                                           <div className="p-3 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+                                               <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">AI Suggestions</span>
+                                               <button onClick={handleFetchHashtags} className="text-blue-600 hover:bg-blue-100 p-1 rounded transition-colors" title="Refresh">
+                                                  <RefreshCw className={`w-3 h-3 ${isTagsLoading ? 'animate-spin' : ''}`} />
+                                               </button>
+                                           </div>
+                                           <div className="p-2 flex flex-wrap gap-2 max-h-40 overflow-y-auto custom-scrollbar">
+                                               {suggestedHashtags.map(h => 
+                                                   <button 
+                                                      key={h} 
+                                                      onClick={() => handleInsertText(h)} 
+                                                      className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg text-xs font-medium transition-colors border border-blue-100"
+                                                   >
+                                                      {h}
+                                                   </button>
+                                               )}
+                                           </div>
+                                       </div>
+                                   )}
+                               </div>
+                           </div>
+                       </div>
+                       
                        {selectedMedia ? (
-                          <div className="relative rounded-2xl overflow-hidden group shadow-sm bg-gray-100 h-48">
+                          <div className="relative rounded-2xl overflow-hidden group shadow-sm bg-gray-100 h-48 mt-2">
                               {selectedMedia.type === 'image' ? <img src={selectedMedia.url} className="w-full h-full object-cover" /> : <video src={selectedMedia.url} className="w-full h-full object-cover" controls />}
                               <button onClick={() => setSelectedMedia(null)} className="absolute top-2 right-2 p-1.5 bg-black/40 text-white rounded-full"><X className="w-4 h-4" /></button>
                           </div>
                        ) : (
-                          <button onClick={() => setIsMediaPickerOpen(true)} className="w-full h-16 rounded-2xl border border-dashed border-gray-300 flex items-center justify-center gap-2 text-gray-400 hover:text-blue-500 hover:bg-blue-50 transition-all font-medium text-sm">
+                          <button onClick={() => handleMediaPickerOpen('main')} className="w-full h-16 rounded-2xl border border-dashed border-gray-300 flex items-center justify-center gap-2 text-gray-400 hover:text-blue-500 hover:bg-blue-50 transition-all font-medium text-sm mt-2">
                              <ImageIcon className="w-5 h-5" /> Add Photo or Video
                           </button>
                        )}
@@ -832,7 +973,7 @@ export const Calendar: React.FC = () => {
         </div>
       )}
       
-      <MediaPicker isOpen={isMediaPickerOpen} onClose={() => setIsMediaPickerOpen(false)} onSelect={setSelectedMedia} />
+      <MediaPicker isOpen={isMediaPickerOpen} onClose={() => setIsMediaPickerOpen(false)} onSelect={handleMediaSelect} />
     </div>
   );
 };

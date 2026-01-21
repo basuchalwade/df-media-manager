@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Sparkles, Send, Calendar as CalendarIcon, RotateCcw, Image as ImageIcon, ChevronDown, CheckCircle, Briefcase, Smile, Rocket, GraduationCap, X, FileVideo, Clock, Save, AlertCircle, Check, Zap, Eye, Copy, Hash, MoreHorizontal, ThumbsUp, MessageSquare, Share2, Repeat, Bookmark, Globe, Heart } from 'lucide-react';
-import { generatePostContent } from '../services/geminiService';
+import { Sparkles, Send, Calendar as CalendarIcon, RotateCcw, Image as ImageIcon, ChevronDown, CheckCircle, Briefcase, Smile, Rocket, GraduationCap, X, FileVideo, Clock, Save, AlertCircle, Check, Zap, Eye, Copy, Hash, MoreHorizontal, ThumbsUp, MessageSquare, Share2, Repeat, Bookmark, Globe, Heart, Layers, UploadCloud, RefreshCw } from 'lucide-react';
+import { generatePostContent, generateHashtags } from '../services/geminiService';
 import { store } from '../services/mockStore';
 import { Platform, PostStatus, MediaItem, Post } from '../types';
 import { PlatformIcon } from '../components/PlatformIcon';
@@ -20,8 +20,12 @@ const PLATFORM_LIMITS: Record<Platform, number> = {
 
 const TONES = ['Professional', 'Funny', 'Viral', 'Educational', 'Empathetic', 'Controversial'];
 
-const HASHTAG_SUGGESTIONS = ['#TechTrends', '#Innovation', '#FutureOfWork', '#AI', '#Growth', '#StartupLife'];
-const EMOJI_LIST = ['🚀', '💡', '🔥', '✨', '🤖', '📈', '💪', '🎯'];
+const EMOJI_CATEGORIES = {
+  'Popular': ['🚀', '🔥', '✨', '💡', '📈', '💪', '🎯', '🤖', '👀', '✅', '⚠️', '🎉'],
+  'Faces': ['😀', '😂', '😎', '🤔', '🤯', '😍', '🥳', '🥶', '🤡', '🤠', '🤐', '🫠'],
+  'Objects': ['📱', '💻', '📷', '🎥', '🎙️', '⌚', '🔋', '🔌', '🧰', '🔭', '📡', '💾'],
+  'Symbols': ['🔴', '🟢', '🔵', '💯', '💢', '💫', '💥', '💦', '💤', '💭', '📣', '🔔']
+};
 
 export const CreatorStudio: React.FC = () => {
   // --- AI State ---
@@ -32,13 +36,18 @@ export const CreatorStudio: React.FC = () => {
 
   // --- Composer State ---
   const [content, setContent] = useState('');
-  const [youtubeTitle, setYoutubeTitle] = useState(''); // Specific for YouTube
+  const [youtubeTitle, setYoutubeTitle] = useState(''); 
+  const [youtubeThumbnail, setYoutubeThumbnail] = useState<MediaItem | null>(null);
+  const [isCarousel, setIsCarousel] = useState(false);
   const [selectedPlatforms, setSelectedPlatforms] = useState<Platform[]>([Platform.Twitter]);
   const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(null);
   
   // --- Tools State ---
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showHashtags, setShowHashtags] = useState(false);
+  const [currentEmojiCategory, setCurrentEmojiCategory] = useState('Popular');
+  const [suggestedHashtags, setSuggestedHashtags] = useState<string[]>([]);
+  const [isTagsLoading, setIsTagsLoading] = useState(false);
   
   // --- Scheduling State ---
   const [scheduleMode, setScheduleMode] = useState<'now' | 'later'>('now');
@@ -54,6 +63,7 @@ export const CreatorStudio: React.FC = () => {
   // --- UI State ---
   const [previewPlatform, setPreviewPlatform] = useState<Platform>(Platform.Twitter);
   const [isMediaPickerOpen, setIsMediaPickerOpen] = useState(false);
+  const [mediaPickerMode, setMediaPickerMode] = useState<'main' | 'thumbnail'>('main');
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -70,17 +80,44 @@ export const CreatorStudio: React.FC = () => {
     selectedPlatforms.forEach(p => {
       const limit = PLATFORM_LIMITS[p];
       if (content.length > limit) {
-        errors.push(`${p} limit exceeded (${content.length}/${limit})`);
+        errors.push(`${p}: Text limit exceeded (${content.length}/${limit})`);
       }
-      if (p === Platform.YouTube && !youtubeTitle) {
-        errors.push("YouTube requires a video title.");
+      
+      // YouTube Rules
+      if (p === Platform.YouTube) {
+        if (!youtubeTitle) errors.push("YouTube: Video title is required.");
+        if (!selectedMedia) errors.push("YouTube: Video file is required.");
+        if (selectedMedia && selectedMedia.type !== 'video') errors.push("YouTube: Selected media must be a video.");
+        if (!youtubeThumbnail) errors.push("YouTube: Thumbnail image is recommended.");
       }
-      if (p === Platform.Instagram && selectedMedia && selectedMedia.type !== 'image' && selectedMedia.type !== 'video') {
-         // Mock aspect ratio check
+
+      // Instagram Rules
+      if (p === Platform.Instagram) {
+         if (selectedMedia && selectedMedia.type === 'image') {
+            // Mock aspect ratio check - typically we'd check item.dimensions
+            if (isCarousel) {
+               // OK
+            } else {
+               // Just a warning in this mock
+            }
+         }
+         if (!selectedMedia && !content) errors.push("Instagram: Must include media or text.");
+      }
+
+      // Twitter Rules
+      if (p === Platform.Twitter) {
+         if (selectedMedia && selectedMedia.size > 5 * 1024 * 1024) { // 5MB limit
+            errors.push("Twitter: Image exceeds 5MB limit.");
+         }
       }
     });
     setValidationErrors(errors);
-  }, [content, selectedPlatforms, youtubeTitle, selectedMedia]);
+  }, [content, selectedPlatforms, youtubeTitle, selectedMedia, youtubeThumbnail, isCarousel]);
+
+  // Initial Hashtags
+  useEffect(() => {
+    setSuggestedHashtags(['#Trend', '#New', '#Update', '#Growth', '#Tech']);
+  }, []);
 
   // --- Handlers ---
 
@@ -95,10 +132,32 @@ export const CreatorStudio: React.FC = () => {
     setIsGenerating(false);
   };
 
+  const handleFetchHashtags = async () => {
+    setIsTagsLoading(true);
+    const tags = await generateHashtags(topic || "Technology", content);
+    setSuggestedHashtags(tags);
+    setIsTagsLoading(false);
+  };
+
   const handleInsertText = (text: string) => {
     setContent(prev => prev + (prev.length > 0 ? ' ' : '') + text);
-    setShowEmojiPicker(false);
-    setShowHashtags(false);
+  };
+
+  const handleMediaPickerOpen = (mode: 'main' | 'thumbnail') => {
+    setMediaPickerMode(mode);
+    setIsMediaPickerOpen(true);
+  };
+
+  const handleMediaSelect = (item: MediaItem) => {
+    if (mediaPickerMode === 'main') {
+      setSelectedMedia(item);
+    } else {
+      if (item.type !== 'image') {
+        alert("Thumbnails must be images.");
+        return;
+      }
+      setYoutubeThumbnail(item);
+    }
   };
 
   const constructPostObject = (status: PostStatus): Post => {
@@ -114,6 +173,9 @@ export const CreatorStudio: React.FC = () => {
     return {
       id: Date.now().toString(),
       title: youtubeTitle,
+      description: content, // Reuse content as description
+      thumbnailUrl: youtubeThumbnail?.url,
+      isCarousel,
       content: content,
       platforms: selectedPlatforms,
       scheduledFor: finalDate.toISOString(),
@@ -146,13 +208,14 @@ export const CreatorStudio: React.FC = () => {
   };
 
   const handleDuplicate = () => {
-    // Logic just to keep content but maybe change platform
     alert("Draft duplicated! You can now edit this version.");
   };
 
   const resetForm = () => {
     setContent('');
     setYoutubeTitle('');
+    setYoutubeThumbnail(null);
+    setIsCarousel(false);
     setTopic('');
     setSelectedMedia(null);
     setIsAiGenerated(false);
@@ -237,11 +300,16 @@ export const CreatorStudio: React.FC = () => {
                <MoreHorizontal className="w-5 h-5 text-gray-600" />
             </div>
             
-            <div className="aspect-square bg-gray-100">
+            <div className="aspect-square bg-gray-100 relative">
                {selectedMedia ? (
                  selectedMedia.type === 'image' ? <img src={selectedMedia.url} className="w-full h-full object-cover" /> : <video src={selectedMedia.url} className="w-full h-full object-cover" />
                ) : (
                  <div className="w-full h-full flex items-center justify-center text-gray-300 bg-gray-50">No Media</div>
+               )}
+               {isCarousel && (
+                  <div className="absolute top-2 right-2 bg-black/60 rounded-full p-1.5">
+                     <Layers className="w-4 h-4 text-white" />
+                  </div>
                )}
             </div>
 
@@ -291,11 +359,18 @@ export const CreatorStudio: React.FC = () => {
       case Platform.YouTube:
         return (
           <div className="bg-white h-full flex flex-col">
-             <div className="aspect-video bg-black w-full flex items-center justify-center">
+             <div className="aspect-video bg-black w-full flex items-center justify-center relative">
                 {selectedMedia ? (
                    selectedMedia.type === 'image' ? <img src={selectedMedia.url} className="w-full h-full object-cover opacity-80" /> : <video src={selectedMedia.url} className="w-full h-full object-cover" />
                 ) : (
                    <div className="text-gray-500">Video Player</div>
+                )}
+                
+                {/* Thumbnail Preview Overlay */}
+                {youtubeThumbnail && (
+                   <div className="absolute bottom-2 right-2 w-24 aspect-video bg-black border border-white rounded shadow-lg overflow-hidden z-20">
+                      <img src={youtubeThumbnail.url} className="w-full h-full object-cover" alt="Thumb" />
+                   </div>
                 )}
              </div>
              <div className="p-4">
@@ -320,7 +395,6 @@ export const CreatorStudio: React.FC = () => {
         );
 
       default:
-         // Generic Facebook/Thread style
          return (
           <div className="bg-white p-4">
              <div className="flex gap-3 mb-3">
@@ -372,15 +446,13 @@ export const CreatorStudio: React.FC = () => {
         {/* LEFT COLUMN: Editor & Configuration */}
         <div className="flex-1 flex flex-col gap-6 min-w-0">
            
-           {/* AI Assistant Card */}
+           {/* AI Assistant */}
            <div className="bg-white rounded-[32px] p-6 shadow-sm border border-black/5 relative overflow-hidden">
               <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-100 rounded-full blur-3xl opacity-50 -mr-10 -mt-10 pointer-events-none"></div>
-              
               <div className="flex items-center gap-2 mb-4">
                  <Sparkles className="w-5 h-5 text-yellow-500 fill-current" />
                  <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wide">AI Assistant</h2>
               </div>
-              
               <div className="flex flex-col gap-4">
                  <div className="flex gap-4">
                     <div className="flex-1">
@@ -443,23 +515,54 @@ export const CreatorStudio: React.FC = () => {
                     })}
                  </div>
                  {selectedPlatforms.includes(Platform.Instagram) && (
-                    <div className="mt-2 text-xs text-orange-600 bg-orange-50 px-3 py-2 rounded-lg inline-flex items-center gap-2 font-medium">
-                       <AlertCircle className="w-3 h-3" /> Instagram Warning: Ensure media is 1:1 or 4:5 aspect ratio.
+                    <div className="mt-3 flex items-center gap-4">
+                       <div className="text-xs text-orange-600 bg-orange-50 px-3 py-2 rounded-lg inline-flex items-center gap-2 font-medium">
+                          <AlertCircle className="w-3 h-3" /> Best ratio: 1:1 or 4:5
+                       </div>
+                       <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-gray-700 hover:text-black">
+                          <input 
+                            type="checkbox" 
+                            checked={isCarousel} 
+                            onChange={(e) => setIsCarousel(e.target.checked)} 
+                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          />
+                          Post as Carousel
+                       </label>
                     </div>
                  )}
               </div>
               
-              {/* Conditional YouTube Title */}
+              {/* Conditional YouTube Fields */}
               {selectedPlatforms.includes(Platform.YouTube) && (
-                 <div className="animate-in slide-in-from-top-2">
-                    <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 block">Video Title <span className="text-red-500">*</span></label>
-                    <input 
-                      type="text" 
-                      value={youtubeTitle}
-                      onChange={(e) => setYoutubeTitle(e.target.value)}
-                      placeholder="Enter an engaging title for your video..."
-                      className="w-full bg-gray-50 border-transparent focus:border-red-500 focus:bg-white rounded-xl px-4 py-3 text-sm font-bold text-gray-900 transition-colors"
-                    />
+                 <div className="bg-red-50 p-4 rounded-xl border border-red-100 space-y-4 animate-in slide-in-from-top-2">
+                    <div className="flex items-center gap-2 text-red-700 font-bold text-xs uppercase tracking-wider mb-1">
+                       <PlatformIcon platform={Platform.YouTube} size={14} /> YouTube Settings
+                    </div>
+                    <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-2 block">Video Title <span className="text-red-500">*</span></label>
+                        <input 
+                          type="text" 
+                          value={youtubeTitle}
+                          onChange={(e) => setYoutubeTitle(e.target.value)}
+                          placeholder="Enter an engaging title..."
+                          className="w-full bg-white border border-red-200 focus:border-red-500 focus:ring-1 focus:ring-red-500 rounded-xl px-4 py-2 text-sm font-bold text-gray-900 transition-colors"
+                        />
+                    </div>
+                    <div>
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-2 block">Thumbnail</label>
+                        {youtubeThumbnail ? (
+                           <div className="relative w-40 aspect-video rounded-lg overflow-hidden group border border-gray-200">
+                              <img src={youtubeThumbnail.url} className="w-full h-full object-cover" />
+                              <button onClick={() => setYoutubeThumbnail(null)} className="absolute top-1 right-1 p-1 bg-black/50 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
+                                 <X className="w-3 h-3" />
+                              </button>
+                           </div>
+                        ) : (
+                           <button onClick={() => handleMediaPickerOpen('thumbnail')} className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg text-xs font-bold text-gray-600 hover:bg-gray-50">
+                              <ImageIcon className="w-4 h-4" /> Select Thumbnail
+                           </button>
+                        )}
+                    </div>
                  </div>
               )}
 
@@ -501,36 +604,74 @@ export const CreatorStudio: React.FC = () => {
                     />
                     
                     {/* Toolbar */}
-                    <div className="absolute bottom-3 left-3 right-3 flex justify-between items-center">
+                    <div className="absolute bottom-3 left-3 right-3 flex justify-between items-center bg-white/80 backdrop-blur-sm p-1 rounded-xl border border-gray-100 shadow-sm">
                         <div className="flex gap-1">
-                            <button onClick={() => setIsMediaPickerOpen(true)} className="p-2 hover:bg-white rounded-lg text-gray-500 hover:text-blue-600 transition-colors" title="Add Media">
+                            <button onClick={() => handleMediaPickerOpen('main')} className="p-2 hover:bg-gray-100 rounded-lg text-gray-500 hover:text-blue-600 transition-colors" title="Add Media">
                                 <ImageIcon className="w-4 h-4" />
                             </button>
+                            
+                            {/* Emoji Picker */}
                             <div className="relative">
-                                <button onClick={() => setShowEmojiPicker(!showEmojiPicker)} className="p-2 hover:bg-white rounded-lg text-gray-500 hover:text-yellow-500 transition-colors" title="Add Emoji">
+                                <button onClick={() => { setShowEmojiPicker(!showEmojiPicker); setShowHashtags(false); }} className="p-2 hover:bg-gray-100 rounded-lg text-gray-500 hover:text-yellow-500 transition-colors" title="Add Emoji">
                                     <Smile className="w-4 h-4" />
                                 </button>
                                 {showEmojiPicker && (
-                                    <div className="absolute bottom-full left-0 mb-2 bg-white shadow-xl border border-gray-100 rounded-xl p-2 grid grid-cols-4 gap-1 z-20 w-48">
-                                        {EMOJI_LIST.map(e => <button key={e} onClick={() => handleInsertText(e)} className="hover:bg-gray-100 p-2 rounded text-xl">{e}</button>)}
+                                    <div className="absolute bottom-full left-0 mb-3 bg-white shadow-xl border border-gray-100 rounded-xl overflow-hidden z-20 w-64 animate-in zoom-in-95 duration-150">
+                                        <div className="flex border-b border-gray-100 bg-gray-50">
+                                           {Object.keys(EMOJI_CATEGORIES).map(cat => (
+                                              <button 
+                                                key={cat} 
+                                                onClick={() => setCurrentEmojiCategory(cat)}
+                                                className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-wide ${currentEmojiCategory === cat ? 'text-black bg-white border-b-2 border-black' : 'text-gray-400 hover:text-gray-600'}`}
+                                              >
+                                                 {cat}
+                                              </button>
+                                           ))}
+                                        </div>
+                                        <div className="p-3 grid grid-cols-6 gap-2 bg-white max-h-40 overflow-y-auto custom-scrollbar">
+                                            {EMOJI_CATEGORIES[currentEmojiCategory as keyof typeof EMOJI_CATEGORIES].map(e => (
+                                               <button key={e} onClick={() => { handleInsertText(e); setShowEmojiPicker(false); }} className="hover:bg-gray-100 p-1.5 rounded text-xl flex items-center justify-center transition-colors">
+                                                  {e}
+                                               </button>
+                                            ))}
+                                        </div>
                                     </div>
                                 )}
                             </div>
+                            
+                            {/* Hashtag Generator */}
                             <div className="relative">
-                                <button onClick={() => setShowHashtags(!showHashtags)} className="p-2 hover:bg-white rounded-lg text-gray-500 hover:text-blue-500 transition-colors" title="Add Hashtags">
+                                <button onClick={() => { setShowHashtags(!showHashtags); setShowEmojiPicker(false); }} className="p-2 hover:bg-gray-100 rounded-lg text-gray-500 hover:text-blue-500 transition-colors" title="Smart Hashtags">
                                     <Hash className="w-4 h-4" />
                                 </button>
                                 {showHashtags && (
-                                    <div className="absolute bottom-full left-0 mb-2 bg-white shadow-xl border border-gray-100 rounded-xl p-2 flex flex-col gap-1 z-20 w-40">
-                                        {HASHTAG_SUGGESTIONS.map(h => 
-                                            <button key={h} onClick={() => handleInsertText(h)} className="text-left px-3 py-1.5 hover:bg-blue-50 text-xs font-bold text-blue-600 rounded-lg">{h}</button>
-                                        )}
+                                    <div className="absolute bottom-full left-0 mb-3 bg-white shadow-xl border border-gray-100 rounded-xl overflow-hidden z-20 w-64 animate-in zoom-in-95 duration-150">
+                                        <div className="p-3 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+                                            <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">AI Suggestions</span>
+                                            <button onClick={handleFetchHashtags} className="text-blue-600 hover:bg-blue-100 p-1 rounded transition-colors" title="Refresh">
+                                               <RefreshCw className={`w-3 h-3 ${isTagsLoading ? 'animate-spin' : ''}`} />
+                                            </button>
+                                        </div>
+                                        <div className="p-2 flex flex-wrap gap-2 max-h-40 overflow-y-auto custom-scrollbar">
+                                            {suggestedHashtags.map(h => 
+                                                <button 
+                                                   key={h} 
+                                                   onClick={() => handleInsertText(h)} 
+                                                   className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg text-xs font-medium transition-colors border border-blue-100"
+                                                >
+                                                   {h}
+                                                </button>
+                                            )}
+                                            {suggestedHashtags.length === 0 && !isTagsLoading && (
+                                               <div className="w-full text-center py-4 text-xs text-gray-400">Click refresh to generate tags for "{topic || 'your post'}".</div>
+                                            )}
+                                        </div>
                                     </div>
                                 )}
                             </div>
                         </div>
-                        <button className="p-2 bg-white rounded-lg shadow-sm text-gray-500 hover:text-purple-600 border border-gray-200 transition-colors" title="AI Rewrite">
-                           <Zap className="w-4 h-4" />
+                        <button className="p-2 bg-purple-50 rounded-lg shadow-sm text-purple-600 hover:bg-purple-100 border border-purple-100 transition-colors text-xs font-bold flex items-center gap-1.5 px-3" title="AI Rewrite">
+                           <Zap className="w-3 h-3" /> Auto-Fix
                         </button>
                     </div>
                  </div>
@@ -732,7 +873,7 @@ export const CreatorStudio: React.FC = () => {
         </div>
       </div>
       
-      <MediaPicker isOpen={isMediaPickerOpen} onClose={() => setIsMediaPickerOpen(false)} onSelect={setSelectedMedia} />
+      <MediaPicker isOpen={isMediaPickerOpen} onClose={() => setIsMediaPickerOpen(false)} onSelect={handleMediaSelect} />
     </div>
   );
 };

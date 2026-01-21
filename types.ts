@@ -26,6 +26,9 @@ export enum PostStatus {
 export interface Post {
   id: string;
   title?: string; // Added for YouTube/Long-form
+  description?: string; // Explicit description field for YouTube/Long-form
+  thumbnailUrl?: string; // Added for YouTube thumbnail
+  isCarousel?: boolean; // Added for Instagram Carousel
   content: string;
   platforms: Platform[];
   scheduledFor: string; // ISO date string

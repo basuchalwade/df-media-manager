@@ -70,3 +70,37 @@ export const refinePostContent = async (
     return currentContent;
   }
 };
+
+export const generateHashtags = async (
+  topic: string,
+  content: string
+): Promise<string[]> => {
+  if (!API_KEY) {
+    const base = topic.replace(/\s+/g, '') || 'Trending';
+    return [`#${base}`, `#${base}News`, `#Viral`, `#Innovation`, `#Growth`, `#Future`];
+  }
+
+  try {
+    const prompt = `
+      Topic: "${topic}"
+      Content: "${content}"
+      
+      Task: Generate 10 viral, relevant, and high-traffic hashtags for this social media post.
+      Return strictly a JSON array of strings. Example: ["#Tech", "#AI"]
+      Do not include markdown formatting or explanations.
+    `;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: prompt,
+    });
+
+    const text = response.text || "[]";
+    // Simple cleanup to ensure we get an array
+    const cleaned = text.replace(/```json|```/g, '').trim();
+    return JSON.parse(cleaned);
+  } catch (error) {
+    console.error("Gemini Hashtag Error:", error);
+    return ['#Error', '#TryAgain'];
+  }
+};
