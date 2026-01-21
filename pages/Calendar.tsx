@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon, X, Clock, CheckCircle, ChevronDown } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon, X, Clock, CheckCircle, ChevronDown, Image as ImageIcon, Trash2 } from 'lucide-react';
 import { store } from '../services/mockStore';
-import { Post, Platform, PostStatus } from '../types';
+import { Post, Platform, PostStatus, MediaItem } from '../types';
 import { PlatformIcon } from '../components/PlatformIcon';
+import { MediaPicker } from '../components/MediaPicker';
 
 export const Calendar: React.FC = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -15,6 +16,10 @@ export const Calendar: React.FC = () => {
   const [newPostContent, setNewPostContent] = useState('');
   const [newPostTime, setNewPostTime] = useState('09:00');
   const [selectedPlatform, setSelectedPlatform] = useState<Platform>(Platform.Twitter);
+  
+  // Media State
+  const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(null);
+  const [isMediaPickerOpen, setIsMediaPickerOpen] = useState(false);
 
   useEffect(() => {
     loadPosts();
@@ -43,6 +48,7 @@ export const Calendar: React.FC = () => {
     setSelectedDate(clickedDate);
     setIsModalOpen(true);
     setNewPostContent('');
+    setSelectedMedia(null);
     setIsDropdownOpen(false);
   };
 
@@ -61,6 +67,7 @@ export const Calendar: React.FC = () => {
       scheduledFor: scheduledDateTime.toISOString(),
       status: PostStatus.Scheduled,
       generatedByAi: false,
+      mediaUrl: selectedMedia?.url,
     };
 
     await store.addPost(newPost);
@@ -273,6 +280,41 @@ export const Calendar: React.FC = () => {
                 ></textarea>
               </div>
 
+              {/* Attach Media Section */}
+              <div>
+                 <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Attachment</label>
+                 {selectedMedia ? (
+                   <div className="relative rounded-lg overflow-hidden border border-slate-200 bg-slate-50 group">
+                      {selectedMedia.type === 'image' ? (
+                        <img src={selectedMedia.url} alt="Attachment" className="w-full h-32 object-cover" />
+                      ) : (
+                        <div className="w-full h-32 flex items-center justify-center bg-slate-100 text-slate-400">
+                           <span className="text-xs font-mono uppercase">Video Attached</span>
+                        </div>
+                      )}
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                         <button 
+                            onClick={() => setSelectedMedia(null)}
+                            className="bg-red-600 text-white px-3 py-1.5 rounded-full text-xs font-medium flex items-center gap-1 hover:bg-red-700"
+                         >
+                            <Trash2 className="w-3 h-3" /> Remove
+                         </button>
+                      </div>
+                      <div className="absolute bottom-0 left-0 right-0 bg-black/50 p-1 px-2 text-[10px] text-white truncate">
+                        {selectedMedia.name}
+                      </div>
+                   </div>
+                 ) : (
+                   <button 
+                     onClick={() => setIsMediaPickerOpen(true)}
+                     className="w-full h-12 border-2 border-dashed border-slate-300 rounded-lg flex items-center justify-center gap-2 text-slate-500 hover:text-blue-600 hover:border-blue-400 hover:bg-blue-50 transition-colors"
+                   >
+                     <ImageIcon className="w-4 h-4" />
+                     <span className="text-sm font-medium">Attach Image or Video</span>
+                   </button>
+                 )}
+              </div>
+
               <button 
                 onClick={handleQuickSchedule}
                 disabled={!newPostContent}
@@ -285,6 +327,13 @@ export const Calendar: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Media Picker Modal */}
+      <MediaPicker 
+        isOpen={isMediaPickerOpen}
+        onClose={() => setIsMediaPickerOpen(false)}
+        onSelect={(media) => setSelectedMedia(media)}
+      />
     </div>
   );
 };

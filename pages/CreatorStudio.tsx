@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { Sparkles, Send, Calendar as CalendarIcon, RotateCcw, Image as ImageIcon, ChevronDown, CheckCircle, Briefcase, Smile, Rocket, GraduationCap } from 'lucide-react';
+import { Sparkles, Send, Calendar as CalendarIcon, RotateCcw, Image as ImageIcon, ChevronDown, CheckCircle, Briefcase, Smile, Rocket, GraduationCap, X, FileVideo } from 'lucide-react';
 import { generatePostContent } from '../services/geminiService';
 import { store } from '../services/mockStore';
-import { Platform, PostStatus } from '../types';
+import { Platform, PostStatus, MediaItem } from '../types';
 import { PlatformIcon } from '../components/PlatformIcon';
+import { MediaPicker } from '../components/MediaPicker';
 
 export const CreatorStudio: React.FC = () => {
   const [topic, setTopic] = useState('');
@@ -12,6 +13,10 @@ export const CreatorStudio: React.FC = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [tone, setTone] = useState('Professional');
   const [selectedPlatforms, setSelectedPlatforms] = useState<Platform[]>([Platform.Twitter]);
+  
+  // Media State
+  const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(null);
+  const [isMediaPickerOpen, setIsMediaPickerOpen] = useState(false);
   
   // Dropdown States
   const [isPlatformDropdownOpen, setIsPlatformDropdownOpen] = useState(false);
@@ -42,10 +47,12 @@ export const CreatorStudio: React.FC = () => {
       scheduledFor: new Date().toISOString(),
       status: PostStatus.Published,
       generatedByAi: true,
+      mediaUrl: selectedMedia?.url,
       engagement: { likes: 0, shares: 0, comments: 0 }
     });
     setTopic('');
     setGeneratedContent('');
+    setSelectedMedia(null);
     alert('Post published successfully to selected channels!');
   };
 
@@ -208,8 +215,8 @@ export const CreatorStudio: React.FC = () => {
                 <p>AI generated content will appear here</p>
               </div>
             ) : (
-              <div className="animate-fade-in">
-                 <div className="flex items-center gap-3 mb-4">
+              <div className="animate-fade-in h-full flex flex-col">
+                 <div className="flex items-center gap-3 mb-4 shrink-0">
                     <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center border border-slate-200">
                       <PlatformIcon platform={platform} size={20} />
                     </div>
@@ -218,12 +225,38 @@ export const CreatorStudio: React.FC = () => {
                       <div className="h-3 w-20 bg-slate-100 rounded"></div>
                     </div>
                  </div>
-                 <p className="text-slate-800 whitespace-pre-wrap leading-relaxed">{generatedContent}</p>
-                 <div className="mt-4 h-48 bg-slate-100 rounded-lg flex items-center justify-center border-2 border-dashed border-slate-300 cursor-pointer hover:bg-slate-50 transition-colors">
-                    <div className="text-center text-slate-400">
-                      <ImageIcon className="w-8 h-8 mx-auto mb-2" />
-                      <span className="text-sm">Click to add media</span>
-                    </div>
+                 
+                 <div className="flex-1 overflow-y-auto custom-scrollbar">
+                   <p className="text-slate-800 whitespace-pre-wrap leading-relaxed mb-4">{generatedContent}</p>
+                   
+                   {/* Media Preview / Selection */}
+                   {selectedMedia ? (
+                     <div className="relative rounded-lg overflow-hidden border border-slate-200 bg-slate-50 group">
+                        {selectedMedia.type === 'image' ? (
+                          <img src={selectedMedia.url} alt="Post Attachment" className="w-full h-auto max-h-64 object-cover" />
+                        ) : (
+                          <div className="w-full h-48 flex items-center justify-center bg-slate-100">
+                             <FileVideo className="w-12 h-12 text-slate-400" />
+                          </div>
+                        )}
+                        <button 
+                          onClick={() => setSelectedMedia(null)}
+                          className="absolute top-2 right-2 p-1.5 bg-black/50 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                     </div>
+                   ) : (
+                     <div 
+                        onClick={() => setIsMediaPickerOpen(true)}
+                        className="mt-4 h-48 bg-slate-100 rounded-lg flex items-center justify-center border-2 border-dashed border-slate-300 cursor-pointer hover:bg-slate-50 transition-colors"
+                     >
+                        <div className="text-center text-slate-400">
+                          <ImageIcon className="w-8 h-8 mx-auto mb-2" />
+                          <span className="text-sm">Click to add media</span>
+                        </div>
+                     </div>
+                   )}
                  </div>
               </div>
             )}
@@ -267,6 +300,13 @@ export const CreatorStudio: React.FC = () => {
           </div>
         </div>
       </div>
+      
+      {/* Media Picker Modal */}
+      <MediaPicker 
+        isOpen={isMediaPickerOpen}
+        onClose={() => setIsMediaPickerOpen(false)}
+        onSelect={(media) => setSelectedMedia(media)}
+      />
     </div>
   );
 };
