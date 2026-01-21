@@ -1,3 +1,4 @@
+
 import { BotConfig, BotType, DashboardStats, Platform, Post, PostStatus, UserSettings, PlatformAnalytics, AnalyticsDataPoint, User, UserRole, UserStatus, MediaItem } from '../types';
 
 // Initial Mock Data
@@ -36,31 +37,43 @@ const INITIAL_POSTS: Post[] = [
 const INITIAL_BOTS: BotConfig[] = [
   { 
     type: BotType.Creator, 
-    enabled: false, 
+    enabled: true, 
     intervalMinutes: 60, 
-    status: 'Idle', 
-    logs: [],
+    status: 'Running', 
+    logs: ['Drafted post for LinkedIn', 'Checked content calendar'],
+    stats: {
+      currentDailyActions: 12,
+      maxDailyActions: 50,
+      consecutiveErrors: 0
+    },
     config: {
       contentTopics: ['SaaS', 'AI', 'Marketing'],
       targetPlatforms: [Platform.Twitter, Platform.LinkedIn],
       generationMode: 'AI',
       workHoursStart: '09:00',
-      workHoursEnd: '17:00'
+      workHoursEnd: '17:00',
+      safetyLevel: 'Moderate'
     }
   },
   { 
     type: BotType.Engagement, 
     enabled: true, 
     intervalMinutes: 15, 
-    status: 'Running', 
-    logs: ['Replied to @user123', 'Liked post #455'],
+    status: 'LimitReached', 
+    logs: ['Daily limit reached (150/150). Paused until 00:00 UTC.', 'Liked post #882', 'Replied to @user123'],
+    stats: {
+      currentDailyActions: 150,
+      maxDailyActions: 150,
+      consecutiveErrors: 0
+    },
     config: {
       replyToMentions: true,
       replyToComments: true,
       watchHashtags: ['#TechNews', '#StartupLife'],
       enableAutoLike: true,
-      maxDailyInteractions: 50,
-      mutedKeywords: ['NSFW', 'Spam', 'Crypto']
+      maxDailyInteractions: 150,
+      mutedKeywords: ['NSFW', 'Spam', 'Crypto'],
+      safetyLevel: 'Aggressive'
     }
   },
   { 
@@ -69,23 +82,37 @@ const INITIAL_BOTS: BotConfig[] = [
     intervalMinutes: 240, 
     status: 'Idle', 
     logs: [],
+    stats: {
+      currentDailyActions: 0,
+      maxDailyActions: 100,
+      consecutiveErrors: 0
+    },
     config: {
       trackKeywords: ['Artificial Intelligence', 'Machine Learning'],
       trackAccounts: ['@TechCrunch', '@Verge'],
-      autoSaveToDrafts: true
+      autoSaveToDrafts: true,
+      safetyLevel: 'Conservative'
     }
   },
   { 
     type: BotType.Growth, 
-    enabled: false, 
+    enabled: true, 
     intervalMinutes: 30, 
-    status: 'Idle', 
-    logs: [],
+    status: 'Cooldown', 
+    logs: ['API Rate Limit (429) detected.', 'Cooling down for 45 minutes.', 'Followed @dev_jane'],
+    stats: {
+      currentDailyActions: 45,
+      maxDailyActions: 200,
+      consecutiveErrors: 2,
+      cooldownEndsAt: new Date(Date.now() + 45 * 60000).toISOString()
+    },
     config: {
       growthTags: ['#FollowFriday', '#TechCommunity'],
       interactWithCompetitors: true,
       unfollowAfterDays: 7,
-      hourlyActionLimit: 10
+      hourlyActionLimit: 10,
+      stopOnConsecutiveErrors: 5,
+      minDelaySeconds: 60
     }
   },
 ];

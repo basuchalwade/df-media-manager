@@ -69,16 +69,32 @@ export interface BotSpecificConfig {
   interactWithCompetitors?: boolean;
   unfollowAfterDays?: number;
   hourlyActionLimit?: number;
+
+  // Shared Safety Config
+  safetyLevel?: 'Conservative' | 'Moderate' | 'Aggressive';
+  minDelaySeconds?: number;
+  maxDelaySeconds?: number;
+  stopOnConsecutiveErrors?: number;
 }
+
+export type BotStatus = 'Idle' | 'Running' | 'Cooldown' | 'LimitReached' | 'Error';
 
 export interface BotConfig {
   type: BotType;
   enabled: boolean;
   intervalMinutes: number;
   lastRun?: string;
-  status: 'Idle' | 'Running' | 'Cooldown';
+  status: BotStatus;
   logs: string[];
   config: BotSpecificConfig;
+  
+  // Safety & Usage Stats
+  stats: {
+    currentDailyActions: number;
+    maxDailyActions: number;
+    consecutiveErrors: number;
+    cooldownEndsAt?: string; // ISO String if in cooldown
+  };
 }
 
 export interface DashboardStats {
@@ -91,7 +107,6 @@ export interface DashboardStats {
 export interface UserSettings {
   demoMode: boolean;
   geminiApiKey: string;
-  // Platforms moved to User object for specific integrations
 }
 
 export interface AnalyticsDataPoint {
