@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Sparkles, Send, Calendar as CalendarIcon, RotateCcw, Image as ImageIcon, X } from 'lucide-react';
+import { Sparkles, Send, Calendar as CalendarIcon, RotateCcw, Image as ImageIcon, ChevronDown, CheckCircle, Briefcase, Smile, Rocket, GraduationCap } from 'lucide-react';
 import { generatePostContent } from '../services/geminiService';
 import { store } from '../services/mockStore';
 import { Platform, PostStatus } from '../types';
@@ -12,6 +12,10 @@ export const CreatorStudio: React.FC = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [tone, setTone] = useState('Professional');
   const [selectedPlatforms, setSelectedPlatforms] = useState<Platform[]>([Platform.Twitter]);
+  
+  // Dropdown States
+  const [isPlatformDropdownOpen, setIsPlatformDropdownOpen] = useState(false);
+  const [isToneDropdownOpen, setIsToneDropdownOpen] = useState(false);
 
   const handleGenerate = async () => {
     if (!topic) return;
@@ -45,6 +49,14 @@ export const CreatorStudio: React.FC = () => {
     alert('Post published successfully to selected channels!');
   };
 
+  // Tone Configuration with Icons
+  const toneIcons: Record<string, React.ReactNode> = {
+    'Professional': <Briefcase size={16} className="text-blue-600" />,
+    'Funny': <Smile size={16} className="text-orange-500" />,
+    'Viral/Hype': <Rocket size={16} className="text-purple-600" />,
+    'Educational': <GraduationCap size={16} className="text-green-600" />,
+  };
+
   return (
     <div className="h-full flex flex-col lg:flex-row gap-6">
       {/* Left: Controls */}
@@ -72,33 +84,89 @@ export const CreatorStudio: React.FC = () => {
 
           {/* Configuration */}
           <div className="grid grid-cols-2 gap-4">
+            {/* Platform Dropdown */}
             <div className="space-y-2">
               <label className="text-sm font-medium text-slate-700">Primary Platform</label>
               <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setIsPlatformDropdownOpen(!isPlatformDropdownOpen)}
+                  className="w-full pl-10 p-2.5 text-left border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white flex items-center justify-between"
+                >
+                  <span className="text-slate-900 text-sm font-medium truncate">{platform}</span>
+                  <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
+                </button>
+
                 <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
                   <PlatformIcon platform={platform} size={16} />
                 </div>
-                <select 
-                  className="w-full pl-10 p-2.5 border border-slate-300 rounded-lg appearance-none bg-white"
-                  value={platform}
-                  onChange={(e) => setPlatform(e.target.value as Platform)}
-                >
-                  {Object.values(Platform).map(p => <option key={p} value={p}>{p}</option>)}
-                </select>
+
+                {isPlatformDropdownOpen && (
+                  <div className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-xl max-h-60 overflow-y-auto animate-in fade-in zoom-in-95 duration-100">
+                    {Object.values(Platform).map(p => (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => {
+                          setPlatform(p);
+                          setIsPlatformDropdownOpen(false);
+                        }}
+                        className={`w-full px-3 py-2.5 flex items-center gap-3 text-left text-sm transition-colors border-b border-slate-50 last:border-0 ${
+                          platform === p 
+                            ? 'bg-blue-50 text-blue-700' 
+                            : 'text-slate-700 hover:bg-slate-50'
+                        }`}
+                      >
+                        <PlatformIcon platform={p} size={16} />
+                        <span className="font-medium">{p}</span>
+                        {platform === p && <CheckCircle className="w-3.5 h-3.5 ml-auto text-blue-600" />}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
+
+            {/* Tone Dropdown (Custom) */}
             <div className="space-y-2">
               <label className="text-sm font-medium text-slate-700">Tone</label>
-              <select 
-                className="w-full p-2.5 border border-slate-300 rounded-lg"
-                value={tone}
-                onChange={(e) => setTone(e.target.value)}
-              >
-                <option>Professional</option>
-                <option>Funny</option>
-                <option>Viral/Hype</option>
-                <option>Educational</option>
-              </select>
+              <div className="relative">
+                <button 
+                  type="button"
+                  onClick={() => setIsToneDropdownOpen(!isToneDropdownOpen)}
+                  className="w-full p-2.5 text-left border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white flex items-center justify-between"
+                >
+                  <div className="flex items-center gap-2">
+                    {toneIcons[tone]}
+                    <span className="text-slate-900 text-sm font-medium truncate">{tone}</span>
+                  </div>
+                  <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
+                </button>
+
+                {isToneDropdownOpen && (
+                  <div className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-xl animate-in fade-in zoom-in-95 duration-100">
+                    {Object.keys(toneIcons).map(t => (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => {
+                          setTone(t);
+                          setIsToneDropdownOpen(false);
+                        }}
+                        className={`w-full px-3 py-2.5 flex items-center gap-3 text-left text-sm transition-colors border-b border-slate-50 last:border-0 ${
+                          tone === t
+                            ? 'bg-blue-50 text-blue-700'
+                            : 'text-slate-700 hover:bg-slate-50'
+                        }`}
+                      >
+                        {toneIcons[t]}
+                        <span className="font-medium">{t}</span>
+                        {tone === t && <CheckCircle className="w-3.5 h-3.5 ml-auto text-blue-600" />}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
