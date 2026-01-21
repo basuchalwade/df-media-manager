@@ -1,22 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Sparkles, Send, Calendar as CalendarIcon, RotateCcw, Image as ImageIcon, ChevronDown, CheckCircle, Briefcase, Smile, Rocket, GraduationCap, X, FileVideo, Clock, Save, AlertCircle, Check, Zap, Eye, Copy, Hash, MoreHorizontal, ThumbsUp, MessageSquare, Share2, Repeat, Bookmark, Globe, Heart, Layers, UploadCloud, RefreshCw, ShieldCheck, AlertTriangle } from 'lucide-react';
 import { generatePostContent, generateHashtags, validateContentSafety } from '../services/geminiService';
+import { validatePost, PLATFORM_LIMITS } from '../services/validationService';
 import { store } from '../services/mockStore';
-import { Platform, PostStatus, MediaItem, Post } from '../types';
+import { Platform, PostStatus, MediaItem, Post, PageProps } from '../types';
 import { PlatformIcon } from '../components/PlatformIcon';
 import { MediaPicker } from '../components/MediaPicker';
-
-// --- Constants ---
-
-const PLATFORM_LIMITS: Record<Platform, number> = {
-  [Platform.Twitter]: 280,
-  [Platform.LinkedIn]: 3000,
-  [Platform.Instagram]: 2200,
-  [Platform.Facebook]: 63206,
-  [Platform.Threads]: 500,
-  [Platform.YouTube]: 5000,
-  [Platform.Discord]: 2000,
-};
 
 const TONES = ['Professional', 'Funny', 'Viral', 'Educational', 'Empathetic', 'Controversial'];
 
@@ -27,7 +16,7 @@ const EMOJI_CATEGORIES = {
   'Symbols': ['🔴', '🟢', '🔵', '💯', '💢', '💫', '💥', '💦', '💤', '💭', '📣', '🔔']
 };
 
-export const CreatorStudio: React.FC = () => {
+export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
   // --- AI State ---
   const [topic, setTopic] = useState('');
   const [tone, setTone] = useState('Professional');
@@ -35,7 +24,7 @@ export const CreatorStudio: React.FC = () => {
   const [generationPlatform, setGenerationPlatform] = useState<Platform>(Platform.Twitter);
 
   // --- Composer State ---
-  const [currentPostId, setCurrentPostId] = useState<string | null>(null); // Track if editing an existing draft
+  const [currentPostId, setCurrentPostId] = useState<string | null>(null);
   const [content, setContent] = useState('');
   const [youtubeTitle, setYoutubeTitle] = useState(''); 
   const [youtubeThumbnail, setYoutubeThumbnail] = useState<MediaItem | null>(null);
@@ -73,6 +62,66 @@ export const CreatorStudio: React.FC = () => {
   const [safetyIssues, setSafetyIssues] = useState<string[]>([]);
   const [showSafetyModal, setShowSafetyModal] = useState(false);
 
+  // Initialize from Navigation Params
+  useEffect(() => {
+    if (params) {
+      if (params.postId) {
+        // Edit Mode
+        store.getPosts().then(posts => {
+          const post = posts.find(p => p.id === params.postId);
+          if (post) {
+            setCurrentPostId(post.id);
+            setContent(post.content);
+            setSelectedPlatforms(post.platforms);
+            setYoutubeTitle(post.title || '');
+            setIsCarousel(post.isCarousel || false);
+            setIsAiGenerated(post.generatedByAi);
+            
+            // Media
+            if (post.mediaUrl) {
+               setSelectedMedia({ 
+                 id: 'loaded-media', 
+                 name: 'Current Media', 
+                 type: post.mediaType || 'image', 
+                 url: post.mediaUrl, 
+                 size: 0, 
+                 createdAt: '' 
+               });
+            } else {
+               setSelectedMedia(null);
+            }
+            if (post.thumbnailUrl) {
+               setYoutubeThumbnail({
+                  id: 'loaded-thumb', name: 'Thumbnail', type: 'image', url: post.thumbnailUrl, size: 0, createdAt: ''
+               });
+            }
+
+            // Schedule
+            if (post.scheduledFor) {
+               const date = new Date(post.scheduledFor);
+               if (date > new Date()) {
+                  setScheduleMode('later');
+                  setScheduledDate(date);
+                  let h = date.getHours();
+                  const p = h >= 12 ? 'PM' : 'AM';
+                  h = h % 12;
+                  h = h ? h : 12;
+                  setTimeState({ hour: h.toString().padStart(2, '0'), minute: date.getMinutes().toString().padStart(2, '0'), period: p });
+               }
+            }
+          }
+        });
+      } else if (params.date) {
+        // Create Mode with Date
+        setScheduleMode('later');
+        setScheduledDate(new Date(params.date));
+        resetForm(false); // Reset but keep date
+      }
+    } else {
+      resetForm(true);
+    }
+  }, [params]);
+
   // Sync preview platform
   useEffect(() => {
     if (selectedPlatforms.length > 0 && !selectedPlatforms.includes(previewPlatform)) {
@@ -80,45 +129,11 @@ export const CreatorStudio: React.FC = () => {
     }
   }, [selectedPlatforms]);
 
-  // Validation Logic
+  // Validation Logic (Shared)
   useEffect(() => {
-    const errors: string[] = [];
-    selectedPlatforms.forEach(p => {
-      const limit = PLATFORM_LIMITS[p];
-      if (content.length > limit) {
-        errors.push(`${p}: Text limit exceeded (${content.length}/${limit})`);
-      }
-      
-      // YouTube Rules
-      if (p === Platform.YouTube) {
-        if (!youtubeTitle) errors.push("YouTube: Video title is required.");
-        if (!selectedMedia) errors.push("YouTube: Video file is required.");
-        if (selectedMedia && selectedMedia.type !== 'video') errors.push("YouTube: Selected media must be a video.");
-        if (!youtubeThumbnail) errors.push("YouTube: Thumbnail image is recommended.");
-      }
-
-      // Instagram Rules
-      if (p === Platform.Instagram) {
-         if (selectedMedia && selectedMedia.type === 'image') {
-            // Mock aspect ratio check - typically we'd check item.dimensions
-            if (isCarousel) {
-               // OK
-            } else {
-               // Just a warning in this mock
-            }
-         }
-         if (!selectedMedia && !content) errors.push("Instagram: Must include media or text.");
-      }
-
-      // Twitter Rules
-      if (p === Platform.Twitter) {
-         if (selectedMedia && selectedMedia.size > 5 * 1024 * 1024) { // 5MB limit
-            errors.push("Twitter: Image exceeds 5MB limit.");
-         }
-      }
-    });
+    const errors = validatePost(content, selectedPlatforms, selectedMedia, isCarousel, youtubeTitle);
     setValidationErrors(errors);
-  }, [content, selectedPlatforms, youtubeTitle, selectedMedia, youtubeThumbnail, isCarousel]);
+  }, [content, selectedPlatforms, youtubeTitle, selectedMedia, isCarousel]);
 
   // Initial Hashtags
   useEffect(() => {
@@ -220,7 +235,6 @@ export const CreatorStudio: React.FC = () => {
     const status = scheduleMode === 'now' ? PostStatus.Published : PostStatus.Scheduled;
     const newPost = constructPostObject(status);
     
-    // If we have a current ID, we update, otherwise add
     if (currentPostId) {
       await store.updatePost(newPost);
     } else {
@@ -228,9 +242,12 @@ export const CreatorStudio: React.FC = () => {
     }
     
     alert(scheduleMode === 'now' ? 'Published successfully!' : 'Scheduled successfully!');
-    resetForm();
     setIsSaving(false);
     setShowSafetyModal(false);
+    
+    // Optional: Navigate back to calendar if that's where we came from?
+    // For now, reset or stay.
+    if (!currentPostId) resetForm(true);
   };
 
   const handleSaveDraft = async () => {
@@ -241,7 +258,6 @@ export const CreatorStudio: React.FC = () => {
     
     if (currentPostId) {
        await store.updatePost(newPost);
-       // Simple visual feedback
        const btn = document.getElementById('save-draft-btn');
        if(btn) {
          const originalText = btn.innerText;
@@ -260,18 +276,17 @@ export const CreatorStudio: React.FC = () => {
   const handleDuplicate = async () => {
     if (!content) return;
     setIsSaving(true);
-    // Force new ID to create a copy
     const newPost = constructPostObject(PostStatus.Draft, true);
     if (newPost.title) newPost.title = `${newPost.title} (Copy)`;
     
     const saved = await store.addPost(newPost);
-    setCurrentPostId(saved.id); // Switch context to the new copy
+    setCurrentPostId(saved.id);
     
     alert("Version duplicated! You are now editing the copy.");
     setIsSaving(false);
   };
 
-  const resetForm = () => {
+  const resetForm = (clearDate: boolean = true) => {
     setContent('');
     setYoutubeTitle('');
     setYoutubeThumbnail(null);
@@ -281,8 +296,9 @@ export const CreatorStudio: React.FC = () => {
     setIsAiGenerated(false);
     setSelectedPlatforms([Platform.Twitter]);
     setValidationErrors([]);
-    setScheduleMode('now');
-    setCurrentPostId(null); // Clear current ID
+    setScheduleMode(clearDate ? 'now' : 'later');
+    if (clearDate) setScheduledDate(new Date());
+    setCurrentPostId(null);
     setSafetyIssues([]);
   };
 
@@ -304,9 +320,8 @@ export const CreatorStudio: React.FC = () => {
   // Preview Truncation
   const previewLimit = PLATFORM_LIMITS[previewPlatform] || 500;
   const displayContent = content ? content.slice(0, previewLimit) : '';
-  const isTruncated = content.length > previewLimit;
 
-  // Render Logic for specific platforms
+  // Render Logic
   const renderPreviewContent = () => {
     const commonMedia = selectedMedia && (
         <div className="w-full bg-black flex items-center justify-center relative overflow-hidden bg-gray-100">
@@ -506,6 +521,7 @@ export const CreatorStudio: React.FC = () => {
       </div>
 
       <div className="flex flex-col xl:flex-row gap-8 h-full">
+        {/* Same Layout as before, just state wired up */}
         
         {/* LEFT COLUMN: Editor & Configuration */}
         <div className="flex-1 flex flex-col gap-6 min-w-0">
@@ -720,7 +736,7 @@ export const CreatorStudio: React.FC = () => {
                                             {suggestedHashtags.map(h => 
                                                 <button 
                                                    key={h} 
-                                                   onClick={() => handleInsertText(h)} 
+                                                   onClick={() => { handleInsertText(h); setShowHashtags(false); }}
                                                    className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg text-xs font-medium transition-colors border border-blue-100"
                                                 >
                                                    {h}
@@ -800,26 +816,33 @@ export const CreatorStudio: React.FC = () => {
 
               {scheduleMode === 'later' && (
                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-in slide-in-from-top-2">
-                    <label className="relative flex items-center bg-gray-50 rounded-xl p-3 border border-gray-200 group hover:border-blue-300 transition-colors cursor-pointer">
+                    <div className="relative flex items-center bg-gray-50 rounded-xl p-3 border border-gray-200 group hover:border-blue-300 transition-colors w-full">
                        <CalendarIcon className="w-5 h-5 text-gray-400 mr-3 group-hover:text-blue-500 transition-colors pointer-events-none" />
                        <span className="text-sm font-bold text-gray-900 pointer-events-none">
                           {scheduledDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                        </span>
                        <input 
-                          ref={dateInputRef}
                           type="date"
                           min={getFormattedDateValue(new Date())}
                           value={getFormattedDateValue(scheduledDate)}
                           onChange={(e) => {
                              if(e.target.value) {
                                 const parts = e.target.value.split('-').map(Number);
-                                setScheduledDate(new Date(parts[0], parts[1]-1, parts[2], 12, 0, 0));
+                                const newDate = new Date(scheduledDate);
+                                newDate.setFullYear(parts[0]);
+                                newDate.setMonth(parts[1] - 1);
+                                newDate.setDate(parts[2]);
+                                setScheduledDate(newDate);
                              }
                           }}
-                          onClick={(e) => {try{e.currentTarget.showPicker()}catch(err){}}}
-                          className="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10"
+                          onClick={(e) => {
+                             try {
+                                e.currentTarget.showPicker();
+                             } catch (err) {}
+                          }}
+                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                        />
-                    </label>
+                    </div>
                     <div className="relative">
                        <button 
                           onClick={() => setIsTimePickerOpen(!isTimePickerOpen)}

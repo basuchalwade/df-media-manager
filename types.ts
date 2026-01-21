@@ -125,3 +125,14 @@ export interface MediaItem {
   createdAt: string;
   dimensions?: string; // e.g. "1920x1080"
 }
+
+// Navigation & Validation Types
+export interface PageProps {
+  onNavigate: (page: string, params?: any) => void;
+  params?: any;
+}
+
+export interface ValidationResult {
+  isValid: boolean;
+  errors: string[];
+}

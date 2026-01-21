@@ -1,28 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon, X, Clock, 
-  ChevronDown, Image as ImageIcon, Trash2, Zap, Copy, Filter, Eye, Heart, 
-  MessageCircle, Share, MoreHorizontal, AlertTriangle, LayoutList, Grid3X3,
-  Bot, RefreshCw, ArrowRight, Globe, BarChart3, AlertCircle, CheckCircle,
-  MessageSquare, Repeat, Heart as HeartOutline, Share2, Bookmark, Send, Layers, Smile, Hash, Save, ShieldCheck
+  ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon, 
+  Eye, Filter, LayoutList, Grid3X3,
+  Globe
 } from 'lucide-react';
 import { store } from '../services/mockStore';
-import { generateHashtags, validateContentSafety } from '../services/geminiService';
-import { Post, Platform, PostStatus, MediaItem, BotType } from '../types';
+import { Post, Platform, PostStatus, PageProps } from '../types';
 import { PlatformIcon } from '../components/PlatformIcon';
-import { MediaPicker } from '../components/MediaPicker';
 
 // --- Constants & Helpers ---
-
-const PLATFORM_LIMITS: Record<Platform, number> = {
-  [Platform.Twitter]: 280,
-  [Platform.LinkedIn]: 3000,
-  [Platform.Instagram]: 2200,
-  [Platform.Facebook]: 63206,
-  [Platform.Threads]: 500,
-  [Platform.YouTube]: 5000,
-  [Platform.Discord]: 2000,
-};
 
 const TIMEZONES = [
   { label: 'New York (EST)', value: 'America/New_York' },
@@ -32,13 +18,6 @@ const TIMEZONES = [
   { label: 'Tokyo (JST)', value: 'Asia/Tokyo' },
   { label: 'Sydney (AEDT)', value: 'Australia/Sydney' },
 ];
-
-const EMOJI_CATEGORIES = {
-  'Popular': ['🚀', '🔥', '✨', '💡', '📈', '💪', '🎯', '🤖', '👀', '✅', '⚠️', '🎉'],
-  'Faces': ['😀', '😂', '😎', '🤔', '🤯', '😍', '🥳', '🥶', '🤡', '🤠', '🤐', '🫠'],
-  'Objects': ['📱', '💻', '📷', '🎥', '🎙️', '⌚', '🔋', '🔌', '🧰', '🔭', '📡', '💾'],
-  'Symbols': ['🔴', '🟢', '🔵', '💯', '💢', '💫', '💥', '💦', '💤', '💭', '📣', '🔔']
-};
 
 const getStatusStyle = (status: PostStatus) => {
   switch (status) {
@@ -61,11 +40,10 @@ const isBestTime = (day: number) => {
   return day % 3 === 0 || day % 7 === 0; // Mock logic
 };
 
-export const Calendar: React.FC = () => {
+export const Calendar: React.FC<PageProps> = ({ onNavigate }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [posts, setPosts] = useState<Post[]>([]);
-  const [userSettings, setUserSettings] = useState<any>(null);
   
   // Filter & View State
   const [filterPlatform, setFilterPlatform] = useState<Platform | 'All'>('All');
@@ -79,49 +57,9 @@ export const Calendar: React.FC = () => {
   // Drag & Drop State
   const [draggedPost, setDraggedPost] = useState<Post | null>(null);
 
-  // Modal State
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingPost, setEditingPost] = useState<Post | null>(null);
-  
-  // Form State
-  const [newPostContent, setNewPostContent] = useState('');
-  const [newPostTitle, setNewPostTitle] = useState(''); 
-  const [youtubeThumbnail, setYoutubeThumbnail] = useState<MediaItem | null>(null);
-  const [isCarousel, setIsCarousel] = useState(false);
-  const [timeState, setTimeState] = useState({ hour: '09', minute: '00', period: 'AM' });
-  const [selectedPlatforms, setSelectedPlatforms] = useState<Platform[]>([Platform.Twitter]);
-  const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(null);
-  const [autoEngage, setAutoEngage] = useState(false);
-  
-  // Tools State
-  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const [showHashtags, setShowHashtags] = useState(false);
-  const [currentEmojiCategory, setCurrentEmojiCategory] = useState('Popular');
-  const [suggestedHashtags, setSuggestedHashtags] = useState<string[]>(['#Trend', '#New', '#Update', '#Growth', '#Tech']);
-  const [isTagsLoading, setIsTagsLoading] = useState(false);
-
-  // Preview State
-  const [previewPlatform, setPreviewPlatform] = useState<Platform>(Platform.Twitter);
-
-  // UI State
-  const [isMediaPickerOpen, setIsMediaPickerOpen] = useState(false);
-  const [mediaPickerMode, setMediaPickerMode] = useState<'main' | 'thumbnail'>('main');
-  const [isTimePickerOpen, setIsTimePickerOpen] = useState(false);
-  const [isCheckingSafety, setIsCheckingSafety] = useState(false);
-  const [showSafetyModal, setShowSafetyModal] = useState(false);
-  const [safetyIssues, setSafetyIssues] = useState<string[]>([]);
-
   useEffect(() => {
     loadPosts();
-    store.getSettings().then(setUserSettings);
   }, []);
-
-  // Update preview platform when selected platforms change
-  useEffect(() => {
-    if (selectedPlatforms.length > 0 && !selectedPlatforms.includes(previewPlatform)) {
-      setPreviewPlatform(selectedPlatforms[0]);
-    }
-  }, [selectedPlatforms]);
 
   const loadPosts = async () => {
     const fetchedPosts = await store.getPosts();
@@ -135,97 +73,16 @@ export const Calendar: React.FC = () => {
     setSelectedDate(date);
   };
 
-  const resetForm = () => {
-    setNewPostContent('');
-    setNewPostTitle('');
-    setYoutubeThumbnail(null);
-    setIsCarousel(false);
-    setSelectedMedia(null);
-    setAutoEngage(false);
-    setEditingPost(null);
-    setSelectedPlatforms([Platform.Twitter]);
-    setPreviewPlatform(Platform.Twitter);
-    setTimeState({ hour: '09', minute: '00', period: 'AM' });
-    setSafetyIssues([]);
-  };
-
   const handleCreateEvent = () => {
-    resetForm();
+    let dateToUse = selectedDate;
     if (isPastDate(selectedDate)) {
-      setSelectedDate(new Date());
+      dateToUse = new Date();
     }
-    setIsModalOpen(true);
+    onNavigate('creator', { date: dateToUse.toISOString() });
   };
 
   const handleEditPost = (post: Post) => {
-    setEditingPost(post);
-    setNewPostContent(post.content);
-    setNewPostTitle(post.title || '');
-    if(post.thumbnailUrl) {
-       setYoutubeThumbnail({
-          id: 'mock-thumb', name: 'Thumbnail', type: 'image', url: post.thumbnailUrl, size: 0, createdAt: ''
-       });
-    } else {
-       setYoutubeThumbnail(null);
-    }
-    setIsCarousel(post.isCarousel || false);
-    setSelectedPlatforms(post.platforms);
-    setPreviewPlatform(post.platforms[0] || Platform.Twitter);
-    
-    if (post.mediaUrl) {
-       const isVideo = post.mediaType === 'video' || post.mediaUrl.toLowerCase().endsWith('.mp4');
-       setSelectedMedia({ 
-         id: 'mock', 
-         name: 'Existing Media', 
-         type: isVideo ? 'video' : 'image', 
-         url: post.mediaUrl, 
-         size: 0, 
-         createdAt: '' 
-       });
-    } else {
-      setSelectedMedia(null);
-    }
-    
-    // Parse time
-    const date = new Date(post.scheduledFor);
-    let hours = date.getHours();
-    const period = hours >= 12 ? 'PM' : 'AM';
-    hours = hours % 12;
-    hours = hours ? hours : 12;
-    const minutes = date.getMinutes().toString().padStart(2, '0');
-    
-    setTimeState({ hour: hours.toString().padStart(2, '0'), minute: minutes, period });
-    setSelectedDate(new Date(date.getFullYear(), date.getMonth(), date.getDate()));
-    setIsModalOpen(true);
-  };
-
-  const handleMediaPickerOpen = (mode: 'main' | 'thumbnail') => {
-    setMediaPickerMode(mode);
-    setIsMediaPickerOpen(true);
-  };
-
-  const handleMediaSelect = (item: MediaItem) => {
-    if (mediaPickerMode === 'main') {
-      setSelectedMedia(item);
-    } else {
-      if (item.type !== 'image') {
-        alert("Thumbnail must be an image.");
-        return;
-      }
-      setYoutubeThumbnail(item);
-    }
-  };
-
-  // --- Tool Handlers ---
-  const handleInsertText = (text: string) => {
-    setNewPostContent(prev => prev + (prev.length > 0 ? ' ' : '') + text);
-  };
-
-  const handleFetchHashtags = async () => {
-    setIsTagsLoading(true);
-    const tags = await generateHashtags("General", newPostContent);
-    setSuggestedHashtags(tags);
-    setIsTagsLoading(false);
+    onNavigate('creator', { postId: post.id });
   };
 
   // --- Drag & Drop Handlers ---
@@ -259,112 +116,11 @@ export const Calendar: React.FC = () => {
       scheduledFor: newDate.toISOString()
     };
 
+    // Optimistic Update
     setPosts(prev => prev.map(p => p.id === updatedPost.id ? updatedPost : p));
     await store.updatePost(updatedPost);
     setDraggedPost(null);
     await loadPosts();
-  };
-
-  const handleDeletePost = async (e: React.MouseEvent, id: string) => {
-    e.stopPropagation();
-    e.preventDefault();
-    if (confirm("Are you sure you want to delete this scheduled post?")) {
-      await store.deletePost(id);
-      await loadPosts();
-    }
-  };
-
-  const handleDeleteFromModal = async () => {
-    if (!editingPost) return;
-    if (confirm("Are you sure you want to delete this scheduled post?")) {
-      try {
-        await store.deletePost(editingPost.id);
-        setEditingPost(null);
-        setIsModalOpen(false);
-        await loadPosts();
-      } catch (err) {
-        console.error("Failed to delete post", err);
-      }
-    }
-  };
-
-  const getPostObject = (status: PostStatus, forceNewId: boolean = false): Post => {
-      let hours = parseInt(timeState.hour);
-      if (timeState.period === 'PM' && hours !== 12) hours += 12;
-      else if (timeState.period === 'AM' && hours === 12) hours = 0;
-
-      const scheduledDateTime = new Date(selectedDate);
-      scheduledDateTime.setHours(hours, parseInt(timeState.minute), 0, 0);
-
-      // Determine ID
-      let id = (editingPost && !forceNewId) ? editingPost.id : `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-
-      return {
-        id,
-        title: newPostTitle,
-        description: newPostContent,
-        thumbnailUrl: youtubeThumbnail?.url,
-        isCarousel,
-        content: newPostContent,
-        platforms: selectedPlatforms,
-        scheduledFor: scheduledDateTime.toISOString(),
-        status: status,
-        generatedByAi: editingPost ? editingPost.generatedByAi : false,
-        mediaUrl: selectedMedia?.url,
-        mediaType: selectedMedia?.type,
-      };
-  };
-
-  const performSafetyCheck = async (): Promise<boolean> => {
-    setIsCheckingSafety(true);
-    const result = await validateContentSafety(newPostContent, selectedPlatforms);
-    setIsCheckingSafety(false);
-    
-    if (!result.safe) {
-      setSafetyIssues(result.issues);
-      setShowSafetyModal(true);
-      return false;
-    }
-    return true;
-  };
-
-  const handleSavePost = async (skipSafety: boolean = false) => {
-    if (!newPostContent && !selectedMedia) return;
-
-    if (!skipSafety) {
-      const isSafe = await performSafetyCheck();
-      if (!isSafe) return;
-    }
-
-    // Preserve existing status if editing, unless it's new
-    const status = editingPost ? editingPost.status : PostStatus.Scheduled;
-    const postData = getPostObject(status);
-
-    if (editingPost) await store.updatePost(postData);
-    else await store.addPost(postData);
-
-    await loadPosts();
-    setIsModalOpen(false);
-    setShowSafetyModal(false);
-  };
-
-  const handleSaveDraft = async () => {
-     if (!newPostContent && !selectedMedia) return;
-     const postData = getPostObject(PostStatus.Draft);
-     if (editingPost) await store.updatePost(postData);
-     else await store.addPost(postData);
-     await loadPosts();
-     setIsModalOpen(false);
-  };
-
-  const handleDuplicate = async () => {
-     if (!newPostContent && !selectedMedia) return;
-     const postData = getPostObject(PostStatus.Draft, true);
-     if (postData.title) postData.title += " (Copy)";
-     await store.addPost(postData);
-     await loadPosts();
-     alert("Version copied to Drafts!");
-     setIsModalOpen(false);
   };
 
   // --- Logic & Filtering ---
@@ -378,12 +134,6 @@ export const Calendar: React.FC = () => {
              pDate.getMonth() === date.getMonth() && 
              pDate.getFullYear() === date.getFullYear();
     });
-  };
-
-  // Helper for rendering
-  const hasConflict = (post: Post) => {
-     // Simplistic conflict check
-     return false;
   };
 
   const rawPostsForDate = getPostsForDate(selectedDate);
@@ -402,183 +152,9 @@ export const Calendar: React.FC = () => {
       .slice(0, 20);
   };
 
-  const charCount = newPostContent.length;
-  const isOverLimit = selectedPlatforms.some(p => charCount > (PLATFORM_LIMITS[p] || 5000));
-
-  // Render Logic for specific platforms (Synced with CreatorStudio)
-  const renderPreviewContent = () => {
-    const commonMedia = selectedMedia && (
-        <div className="w-full bg-black flex items-center justify-center relative overflow-hidden bg-gray-100">
-           {selectedMedia.type === 'image' ? (
-              <img src={selectedMedia.url} className="w-full h-full object-cover" alt="Preview" />
-           ) : (
-              <video src={selectedMedia.url} className="w-full h-full object-cover" controls />
-           )}
-        </div>
-    );
-
-    switch (previewPlatform) {
-      case Platform.Twitter:
-        return (
-          <div className="bg-white">
-            <div className="px-4 py-3 flex gap-3">
-              <div className="w-10 h-10 rounded-full bg-gray-200 flex-shrink-0"></div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-1 text-[15px] leading-5">
-                   <span className="font-bold text-gray-900">Your Brand</span>
-                   <span className="text-gray-500">@brand</span>
-                   <span className="text-gray-500">·</span>
-                   <span className="text-gray-500">2h</span>
-                </div>
-                <div className="mt-1 text-[15px] text-gray-900 leading-normal whitespace-pre-wrap break-words">
-                   {newPostContent.slice(0, 280) || <span className="text-gray-300">Your post text...</span>}
-                </div>
-                {selectedMedia && <div className="mt-3 rounded-2xl overflow-hidden border border-gray-100">{commonMedia}</div>}
-                
-                <div className="flex justify-between mt-3 text-gray-500 max-w-md pr-4">
-                   <MessageSquare className="w-4 h-4" />
-                   <Repeat className="w-4 h-4" />
-                   <HeartOutline className="w-4 h-4" />
-                   <Share2 className="w-4 h-4" />
-                </div>
-              </div>
-            </div>
-          </div>
-        );
-
-      case Platform.Instagram:
-        return (
-          <div className="bg-white">
-            <div className="flex items-center justify-between px-3 py-2">
-               <div className="flex items-center gap-2">
-                 <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-yellow-400 to-purple-600 p-[2px]">
-                   <div className="w-full h-full bg-white rounded-full p-[2px]">
-                     <div className="w-full h-full bg-gray-200 rounded-full"></div>
-                   </div>
-                 </div>
-                 <span className="text-sm font-semibold">your_brand</span>
-               </div>
-               <MoreHorizontal className="w-5 h-5 text-gray-600" />
-            </div>
-            
-            <div className="aspect-square bg-gray-100 relative">
-               {selectedMedia ? (
-                 selectedMedia.type === 'image' ? <img src={selectedMedia.url} className="w-full h-full object-cover" /> : <video src={selectedMedia.url} className="w-full h-full object-cover" />
-               ) : (
-                 <div className="w-full h-full flex items-center justify-center text-gray-300 bg-gray-50">No Media</div>
-               )}
-               {isCarousel && (
-                  <div className="absolute top-2 right-2 bg-black/60 rounded-full p-1.5">
-                     <Layers className="w-4 h-4 text-white" />
-                  </div>
-               )}
-            </div>
-
-            <div className="p-3">
-               <div className="flex justify-between mb-2">
-                  <div className="flex gap-4">
-                     <HeartOutline className="w-6 h-6 text-black" />
-                     <MessageSquare className="w-6 h-6 text-black" />
-                     <Send className="w-6 h-6 text-black" />
-                  </div>
-                  <Bookmark className="w-6 h-6 text-black" />
-               </div>
-               <div className="font-semibold text-sm mb-1">1,234 likes</div>
-               <div className="text-sm">
-                  <span className="font-semibold mr-2">your_brand</span>
-                  <span className="whitespace-pre-wrap">{newPostContent.slice(0, 2200)}</span>
-               </div>
-            </div>
-          </div>
-        );
-      
-      case Platform.LinkedIn:
-        return (
-          <div className="bg-white border-y border-gray-200 mt-2">
-             <div className="px-4 py-3 flex gap-3">
-                <div className="w-12 h-12 rounded-full bg-gray-200"></div>
-                <div>
-                   <div className="text-sm font-semibold text-gray-900">Your Name</div>
-                   <div className="text-xs text-gray-500">Marketing Director at Brand</div>
-                   <div className="text-xs text-gray-500 flex items-center gap-1">2h • <Globe className="w-3 h-3" /></div>
-                </div>
-             </div>
-             <div className="px-4 pb-2 text-sm text-gray-900 whitespace-pre-wrap break-words">
-                {newPostContent.slice(0, 3000)}
-             </div>
-             {selectedMedia && <div className="w-full">{commonMedia}</div>}
-             <div className="px-4 py-2 border-t border-gray-100 flex justify-between">
-                {['Like', 'Comment', 'Repost', 'Send'].map(action => (
-                   <div key={action} className="flex flex-col items-center justify-center px-2 py-1 hover:bg-gray-100 rounded cursor-pointer text-gray-500">
-                      <span className="text-xs font-semibold">{action}</span>
-                   </div>
-                ))}
-             </div>
-          </div>
-        );
-
-      case Platform.YouTube:
-        return (
-          <div className="bg-white h-full flex flex-col">
-             <div className="aspect-video bg-black w-full flex items-center justify-center relative">
-                {selectedMedia ? (
-                   selectedMedia.type === 'image' ? <img src={selectedMedia.url} className="w-full h-full object-cover opacity-80" /> : <video src={selectedMedia.url} className="w-full h-full object-cover" />
-                ) : (
-                   <div className="text-gray-500">Video Player</div>
-                )}
-                {/* Thumbnail Overlay */}
-                {youtubeThumbnail && (
-                   <div className="absolute bottom-2 right-2 w-24 aspect-video bg-black border border-white rounded shadow-lg overflow-hidden z-20">
-                      <img src={youtubeThumbnail.url} className="w-full h-full object-cover" alt="Thumb" />
-                   </div>
-                )}
-             </div>
-             <div className="p-4">
-                <h3 className="text-lg font-bold text-gray-900 leading-tight mb-2 line-clamp-2">{newPostTitle || "Video Title Goes Here"}</h3>
-                <div className="flex items-center justify-between mb-4">
-                   <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-full bg-gray-200"></div>
-                      <div>
-                         <div className="text-sm font-semibold text-gray-800">Your Channel</div>
-                         <div className="text-xs text-gray-500">100K subscribers</div>
-                      </div>
-                   </div>
-                   <button className="bg-black text-white text-xs font-bold px-3 py-1.5 rounded-full uppercase">Subscribe</button>
-                </div>
-                <div className="bg-gray-100 rounded-xl p-3 text-sm text-gray-700 whitespace-pre-wrap">
-                   <span className="font-semibold">15K views • 2 hours ago</span>
-                   <br />
-                   {newPostContent.slice(0, 5000)}
-                </div>
-             </div>
-          </div>
-        );
-
-      default:
-         return (
-          <div className="bg-white p-4">
-             <div className="flex gap-3 mb-3">
-               <div className="w-10 h-10 rounded-full bg-gray-200"></div>
-               <div>
-                  <div className="font-bold text-gray-900 text-sm">Your Brand</div>
-                  <div className="text-xs text-gray-500">Just now</div>
-               </div>
-             </div>
-             <div className="mb-3 text-sm text-gray-800 whitespace-pre-wrap">{newPostContent}</div>
-             {selectedMedia && <div className="rounded-lg overflow-hidden border border-gray-100">{commonMedia}</div>}
-             <div className="flex justify-between mt-3 pt-3 border-t border-gray-100 text-gray-500 text-sm font-semibold">
-                <span>Like</span>
-                <span>Comment</span>
-                <span>Share</span>
-             </div>
-          </div>
-         );
-    }
-  };
-
   return (
     <div className="h-full flex flex-col gap-6 animate-in fade-in duration-700">
-      {/* Header (Same as before) */}
+      {/* Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between px-2 gap-4">
         <div>
           <h1 className="text-[34px] font-bold text-[#1d1d1f] tracking-tight">Calendar</h1>
@@ -707,7 +283,7 @@ export const Calendar: React.FC = () => {
             </>
           ) : (
             <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4">
-               {/* Agenda View Content same as before */}
+               {/* Agenda View Content */}
                <h3 className="text-lg font-bold text-gray-800 sticky top-0 bg-white py-2 z-10 border-b border-gray-100">Upcoming Agenda</h3>
                {getAgendaPosts().map(post => (
                  <div key={post.id} className="flex gap-4 p-4 bg-gray-50 rounded-xl border border-gray-100 hover:border-blue-200 transition-colors group cursor-pointer" onClick={() => handleEditPost(post)}>
@@ -741,7 +317,7 @@ export const Calendar: React.FC = () => {
 
         {/* Right: Day View / Detail Sidebar */}
         <div className="w-full lg:w-[400px] bg-[#F5F5F7]/80 backdrop-blur-xl rounded-[32px] border border-white/60 flex flex-col h-full overflow-hidden shadow-xl shadow-gray-200/50">
-           {/* Sidebar Timeline Content same as before */}
+           {/* Sidebar Timeline Content */}
            <div className="p-6 border-b border-gray-200/50 bg-white/60 sticky top-0 z-20 backdrop-blur-md">
               <div className="flex items-center gap-2 mb-2">
                  <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></div>
@@ -770,7 +346,7 @@ export const Calendar: React.FC = () => {
                    ))}
                  </div>
                  
-                 {/* Status Filter Row - Added per request */}
+                 {/* Status Filter Row */}
                  <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar items-center pl-6">
                     {['All', ...Object.values(PostStatus)].map(status => (
                         <button
@@ -795,6 +371,9 @@ export const Calendar: React.FC = () => {
                  <div className="h-full flex flex-col items-center justify-center text-gray-400 py-12">
                     <CalendarIcon className="w-8 h-8 text-gray-300 mb-4" />
                     <p className="font-medium text-sm text-center px-8">No posts found.</p>
+                    <button onClick={handleCreateEvent} className="mt-4 text-blue-600 font-bold text-xs hover:underline">
+                       Create one for this day
+                    </button>
                  </div>
               ) : (
                 <>
@@ -814,7 +393,7 @@ export const Calendar: React.FC = () => {
                            </span>
                            <div className={`w-2.5 h-2.5 rounded-full border-2 z-10 bg-white border-gray-300 group-hover:border-blue-500`}></div>
                         </div>
-                        <div className="flex-1 bg-white rounded-2xl shadow-sm border border-gray-100 hover:border-blue-100 p-3">
+                        <div className="flex-1 bg-white rounded-2xl shadow-sm border border-gray-100 hover:border-blue-100 p-3 transition-colors">
                            <div className="flex justify-between items-center mb-2">
                               <div className="flex -space-x-2 pl-1">
                                  {post.platforms.map((p, i) => (
@@ -835,279 +414,6 @@ export const Calendar: React.FC = () => {
            </div>
         </div>
       </div>
-
-      {/* Edit Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-           <div className="absolute inset-0 bg-gray-900/30 backdrop-blur-sm transition-opacity" onClick={() => setIsModalOpen(false)} />
-           <div className="relative bg-white w-full max-w-5xl rounded-[32px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col h-[90vh]">
-              <div className="px-8 py-5 border-b border-gray-100 flex justify-between items-center bg-white sticky top-0 z-10">
-                 <div className="flex items-center gap-3">
-                    <h2 className="text-xl font-bold text-gray-900">{editingPost ? 'Edit Post' : 'New Post'}</h2>
-                    {editingPost && (
-                       <button onClick={handleDuplicate} className="text-xs bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-full font-bold text-gray-600 flex items-center gap-1 transition-colors">
-                          <Copy className="w-3 h-3" /> Duplicate
-                       </button>
-                    )}
-                 </div>
-                 <button onClick={() => setIsModalOpen(false)} className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-200 transition-colors">
-                    <X className="w-4 h-4" />
-                 </button>
-              </div>
-
-              <div className="flex flex-col lg:flex-row flex-1 min-h-0 overflow-hidden">
-                 <div className="flex-1 overflow-y-auto custom-scrollbar p-8 space-y-8 lg:border-r border-gray-100">
-                    <section className="space-y-3">
-                       <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Target Platforms</label>
-                       <div className="flex flex-wrap gap-2">
-                          {Object.values(Platform).map(p => {
-                             const isSelected = selectedPlatforms.includes(p);
-                             return (
-                                <button
-                                   key={p}
-                                   onClick={() => isSelected ? setSelectedPlatforms(prev => prev.filter(i => i !== p)) : setSelectedPlatforms(prev => [...prev, p])}
-                                   className={`flex items-center gap-2 px-4 py-2.5 rounded-full border transition-all duration-200 ${isSelected ? 'bg-black text-white border-black' : 'bg-white text-gray-500 border-gray-200'}`}
-                                >
-                                   <PlatformIcon platform={p} size={16} white={isSelected} />
-                                   <span className="text-sm font-semibold">{p}</span>
-                                </button>
-                             );
-                          })}
-                       </div>
-                    </section>
-                    
-                    {/* YouTube Title Field */}
-                    {selectedPlatforms.includes(Platform.YouTube) && (
-                       <div className="space-y-4 bg-red-50 p-4 rounded-xl border border-red-100">
-                           <div className="flex items-center gap-2 text-red-700 font-bold text-xs uppercase tracking-wider mb-1">
-                              <PlatformIcon platform={Platform.YouTube} size={14} /> YouTube Settings
-                           </div>
-                           <div>
-                              <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Video Title</label>
-                              <input 
-                                 type="text"
-                                 value={newPostTitle}
-                                 onChange={(e) => setNewPostTitle(e.target.value)}
-                                 placeholder="YouTube video title"
-                                 className="w-full bg-white rounded-xl px-4 py-3 text-sm font-bold text-gray-900 border border-red-200 focus:border-red-500 focus:ring-1 focus:ring-red-500"
-                              />
-                           </div>
-                           <div>
-                              <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 block">Thumbnail</label>
-                              {youtubeThumbnail ? (
-                                 <div className="relative w-40 aspect-video rounded-lg overflow-hidden group border border-gray-200">
-                                    <img src={youtubeThumbnail.url} className="w-full h-full object-cover" />
-                                    <button onClick={() => setYoutubeThumbnail(null)} className="absolute top-1 right-1 p-1 bg-black/50 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
-                                       <X className="w-3 h-3" />
-                                    </button>
-                                 </div>
-                              ) : (
-                                 <button onClick={() => handleMediaPickerOpen('thumbnail')} className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg text-xs font-bold text-gray-600 hover:bg-gray-50">
-                                    <ImageIcon className="w-4 h-4" /> Select Thumbnail
-                                 </button>
-                              )}
-                           </div>
-                       </div>
-                    )}
-                    
-                    {/* Instagram Carousel Option */}
-                    {selectedPlatforms.includes(Platform.Instagram) && (
-                        <div className="mt-3 flex items-center gap-4">
-                           <div className="text-xs text-orange-600 bg-orange-50 px-3 py-2 rounded-lg inline-flex items-center gap-2 font-medium">
-                              <AlertCircle className="w-3 h-3" /> Best ratio: 1:1 or 4:5
-                           </div>
-                           <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-gray-700 hover:text-black">
-                              <input 
-                                type="checkbox" 
-                                checked={isCarousel} 
-                                onChange={(e) => setIsCarousel(e.target.checked)} 
-                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                              />
-                              Post as Carousel
-                           </label>
-                        </div>
-                    )}
-
-                    <section className="space-y-3">
-                       <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Content</label>
-                       <textarea
-                          value={newPostContent}
-                          onChange={(e) => setNewPostContent(e.target.value)}
-                          placeholder="Write your masterpiece..."
-                          rows={6}
-                          className="w-full bg-gray-50 rounded-2xl p-4 text-gray-900 placeholder:text-gray-400 border-none focus:ring-2 focus:ring-blue-500/20"
-                       />
-                       
-                       {/* Toolbar */}
-                       <div className="flex justify-between items-center bg-white/80 backdrop-blur-sm p-1 rounded-xl border border-gray-100 shadow-sm mt-2">
-                           <div className="flex gap-1">
-                               <button onClick={() => handleMediaPickerOpen('main')} className="p-2 hover:bg-gray-100 rounded-lg text-gray-500 hover:text-blue-600 transition-colors" title="Add Media">
-                                   <ImageIcon className="w-4 h-4" />
-                               </button>
-                               
-                               {/* Emoji Picker */}
-                               <div className="relative">
-                                   <button onClick={() => { setShowEmojiPicker(!showEmojiPicker); setShowHashtags(false); }} className="p-2 hover:bg-gray-100 rounded-lg text-gray-500 hover:text-yellow-500 transition-colors" title="Add Emoji">
-                                       <Smile className="w-4 h-4" />
-                                   </button>
-                                   {showEmojiPicker && (
-                                       <div className="absolute bottom-full left-0 mb-3 bg-white shadow-xl border border-gray-100 rounded-xl overflow-hidden z-20 w-64 animate-in zoom-in-95 duration-150">
-                                           <div className="flex border-b border-gray-100 bg-gray-50">
-                                              {Object.keys(EMOJI_CATEGORIES).map(cat => (
-                                                 <button 
-                                                   key={cat} 
-                                                   onClick={() => setCurrentEmojiCategory(cat)}
-                                                   className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-wide ${currentEmojiCategory === cat ? 'text-black bg-white border-b-2 border-black' : 'text-gray-400 hover:text-gray-600'}`}
-                                                 >
-                                                    {cat}
-                                                 </button>
-                                              ))}
-                                           </div>
-                                           <div className="p-3 grid grid-cols-6 gap-2 bg-white max-h-40 overflow-y-auto custom-scrollbar">
-                                               {EMOJI_CATEGORIES[currentEmojiCategory as keyof typeof EMOJI_CATEGORIES].map(e => (
-                                                  <button key={e} onClick={() => { handleInsertText(e); setShowEmojiPicker(false); }} className="hover:bg-gray-100 p-1.5 rounded text-xl flex items-center justify-center transition-colors">
-                                                     {e}
-                                                  </button>
-                                               ))}
-                                           </div>
-                                       </div>
-                                   )}
-                               </div>
-                               
-                               {/* Hashtag Generator */}
-                               <div className="relative">
-                                   <button onClick={() => { setShowHashtags(!showHashtags); setShowEmojiPicker(false); }} className="p-2 hover:bg-gray-100 rounded-lg text-gray-500 hover:text-blue-500 transition-colors" title="Smart Hashtags">
-                                       <Hash className="w-4 h-4" />
-                                   </button>
-                                   {showHashtags && (
-                                       <div className="absolute bottom-full left-0 mb-3 bg-white shadow-xl border border-gray-100 rounded-xl overflow-hidden z-20 w-64 animate-in zoom-in-95 duration-150">
-                                           <div className="p-3 border-b border-gray-100 flex justify-between items-center bg-gray-50">
-                                               <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">AI Suggestions</span>
-                                               <button onClick={handleFetchHashtags} className="text-blue-600 hover:bg-blue-100 p-1 rounded transition-colors" title="Refresh">
-                                                  <RefreshCw className={`w-3 h-3 ${isTagsLoading ? 'animate-spin' : ''}`} />
-                                               </button>
-                                           </div>
-                                           <div className="p-2 flex flex-wrap gap-2 max-h-40 overflow-y-auto custom-scrollbar">
-                                               {suggestedHashtags.map(h => 
-                                                   <button 
-                                                      key={h} 
-                                                      onClick={() => handleInsertText(h)} 
-                                                      className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg text-xs font-medium transition-colors border border-blue-100"
-                                                   >
-                                                      {h}
-                                                   </button>
-                                               )}
-                                           </div>
-                                       </div>
-                                   )}
-                               </div>
-                           </div>
-                       </div>
-                       
-                       {selectedMedia ? (
-                          <div className="relative rounded-2xl overflow-hidden group shadow-sm bg-gray-100 h-48 mt-2">
-                              {selectedMedia.type === 'image' ? <img src={selectedMedia.url} className="w-full h-full object-cover" /> : <video src={selectedMedia.url} className="w-full h-full object-cover" controls />}
-                              <button onClick={() => setSelectedMedia(null)} className="absolute top-2 right-2 p-1.5 bg-black/40 text-white rounded-full"><X className="w-4 h-4" /></button>
-                          </div>
-                       ) : (
-                          <button onClick={() => handleMediaPickerOpen('main')} className="w-full h-16 rounded-2xl border border-dashed border-gray-300 flex items-center justify-center gap-2 text-gray-400 hover:text-blue-500 hover:bg-blue-50 transition-all font-medium text-sm mt-2">
-                             <ImageIcon className="w-5 h-5" /> Add Photo or Video
-                          </button>
-                       )}
-                    </section>
-                 </div>
-
-                 {/* Preview Column in Modal (Synced with CreatorStudio Preview) */}
-                 <div className="hidden lg:flex flex-1 min-w-[320px] max-w-[400px] bg-slate-100 p-6 flex-col border-l border-gray-200">
-                    <div className="flex items-center justify-between mb-4">
-                       <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Preview</h3>
-                       {selectedPlatforms.length > 1 && (
-                          <div className="flex gap-1 bg-white rounded-lg p-1 shadow-sm">
-                             {selectedPlatforms.map(p => (
-                                <button key={p} onClick={() => setPreviewPlatform(p)} className={`p-1.5 rounded-md transition-all ${previewPlatform === p ? 'bg-slate-900 text-white' : 'text-slate-400 hover:bg-slate-50'}`}>
-                                   <PlatformIcon platform={p} size={14} white={previewPlatform === p} />
-                                </button>
-                             ))}
-                          </div>
-                       )}
-                    </div>
-                    <div className="flex-1 bg-white rounded-3xl shadow-xl border border-white/50 overflow-hidden flex flex-col relative">
-                       <div className="h-12 border-b border-gray-50 flex items-center justify-center relative bg-white/80 backdrop-blur-sm">
-                          <PlatformIcon platform={previewPlatform} size={20} />
-                       </div>
-                       <div className="p-0 overflow-y-auto custom-scrollbar flex-1 bg-gray-50">
-                          {renderPreviewContent()}
-                       </div>
-                    </div>
-                 </div>
-              </div>
-
-              <div className="px-8 py-5 bg-white border-t border-gray-100 flex justify-between items-center sticky bottom-0 z-20">
-                 {editingPost ? (
-                    <button onClick={handleDeleteFromModal} className="text-red-500 hover:text-red-700 font-bold text-sm flex items-center gap-2"><Trash2 className="w-4 h-4" /> Delete</button>
-                 ) : <div></div>}
-                 <div className="flex gap-3">
-                    <button onClick={handleSaveDraft} className="px-5 py-3 rounded-full font-bold text-gray-500 hover:bg-gray-100 transition-colors flex items-center gap-2 text-sm">
-                       <Save className="w-4 h-4" /> Save Draft
-                    </button>
-                    <button onClick={() => setIsModalOpen(false)} className="px-5 py-3 rounded-full font-bold text-gray-500 hover:bg-gray-100">Cancel</button>
-                    <button 
-                       onClick={() => handleSavePost(false)}
-                       disabled={isCheckingSafety || (!newPostContent && !selectedMedia) || isOverLimit}
-                       className="px-8 py-3 bg-black text-white rounded-full font-bold shadow-xl hover:scale-105 active:scale-95 transition-all disabled:opacity-50 flex items-center gap-2"
-                    >
-                       {isCheckingSafety ? <RefreshCw className="w-4 h-4 animate-spin" /> : (editingPost ? 'Update' : 'Schedule')}
-                    </button>
-                 </div>
-              </div>
-           </div>
-        </div>
-      )}
-      
-      {/* Safety Compliance Modal */}
-      {showSafetyModal && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
-           <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-              <div className="bg-red-50 p-6 flex flex-col items-center text-center border-b border-red-100">
-                 <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4 text-red-600">
-                    <ShieldCheck className="w-8 h-8" />
-                 </div>
-                 <h3 className="text-xl font-bold text-red-900">Safety Check Warning</h3>
-                 <p className="text-sm text-red-700 mt-2">
-                    Our AI detected potential compliance issues with your content.
-                 </p>
-              </div>
-              <div className="p-6">
-                 <div className="bg-gray-50 rounded-xl p-4 border border-gray-100 mb-6">
-                    <ul className="space-y-2">
-                       {safetyIssues.map((issue, idx) => (
-                          <li key={idx} className="flex items-start gap-2 text-sm text-gray-700 font-medium">
-                             <AlertTriangle className="w-4 h-4 text-orange-500 shrink-0 mt-0.5" />
-                             {issue}
-                          </li>
-                       ))}
-                    </ul>
-                 </div>
-                 <div className="flex gap-3">
-                    <button 
-                       onClick={() => setShowSafetyModal(false)}
-                       className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl transition-colors"
-                    >
-                       Edit Post
-                    </button>
-                    <button 
-                       onClick={() => handleSavePost(true)}
-                       className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl transition-colors"
-                    >
-                       Schedule Anyway
-                    </button>
-                 </div>
-              </div>
-           </div>
-        </div>
-      )}
-
-      <MediaPicker isOpen={isMediaPickerOpen} onClose={() => setIsMediaPickerOpen(false)} onSelect={handleMediaSelect} />
     </div>
   );
 };

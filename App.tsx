@@ -12,12 +12,18 @@ import { MediaLibrary } from './pages/MediaLibrary';
 
 const App: React.FC = () => {
   const [currentPage, setCurrentPage] = useState('overview');
+  const [navParams, setNavParams] = useState<any>(undefined);
+
+  const handleNavigate = (page: string, params?: any) => {
+    setCurrentPage(page);
+    setNavParams(params);
+  };
 
   const renderPage = () => {
     switch (currentPage) {
       case 'overview': return <Overview />;
-      case 'creator': return <CreatorStudio />;
-      case 'calendar': return <Calendar />;
+      case 'creator': return <CreatorStudio onNavigate={handleNavigate} params={navParams} />;
+      case 'calendar': return <Calendar onNavigate={handleNavigate} />;
       case 'analytics': return <Analytics />;
       case 'bots': return <BotManager />;
       case 'users': return <UserManagement />;
@@ -38,7 +44,7 @@ const App: React.FC = () => {
   return (
     <div className="flex h-screen w-screen bg-[#F5F5F7] overflow-hidden text-[#1d1d1f]">
       {/* Sidebar - macOS Style */}
-      <Sidebar currentPage={currentPage} onNavigate={setCurrentPage} />
+      <Sidebar currentPage={currentPage} onNavigate={handleNavigate} />
       
       {/* Main Content Area - Card-like container on larger screens */}
       <main className="flex-1 h-full overflow-hidden relative">
