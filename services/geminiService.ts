@@ -122,8 +122,13 @@ export const validateContentSafety = async (
     }
 
     // Mock Hate/Aggression
-    if (lower.includes('hate') || lower.includes('stupid') || lower.includes('kill')) {
+    if (lower.includes('hate') || lower.includes('kill') || lower.includes('stupid')) {
       issues.push("Potential hostile or aggressive language detected.");
+    }
+    
+    // Mock Violence
+    if (lower.includes('blood') || lower.includes('attack') || lower.includes('weapon')) {
+       issues.push("Content contains references to violence or weapons.");
     }
 
     // Mock Platform Policy
@@ -142,16 +147,17 @@ export const validateContentSafety = async (
       Target Platforms: ${platforms.join(', ')}
       Content: "${content}"
 
-      Check for:
+      Strictly Check for the following categories:
       1. Profanity or Offensive Language
-      2. Hate Speech or Harassment
-      3. Dangerous Content
-      4. Platform-specific policy violations (e.g. clickbait, scams, prohibited terms)
+      2. Hate Speech or Harassment (Targeted attacks)
+      3. Violence or Physical Harm (Dangerous acts, weapons, self-harm)
+      4. Sexual Content (NSFW)
+      5. Platform-specific policy violations (e.g. clickbait, scams, prohibited terms)
 
       Return JSON:
       {
         "safe": boolean, // true if completely safe to post, false if any risks found
-        "issues": string[] // Concise list of specific warnings. Empty if safe.
+        "issues": string[] // Concise list of specific warnings. Example: ["Contains violent language", "Potential hate speech"]. Empty if safe.
       }
     `;
 

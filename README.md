@@ -61,22 +61,28 @@ ContentCaster is engineered to support multi-channel publishing with platform-sp
 
 ## ✨ Key Features
 
-### 1. 📊 Dashboard Overview
+### 1. 🛡️ AI Trust & Safety Engine (Content Protection)
+ContentCaster includes a built-in safety layer powered by Google Gemini to protect your brand reputation before any post goes live.
+- **Violence & Physical Harm**: Detects and blocks content promoting violence, self-harm, or dangerous acts.
+- **Hate Speech & Harassment**: Automatically flags discriminatory language or targeted harassment.
+- **Content Protection**: Checks for potential policy violations (e.g., scams, clickbait, NSFW content).
+- **Brand Safety**: Ensures tone consistency and prevents "PR disasters" by analyzing sentiment.
+
+### 2. 📊 Dashboard Overview
 - **Bento Grid Layout**: Real-time performance metrics (Reach, Engagement, Active Bots).
 - **Live Activity Feed**: Streaming logs from backend automation agents.
 - **Trend Detection**: AI analysis of viral topics to prompt immediate action.
 
-### 2. 🎨 Creator Studio (Enhanced)
+### 3. 🎨 Creator Studio (Enhanced)
 - **High-Fidelity Previews**: Pixel-perfect previews for Mobile/Desktop across all platforms.
 - **AI Copilot**: 
   - Generates content based on Tone (Professional, Funny, Viral).
   - Auto-suggests viral hashtags based on content context.
   - "Auto-Fix" grammar and style.
-- **Safety & Compliance**: Integrated `Google GenAI` safety checks for Hate Speech, Harassment, and Profanity before publishing.
 - **Smart Validation**: Real-time checks for character limits, media types (e.g., Video required for YouTube), and aspect ratios.
 - **YouTube Workflow**: Dedicated fields for Video Title and Thumbnail selection.
 
-### 3. 🤖 Bot Manager (Autonomous Agents)
+### 4. 🤖 Bot Manager (Autonomous Agents)
 A full suite of configurable agents with granular control rules:
 
 *   **Creator Bot**: Autonomous content engine.
@@ -88,24 +94,24 @@ A full suite of configurable agents with granular control rules:
 *   **Growth Bot**: Audience builder.
     *   *Config*: Follow strategies based on hashtags, Unfollow logic (e.g., after 7 days), Hourly safety throttles.
 
-### 4. 📅 Content Calendar
+### 5. 📅 Content Calendar
 - **Drag-and-Drop Scheduling**: Easily move posts to reschedule.
 - **Views**: Toggle between Month Grid and Agenda List views.
 - **Smart Filters**: Filter by Platform (e.g., show only LinkedIn posts) or Status (Draft/Scheduled/Published).
 - **Timezone Awareness**: Multi-timezone scheduling support.
 
-### 5. 📈 Advanced Analytics
+### 6. 📈 Advanced Analytics
 - **Cross-Platform Metrics**: Compare growth across Twitter, LinkedIn, etc.
 - **AI Insights**: Text-based analysis of performance (e.g., "Video content is performing 40% better on Tuesdays").
 - **Engagement Heatmaps**: Visualize peak interaction times.
 
-### 6. 🖼️ Media Library
+### 7. 🖼️ Media Library
 - **Central Asset Repo**: Manage Images (JPG, PNG, WEBP) and Videos (MP4).
 - **Details Inspector**: View metadata (Size, Dimensions, Date).
 - **Video Preview**: Hover-to-play functionality for quick video scanning.
 - **Optimization Tools**: Mock capability to crop/resize assets for specific platforms (Square/Story).
 
-### 7. 👥 User Management (RBAC)
+### 8. 👥 User Management (RBAC)
 - **Role-Based Access**:
   - **Admin**: Full system control.
   - **Monitor**: Manage bots and view analytics (Read/Write limited).
