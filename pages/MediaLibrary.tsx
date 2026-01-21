@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Image, Video, UploadCloud, Trash2, Maximize2, Scissors, Check, AlertTriangle, FileVideo, Download } from 'lucide-react';
+import { Image, Video, UploadCloud, Trash2, Maximize2, Scissors, Check, AlertTriangle, FileVideo, Download, X } from 'lucide-react';
 import { store } from '../services/mockStore';
 import { MediaItem } from '../types';
 
@@ -23,10 +23,7 @@ export const MediaLibrary: React.FC = () => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       await processUpload(file);
-      // Reset input to allow selecting the same file again if needed
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
@@ -45,241 +42,147 @@ export const MediaLibrary: React.FC = () => {
 
   const handleDelete = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
-    if (window.confirm("Are you sure you want to delete this file?")) {
+    if (window.confirm("Are you sure?")) {
       await store.deleteMedia(id);
       await loadMedia();
       if (selectedItem?.id === id) setSelectedItem(null);
     }
   };
 
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-  };
-
-  const handleDrop = async (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      await processUpload(e.dataTransfer.files[0]);
-    }
-  };
-
-  const formatBytes = (bytes: number, decimals = 2) => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const dm = decimals < 0 ? 0 : decimals;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
-  };
-
   const handleOptimize = async (variant: string) => {
     if (!selectedItem) return;
     setIsUploading(true);
-    // Simulate processing delay for realistic feel
     await new Promise(resolve => setTimeout(resolve, 1000));
-    
     try {
       await store.createOptimizedCopy(selectedItem.id, variant);
       await loadMedia();
-      setSelectedItem(null); // Close modal on success
+      setSelectedItem(null);
     } catch (err) {
-      console.error("Optimization failed", err);
       setError("Failed to create optimized variant");
     } finally {
       setIsUploading(false);
     }
   };
 
+  const formatBytes = (bytes: number) => {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+  };
+
   return (
-    <div className="h-full flex flex-col gap-6">
-      <header>
-        <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-          <Image className="w-6 h-6 text-blue-600" />
-          Media Library
-        </h1>
-        <p className="text-slate-500">Upload, manage, and optimize your creative assets.</p>
+    <div className="h-full flex flex-col gap-8 animate-in fade-in duration-500">
+      <header className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Assets</h1>
+          <p className="text-slate-500 font-medium mt-1">Centralized media repository.</p>
+        </div>
+        <button 
+           onClick={() => fileInputRef.current?.click()}
+           className="bg-slate-900 text-white px-5 py-2.5 rounded-full font-bold text-sm shadow-lg hover:bg-slate-800 transition-all flex items-center gap-2"
+        >
+           <UploadCloud className="w-4 h-4" /> Upload
+        </button>
       </header>
 
-      {/* Upload Area */}
-      <div 
-        className={`bg-white border-2 border-dashed rounded-xl p-8 text-center transition-colors cursor-pointer ${isUploading ? 'bg-slate-50 border-blue-300' : 'border-slate-300 hover:border-blue-400 hover:bg-slate-50'}`}
-        onClick={() => fileInputRef.current?.click()}
-        onDragOver={handleDragOver}
-        onDrop={handleDrop}
-      >
-        <input 
-          type="file" 
-          ref={fileInputRef} 
-          className="hidden" 
-          accept="image/png, image/jpeg, image/webp, video/mp4" 
-          onChange={handleFileSelect}
-        />
-        
-        {isUploading ? (
-          <div className="flex flex-col items-center">
-            <div className="w-10 h-10 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-3"></div>
-            <p className="text-slate-600 font-medium">Processing File...</p>
-          </div>
-        ) : (
-          <div className="flex flex-col items-center pointer-events-none">
-            <div className="p-4 bg-blue-50 text-blue-600 rounded-full mb-4">
-              <UploadCloud className="w-8 h-8" />
-            </div>
-            <h3 className="text-lg font-semibold text-slate-900 mb-1">Click to upload or drag and drop</h3>
-            <p className="text-sm text-slate-500 max-w-sm mx-auto">
-              Supports JPG, PNG, WEBP (Images) and MP4 (Video).
-              <br />
-              <span className="text-xs text-slate-400">Max size: 50MB for videos.</span>
-            </p>
-            {error && (
-              <div className="mt-4 p-2 bg-red-50 text-red-600 text-sm rounded flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4" /> {error}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+      <input type="file" ref={fileInputRef} className="hidden" accept="image/*,video/mp4" onChange={handleFileSelect} />
 
-      {/* Media Grid */}
+      {/* Grid */}
       <div className="flex-1 overflow-y-auto">
-        {mediaItems.length === 0 ? (
-          <div className="text-center py-20 text-slate-400">
-            <Image className="w-12 h-12 mx-auto mb-3 opacity-20" />
-            <p>Your library is empty.</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-            {mediaItems.map((item) => (
-              <div 
-                key={item.id} 
-                className="group relative bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow cursor-pointer"
-                onClick={() => setSelectedItem(item)}
-              >
-                <div className="aspect-square bg-slate-100 relative flex items-center justify-center overflow-hidden">
-                  {item.type === 'image' ? (
-                    <img src={item.url} alt={item.name} className="w-full h-full object-cover transition-transform group-hover:scale-105" />
-                  ) : (
-                    <div className="text-slate-400 flex flex-col items-center">
-                      <FileVideo className="w-12 h-12 mb-2" />
-                      <span className="text-xs font-mono">MP4</span>
-                    </div>
-                  )}
-                  
-                  {/* Overlay Actions */}
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                     <button 
-                        onClick={(e) => handleDelete(e, item.id)}
-                        className="p-2 bg-white text-red-600 rounded-full hover:bg-red-50" title="Delete"
-                     >
-                        <Trash2 className="w-4 h-4" />
-                     </button>
-                     <button className="p-2 bg-white text-blue-600 rounded-full hover:bg-blue-50" title="View">
-                        <Maximize2 className="w-4 h-4" />
-                     </button>
-                  </div>
-                </div>
-                
-                <div className="p-3">
-                  <p className="text-sm font-medium text-slate-900 truncate" title={item.name}>{item.name}</p>
-                  <div className="flex justify-between items-center mt-1">
-                    <span className="text-xs text-slate-500">{formatBytes(item.size)}</span>
-                    <span className="text-[10px] uppercase bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200">
-                      {item.type}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
+           {/* Upload Placeholder */}
+           <div 
+             onClick={() => fileInputRef.current?.click()}
+             className="aspect-square rounded-2xl border-2 border-dashed border-slate-200 hover:border-blue-400 hover:bg-blue-50/50 transition-all flex flex-col items-center justify-center cursor-pointer group text-slate-400 hover:text-blue-500"
+           >
+             <div className="w-12 h-12 rounded-full bg-slate-50 group-hover:bg-blue-100 flex items-center justify-center mb-3 transition-colors">
+               {isUploading ? <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"/> : <UploadCloud className="w-6 h-6" />}
+             </div>
+             <span className="text-sm font-semibold">New Asset</span>
+           </div>
 
-      {/* Preview/Optimize Modal */}
-      {selectedItem && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm" onClick={() => setSelectedItem(null)}>
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col md:flex-row h-[80vh]" onClick={e => e.stopPropagation()}>
-            
-            {/* Preview Section */}
-            <div className="flex-1 bg-slate-900 flex items-center justify-center p-6 relative">
-               {selectedItem.type === 'image' ? (
-                 <img src={selectedItem.url} alt="Preview" className="max-w-full max-h-full object-contain" />
-               ) : (
-                 <video src={selectedItem.url} controls className="max-w-full max-h-full" />
-               )}
-            </div>
-
-            {/* Sidebar Controls */}
-            <div className="w-full md:w-80 bg-white border-l border-slate-200 flex flex-col">
-              <div className="p-6 border-b border-slate-100">
-                <h3 className="font-bold text-lg text-slate-900 mb-1">Asset Details</h3>
-                <p className="text-sm text-slate-500 break-all">{selectedItem.name}</p>
-              </div>
-
-              <div className="p-6 flex-1 overflow-y-auto space-y-6">
-                <div>
-                   <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">File Info</h4>
-                   <div className="space-y-2 text-sm">
-                      <div className="flex justify-between"><span className="text-slate-500">Size:</span> <span className="text-slate-900 font-medium">{formatBytes(selectedItem.size)}</span></div>
-                      <div className="flex justify-between"><span className="text-slate-500">Type:</span> <span className="text-slate-900 font-medium uppercase">{selectedItem.type}</span></div>
-                      <div className="flex justify-between"><span className="text-slate-500">Date:</span> <span className="text-slate-900 font-medium">{new Date(selectedItem.createdAt).toLocaleDateString()}</span></div>
-                   </div>
-                </div>
-
-                {selectedItem.type === 'image' && (
-                  <div>
-                    <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
-                       <Scissors className="w-3 h-3" /> Smart Optimization
-                    </h4>
-                    <p className="text-xs text-slate-500 mb-3">Generate optimized variants for social platforms.</p>
-                    
-                    <div className="space-y-2">
-                      <button 
-                        onClick={() => handleOptimize('Square')}
-                        className="w-full flex items-center justify-between p-3 rounded-lg border border-slate-200 hover:border-blue-400 hover:bg-blue-50 transition-all group"
-                      >
-                         <div className="flex items-center gap-2">
-                           <div className="w-4 h-4 border border-slate-400 rounded-sm"></div>
-                           <span className="text-sm font-medium text-slate-700 group-hover:text-blue-700">Square (1:1)</span>
-                         </div>
-                         <Download className="w-4 h-4 text-slate-400 group-hover:text-blue-600" />
-                      </button>
-                      <button 
-                        onClick={() => handleOptimize('Story')}
-                        className="w-full flex items-center justify-between p-3 rounded-lg border border-slate-200 hover:border-blue-400 hover:bg-blue-50 transition-all group"
-                      >
-                         <div className="flex items-center gap-2">
-                           <div className="w-3 h-5 border border-slate-400 rounded-sm"></div>
-                           <span className="text-sm font-medium text-slate-700 group-hover:text-blue-700">Story (9:16)</span>
-                         </div>
-                         <Download className="w-4 h-4 text-slate-400 group-hover:text-blue-600" />
-                      </button>
-                      <button 
-                        onClick={() => handleOptimize('Landscape')}
-                        className="w-full flex items-center justify-between p-3 rounded-lg border border-slate-200 hover:border-blue-400 hover:bg-blue-50 transition-all group"
-                      >
-                         <div className="flex items-center gap-2">
-                           <div className="w-5 h-3 border border-slate-400 rounded-sm"></div>
-                           <span className="text-sm font-medium text-slate-700 group-hover:text-blue-700">Landscape (16:9)</span>
-                         </div>
-                         <Download className="w-4 h-4 text-slate-400 group-hover:text-blue-600" />
-                      </button>
-                    </div>
+           {mediaItems.map((item) => (
+             <div 
+               key={item.id} 
+               onClick={() => setSelectedItem(item)}
+               className="group relative aspect-square bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden cursor-pointer hover:shadow-lg hover:translate-y-[-2px] transition-all duration-300"
+             >
+                {item.type === 'image' ? (
+                  <img src={item.url} className="w-full h-full object-cover" alt={item.name} />
+                ) : (
+                  <div className="w-full h-full flex flex-col items-center justify-center bg-slate-50 text-slate-400">
+                    <FileVideo className="w-10 h-10 mb-2" />
+                    <span className="text-[10px] font-bold uppercase tracking-widest">Video</span>
                   </div>
                 )}
+                
+                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-4 translate-y-full group-hover:translate-y-0 transition-transform duration-300">
+                   <p className="text-white text-sm font-medium truncate">{item.name}</p>
+                   <p className="text-white/60 text-xs">{formatBytes(item.size)}</p>
+                </div>
+
+                <button 
+                  onClick={(e) => handleDelete(e, item.id)}
+                  className="absolute top-2 right-2 p-2 bg-white/90 backdrop-blur text-red-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-50"
+                >
+                   <Trash2 className="w-4 h-4" />
+                </button>
+             </div>
+           ))}
+        </div>
+      </div>
+
+      {/* Asset Viewer Modal */}
+      {selectedItem && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/90 backdrop-blur-md animate-in fade-in">
+           <div className="bg-white rounded-[32px] w-full max-w-5xl h-[80vh] flex overflow-hidden shadow-2xl relative">
+              <button 
+                onClick={() => setSelectedItem(null)}
+                className="absolute top-4 right-4 z-10 bg-black/10 hover:bg-black/20 text-slate-800 p-2 rounded-full backdrop-blur-sm transition-colors"
+              >
+                <X className="w-6 h-6" />
+              </button>
+
+              <div className="flex-1 bg-slate-100 flex items-center justify-center p-8">
+                 {selectedItem.type === 'image' ? (
+                   <img src={selectedItem.url} className="max-w-full max-h-full object-contain shadow-lg rounded-lg" alt="Preview" />
+                 ) : (
+                   <video src={selectedItem.url} controls className="max-w-full max-h-full rounded-lg shadow-lg" />
+                 )}
               </div>
 
-              <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end">
-                <button 
-                  onClick={() => setSelectedItem(null)}
-                  className="px-4 py-2 bg-white border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-100"
-                >
-                  Close
-                </button>
+              <div className="w-96 bg-white border-l border-slate-100 flex flex-col p-8">
+                 <h3 className="text-xl font-bold text-slate-900 mb-1 line-clamp-2">{selectedItem.name}</h3>
+                 <p className="text-sm text-slate-400 font-medium mb-6">Added on {new Date(selectedItem.createdAt).toLocaleDateString()}</p>
+                 
+                 <div className="space-y-4 mb-8">
+                    <div className="flex justify-between py-3 border-b border-slate-50">
+                      <span className="text-sm text-slate-500">Size</span>
+                      <span className="text-sm font-semibold text-slate-900">{formatBytes(selectedItem.size)}</span>
+                    </div>
+                    <div className="flex justify-between py-3 border-b border-slate-50">
+                      <span className="text-sm text-slate-500">Dimensions</span>
+                      <span className="text-sm font-semibold text-slate-900">{selectedItem.dimensions || 'Unknown'}</span>
+                    </div>
+                 </div>
+
+                 {selectedItem.type === 'image' && (
+                    <div className="space-y-3">
+                       <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Smart Actions</h4>
+                       <button onClick={() => handleOptimize('Square')} className="w-full flex items-center justify-between p-4 bg-slate-50 hover:bg-slate-100 rounded-xl transition-colors group">
+                          <span className="text-sm font-bold text-slate-700">Square (1:1)</span>
+                          <Scissors className="w-4 h-4 text-slate-400 group-hover:text-blue-600" />
+                       </button>
+                       <button onClick={() => handleOptimize('Story')} className="w-full flex items-center justify-between p-4 bg-slate-50 hover:bg-slate-100 rounded-xl transition-colors group">
+                          <span className="text-sm font-bold text-slate-700">Story (9:16)</span>
+                          <Scissors className="w-4 h-4 text-slate-400 group-hover:text-blue-600" />
+                       </button>
+                    </div>
+                 )}
               </div>
-            </div>
-          </div>
+           </div>
         </div>
       )}
     </div>

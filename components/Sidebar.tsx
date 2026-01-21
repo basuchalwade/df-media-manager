@@ -8,57 +8,78 @@ interface SidebarProps {
 
 export const Sidebar: React.FC<SidebarProps> = ({ currentPage, onNavigate }) => {
   const menuItems = [
-    { id: 'overview', label: 'Overview', icon: LayoutDashboard },
-    { id: 'creator', label: 'Creator Studio', icon: PenTool },
-    { id: 'media', label: 'Media Library', icon: Image },
-    { id: 'calendar', label: 'Calendar', icon: Calendar },
-    { id: 'bots', label: 'Bot Manager', icon: Bot },
-    { id: 'analytics', label: 'Analytics', icon: BarChart3 },
-    { id: 'integrations', label: 'Integrations', icon: Link },
-    { id: 'users', label: 'User Management', icon: Users },
-    { id: 'settings', label: 'Settings', icon: Settings },
+    { section: 'Workspace', items: [
+      { id: 'overview', label: 'Overview', icon: LayoutDashboard },
+      { id: 'creator', label: 'Creator Studio', icon: PenTool },
+      { id: 'media', label: 'Media Library', icon: Image },
+      { id: 'calendar', label: 'Calendar', icon: Calendar },
+    ]},
+    { section: 'Automation', items: [
+      { id: 'bots', label: 'Bot Manager', icon: Bot },
+      { id: 'analytics', label: 'Analytics', icon: BarChart3 },
+    ]},
+    { section: 'System', items: [
+      { id: 'integrations', label: 'Integrations', icon: Link },
+      { id: 'users', label: 'Team', icon: Users },
+      { id: 'settings', label: 'Settings', icon: Settings },
+    ]}
   ];
 
   return (
-    <div className="w-64 bg-slate-900 text-white h-screen fixed left-0 top-0 flex flex-col border-r border-slate-800 z-50">
-      <div className="p-6 flex items-center gap-3">
-        <div className="bg-blue-600 p-2 rounded-lg">
-          <Radio className="w-6 h-6 text-white animate-pulse" />
-        </div>
-        <div>
-          <h1 className="text-xl font-bold tracking-tight">PostMaster</h1>
-          <p className="text-xs text-slate-400">Enterprise Edition</p>
+    <div className="w-[260px] h-full flex flex-col flex-shrink-0 bg-[#F5F5F7]/80 backdrop-blur-2xl border-r border-black/5 select-none">
+      {/* Header */}
+      <div className="p-6 pb-2">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-b from-gray-800 to-black text-white flex items-center justify-center shadow-lg shadow-black/20">
+            <Radio className="w-4 h-4" strokeWidth={2.5} />
+          </div>
+          <div>
+            <h1 className="text-[15px] font-bold tracking-tight text-[#1d1d1f] leading-none">PostMaster</h1>
+            <span className="text-[11px] text-gray-500 font-medium">Enterprise</span>
+          </div>
         </div>
       </div>
 
-      <nav className="flex-1 px-4 py-4 space-y-1">
-        {menuItems.map((item) => {
-          const Icon = item.icon;
-          const isActive = currentPage === item.id;
-          return (
-            <button
-              key={item.id}
-              onClick={() => onNavigate(item.id)}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
-                isActive 
-                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' 
-                  : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-              }`}
-            >
-              <Icon className="w-5 h-5" />
-              {item.label}
-            </button>
-          );
-        })}
-      </nav>
-
-      <div className="p-4 border-t border-slate-800">
-        <div className="bg-slate-800 rounded-lg p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-2 h-2 rounded-full bg-green-500"></div>
-            <span className="text-xs font-medium text-slate-300">System Healthy</span>
+      {/* Navigation */}
+      <div className="flex-1 overflow-y-auto px-4 py-2 space-y-6 custom-scrollbar">
+        {menuItems.map((group, idx) => (
+          <div key={idx}>
+            <h3 className="px-3 mb-2 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">{group.section}</h3>
+            <div className="space-y-0.5">
+              {group.items.map((item) => {
+                const Icon = item.icon;
+                const isActive = currentPage === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => onNavigate(item.id)}
+                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-all duration-200 apple-ease group ${
+                      isActive 
+                        ? 'bg-black/5 text-black' // Subtle gray selection like macOS Finder
+                        : 'text-gray-500 hover:bg-black/5 hover:text-black'
+                    }`}
+                  >
+                    <Icon 
+                      className={`w-[18px] h-[18px] ${isActive ? 'text-blue-600' : 'text-gray-400 group-hover:text-gray-600'}`} 
+                      strokeWidth={isActive ? 2.5 : 2} 
+                    />
+                    {item.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
-          <p className="text-xs text-slate-500">v1.2.0 (Stable)</p>
+        ))}
+      </div>
+
+      {/* User / Footer */}
+      <div className="p-4 border-t border-black/5">
+        <div className="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-black/5 transition-colors cursor-pointer">
+          <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-500 to-purple-500 shadow-sm border border-white/20"></div>
+          <div className="flex-1 min-w-0">
+            <p className="text-[13px] font-semibold text-gray-900 truncate">Admin User</p>
+            <p className="text-[11px] text-gray-500 truncate">Pro Plan</p>
+          </div>
         </div>
       </div>
     </div>

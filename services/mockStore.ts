@@ -79,7 +79,7 @@ const INITIAL_USERS: User[] = [
 
 // Simple in-memory store to simulate backend persistence in the frontend demo
 class MockStore {
-  private posts: Post[] = [...INITIAL_POSTS];
+  private posts: Post[] = [];
   private bots: BotConfig[] = [...INITIAL_BOTS];
   private settings: UserSettings;
   private users: User[];
@@ -93,6 +93,9 @@ class MockStore {
 
     const savedUsers = localStorage.getItem('postmaster_users');
     this.users = savedUsers ? JSON.parse(savedUsers) : [...INITIAL_USERS];
+
+    const savedPosts = localStorage.getItem('postmaster_posts');
+    this.posts = savedPosts ? JSON.parse(savedPosts) : [...INITIAL_POSTS];
   }
 
   // --- Session Simulation ---
@@ -133,7 +136,24 @@ class MockStore {
 
   addPost(post: Post): Promise<Post> {
     this.posts.unshift(post);
+    this.savePosts();
     return Promise.resolve(post);
+  }
+
+  updatePost(post: Post): Promise<Post> {
+    this.posts = this.posts.map(p => p.id === post.id ? post : p);
+    this.savePosts();
+    return Promise.resolve(post);
+  }
+
+  deletePost(id: string): Promise<void> {
+    this.posts = this.posts.filter(p => p.id !== id);
+    this.savePosts();
+    return Promise.resolve();
+  }
+
+  private savePosts() {
+    localStorage.setItem('postmaster_posts', JSON.stringify(this.posts));
   }
 
   // --- Bots ---

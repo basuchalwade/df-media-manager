@@ -6,25 +6,65 @@
     <title>PostMaster | AI Social Media Automation</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+      
+      :root {
+        --apple-gray-bg: #F5F5F7;
+        --apple-blue: #007AFF;
+      }
+
       body {
-        font-family: 'Inter', sans-serif;
-        background-color: #f8fafc;
+        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", "Inter", Roboto, Helvetica, Arial, sans-serif;
+        background-color: var(--apple-gray-bg);
+        color: #1d1d1f;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        overflow: hidden; /* App container handles scrolling */
       }
-      /* Custom scrollbar for dashboard */
+
+      /* Apple-style thin scrollbar */
       ::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
-      }
-      ::-webkit-scrollbar-track {
+        width: 0px; /* Hidden by default for cleaner look, or very thin */
         background: transparent;
       }
-      ::-webkit-scrollbar-thumb {
-        background: #cbd5e1;
-        border-radius: 4px;
+      
+      .custom-scrollbar::-webkit-scrollbar {
+        width: 6px;
       }
-      ::-webkit-scrollbar-thumb:hover {
-        background: #94a3b8;
+      .custom-scrollbar::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .custom-scrollbar::-webkit-scrollbar-thumb {
+        background: rgba(0, 0, 0, 0.1);
+        border-radius: 100vh;
+      }
+      .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+        background: rgba(0, 0, 0, 0.2);
+      }
+      
+      /* Smooth transitions with Apple-like easing */
+      .apple-ease {
+        transition-timing-function: cubic-bezier(0.25, 0.1, 0.25, 1.0);
+      }
+
+      /* Glassmorphism Utilities */
+      .glass-panel {
+        background: rgba(255, 255, 255, 0.72);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border: 1px solid rgba(255, 255, 255, 0.5);
+      }
+      
+      .glass-card {
+        background: rgba(255, 255, 255, 0.85);
+        backdrop-filter: blur(12px);
+        box-shadow: 0 4px 24px -1px rgba(0, 0, 0, 0.04);
+      }
+
+      /* Selection Color */
+      ::selection {
+        background: rgba(0, 122, 255, 0.2);
+        color: #000;
       }
     </style>
   <script type="importmap">

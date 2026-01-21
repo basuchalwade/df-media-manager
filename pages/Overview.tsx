@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Activity, Users, TrendingUp, Share2, AlertCircle } from 'lucide-react';
+import { Activity, Users, TrendingUp, Share2, ArrowRight, ChevronRight } from 'lucide-react';
 import { store } from '../services/mockStore';
 import { DashboardStats, BotConfig } from '../types';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
+import { AreaChart, Area, XAxis, Tooltip, ResponsiveContainer } from 'recharts';
 
 export const Overview: React.FC = () => {
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -16,147 +16,139 @@ export const Overview: React.FC = () => {
       setBots(b);
     };
     loadData();
-    const interval = setInterval(loadData, 5000); // Poll for updates
+    const interval = setInterval(loadData, 5000);
     return () => clearInterval(interval);
   }, []);
 
+  // Smoother chart data
   const chartData = [
     { name: 'Mon', reach: 4000, engagement: 2400 },
-    { name: 'Tue', reach: 3000, engagement: 1398 },
-    { name: 'Wed', reach: 2000, engagement: 9800 },
+    { name: 'Tue', reach: 3000, engagement: 3398 },
+    { name: 'Wed', reach: 4000, engagement: 2800 },
     { name: 'Thu', reach: 2780, engagement: 3908 },
-    { name: 'Fri', reach: 1890, engagement: 4800 },
-    { name: 'Sat', reach: 2390, engagement: 3800 },
-    { name: 'Sun', reach: 3490, engagement: 4300 },
+    { name: 'Fri', reach: 4890, engagement: 4800 },
+    { name: 'Sat', reach: 5390, engagement: 3800 },
+    { name: 'Sun', reach: 6490, engagement: 4300 },
   ];
 
-  if (!stats) return <div className="p-8 text-slate-500">Loading Dashboard...</div>;
+  if (!stats) return <div className="p-8 text-gray-400 font-medium">Loading Overview...</div>;
 
   return (
-    <div className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-bold text-slate-900">Dashboard Overview</h1>
-        <p className="text-slate-500">Welcome back. Here's what's happening today.</p>
-      </header>
+    <div className="space-y-8 animate-in fade-in duration-700">
+      
+      {/* Title */}
+      <div className="flex flex-col gap-1 px-2">
+        <h1 className="text-[34px] font-bold text-[#1d1d1f] tracking-tight">Summary</h1>
+        <p className="text-lg text-gray-500 font-medium">Your social performance today.</p>
+      </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard 
-          title="Total Reach" 
-          value={stats.totalReach.toLocaleString()} 
-          icon={Activity} 
-          trend="+12.5%" 
-          color="blue" 
-        />
-        <StatCard 
-          title="Engagement Rate" 
+      {/* Main Grid - Bento Style */}
+      <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-6 auto-rows-min">
+        
+        {/* Large Chart Card */}
+        <div className="md:col-span-2 xl:col-span-2 row-span-2 bg-white rounded-[32px] p-8 shadow-[0_8px_30px_rgba(0,0,0,0.04)] border border-black/5 relative overflow-hidden group">
+           <div className="flex justify-between items-start mb-2 relative z-10">
+              <div>
+                <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">Total Reach</h3>
+                <div className="text-4xl font-bold text-[#1d1d1f] mt-1 tracking-tight">{stats.totalReach.toLocaleString()}</div>
+              </div>
+              <div className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-bold flex items-center">
+                 <TrendingUp className="w-3 h-3 mr-1" /> +12%
+              </div>
+           </div>
+           
+           <div className="absolute inset-x-0 bottom-0 h-48 w-full">
+             <ResponsiveContainer width="100%" height="100%">
+               <AreaChart data={chartData}>
+                 <defs>
+                   <linearGradient id="colorReach" x1="0" y1="0" x2="0" y2="1">
+                     <stop offset="0%" stopColor="#007AFF" stopOpacity={0.2}/>
+                     <stop offset="100%" stopColor="#007AFF" stopOpacity={0}/>
+                   </linearGradient>
+                 </defs>
+                 <Tooltip cursor={false} content={<CustomTooltip />} />
+                 <Area 
+                   type="monotone" 
+                   dataKey="reach" 
+                   stroke="#007AFF" 
+                   strokeWidth={3} 
+                   fill="url(#colorReach)" 
+                   animationDuration={1500}
+                 />
+               </AreaChart>
+             </ResponsiveContainer>
+           </div>
+        </div>
+
+        {/* Metric Cards - Apple Health Style */}
+        <MetricCard 
+          title="Engagement" 
           value={`${stats.engagementRate}%`} 
-          icon={TrendingUp} 
-          trend="+2.1%" 
-          color="green" 
+          icon={Activity} 
+          color="bg-orange-500"
+          footer="Average across all channels"
         />
-        <StatCard 
+        <MetricCard 
           title="Active Bots" 
           value={stats.activeBots.toString()} 
           icon={Users} 
-          subtext="Running optimally" 
-          color="purple" 
+          color="bg-purple-500" 
+          footer="Running efficiently"
         />
-        <StatCard 
-          title="Total Posts" 
+        <MetricCard 
+          title="Posts Published" 
           value={stats.totalPosts.toString()} 
           icon={Share2} 
-          subtext="Across 6 platforms" 
-          color="orange" 
+          color="bg-blue-500" 
+          footer="Last 7 days"
         />
-      </div>
-
-      {/* Charts & Activity */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Main Chart */}
-        <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-          <h3 className="text-lg font-semibold text-slate-900 mb-4">Weekly Performance</h3>
-          <div className="h-72 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChartComponent data={chartData} />
-            </ResponsiveContainer>
-          </div>
+        
+        {/* Quick Action / Insight */}
+        <div className="bg-black text-white rounded-[32px] p-6 shadow-xl flex flex-col justify-between relative overflow-hidden cursor-pointer group hover:scale-[1.02] transition-transform">
+           <div className="absolute top-0 right-0 w-32 h-32 bg-gray-800 rounded-full blur-2xl -mr-10 -mt-10 opacity-50"></div>
+           <div className="relative z-10">
+              <div className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center mb-4">
+                 <TrendingUp className="w-5 h-5 text-white" />
+              </div>
+              <h3 className="text-lg font-bold leading-tight mb-2">Viral Trend Detected</h3>
+              <p className="text-sm text-gray-300 font-medium">"AI in Healthcare" is trending on Twitter.</p>
+           </div>
+           <div className="relative z-10 flex items-center gap-2 text-sm font-semibold mt-4 text-blue-300 group-hover:text-blue-200">
+              Create Post <ChevronRight className="w-4 h-4" />
+           </div>
         </div>
 
-        {/* Live Bot Logs */}
-        <div className="bg-slate-900 text-slate-100 rounded-xl shadow-sm p-6 overflow-hidden flex flex-col">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-              Live Bot Activity
-            </h3>
-            <span className="text-xs bg-slate-800 px-2 py-1 rounded">Real-time</span>
-          </div>
-          <div className="flex-1 overflow-y-auto space-y-3 pr-2 custom-scrollbar" style={{ maxHeight: '300px' }}>
-            {bots.filter(b => b.logs.length > 0).flatMap(b => b.logs.map((log, i) => (
-              <div key={`${b.type}-${i}`} className="text-sm border-l-2 border-blue-500 pl-3 py-1">
-                <div className="text-xs text-slate-400 flex justify-between">
-                  <span>{b.type}</span>
-                  <span>Now</span>
-                </div>
-                <div className="text-slate-200 mt-0.5">{log}</div>
-              </div>
-            )))}
-            {bots.every(b => b.logs.length === 0) && (
-              <div className="text-slate-500 text-sm text-center py-10 italic">
-                No recent activity. Enable bots in Bot Manager.
-              </div>
-            )}
-          </div>
-        </div>
       </div>
     </div>
   );
 };
 
-// Components helpers
-const StatCard = ({ title, value, icon: Icon, trend, subtext, color }: any) => {
-  const colors: any = {
-    blue: "bg-blue-50 text-blue-600",
-    green: "bg-green-50 text-green-600",
-    purple: "bg-purple-50 text-purple-600",
-    orange: "bg-orange-50 text-orange-600",
-  };
-
-  return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-sm font-medium text-slate-500">{title}</p>
-          <h3 className="text-2xl font-bold text-slate-900 mt-1">{value}</h3>
+const MetricCard = ({ title, value, icon: Icon, color, footer }: any) => (
+  <div className="bg-white rounded-[32px] p-6 shadow-[0_8px_30px_rgba(0,0,0,0.04)] border border-black/5 flex flex-col justify-between hover:scale-[1.02] transition-transform duration-300 apple-ease">
+     <div className="flex items-start justify-between">
+        <div className="flex flex-col">
+           <span className="text-[13px] font-semibold text-gray-500 flex items-center gap-2 mb-2">
+             <span className={`w-2 h-2 rounded-full ${color}`}></span>
+             {title}
+           </span>
+           <span className="text-3xl font-bold text-[#1d1d1f] tracking-tight">{value}</span>
         </div>
-        <div className={`p-2 rounded-lg ${colors[color]}`}>
-          <Icon className="w-5 h-5" />
+        <div className={`p-2 rounded-full bg-gray-50 text-gray-400`}>
+           <Icon className="w-5 h-5" />
         </div>
-      </div>
-      <div className="mt-4 flex items-center text-sm">
-        {trend ? (
-          <span className="text-green-600 font-medium flex items-center gap-1">
-            {trend} <span className="text-slate-400 font-normal">vs last week</span>
-          </span>
-        ) : (
-          <span className="text-slate-400">{subtext}</span>
-        )}
-      </div>
-    </div>
-  );
-};
-
-const AreaChartComponent = ({ data }: { data: any[] }) => (
-  <LineChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b' }} dy={10} />
-    <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b' }} />
-    <Tooltip 
-      contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', color: '#fff' }}
-      itemStyle={{ color: '#fff' }}
-    />
-    <Line type="monotone" dataKey="reach" stroke="#2563eb" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
-    <Line type="monotone" dataKey="engagement" stroke="#10b981" strokeWidth={3} dot={{ r: 4 }} />
-  </LineChart>
+     </div>
+     {footer && <div className="mt-4 pt-4 border-t border-gray-100 text-xs font-medium text-gray-400">{footer}</div>}
+  </div>
 );
+
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-white/90 backdrop-blur-md p-3 rounded-xl shadow-xl border border-white/20 text-xs font-semibold text-gray-700">
+        <p className="mb-1 text-gray-400">{label}</p>
+        <p className="text-blue-600">{payload[0].value.toLocaleString()} Reach</p>
+      </div>
+    );
+  }
+  return null;
+};

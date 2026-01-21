@@ -10,7 +10,6 @@ import { UserManagement } from './pages/UserManagement';
 import { Integrations } from './pages/Integrations';
 import { MediaLibrary } from './pages/MediaLibrary';
 
-// Simple Router implementation since we're using hash-based navigation for simplicity in this output
 const App: React.FC = () => {
   const [currentPage, setCurrentPage] = useState('overview');
 
@@ -26,9 +25,9 @@ const App: React.FC = () => {
       case 'media': return <MediaLibrary />;
       case 'settings': return <Settings />;
       default: return (
-        <div className="flex items-center justify-center h-full text-slate-400">
+        <div className="flex items-center justify-center h-full text-gray-400">
           <div className="text-center">
-             <h2 className="text-xl font-bold mb-2">Coming Soon</h2>
+             <h2 className="text-xl font-bold mb-2 tracking-tight">Coming Soon</h2>
              <p>The {currentPage} module is under development.</p>
           </div>
         </div>
@@ -37,19 +36,25 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="flex min-h-screen bg-slate-50">
+    <div className="flex h-screen w-screen bg-[#F5F5F7] overflow-hidden text-[#1d1d1f]">
+      {/* Sidebar - macOS Style */}
       <Sidebar currentPage={currentPage} onNavigate={setCurrentPage} />
       
-      <main className="flex-1 ml-64 p-8 overflow-y-auto h-screen">
-        <div className="max-w-7xl mx-auto h-full">
-          {renderPage()}
+      {/* Main Content Area - Card-like container on larger screens */}
+      <main className="flex-1 h-full overflow-hidden relative">
+        <div className="h-full overflow-y-auto custom-scrollbar p-6 lg:p-10 scroll-smooth">
+          <div className="max-w-[1400px] mx-auto min-h-full pb-20">
+            {renderPage()}
+          </div>
         </div>
       </main>
 
-      {/* Backend Connection Indicator */}
-      <div className="fixed bottom-4 right-4 bg-white/90 backdrop-blur border border-slate-200 px-3 py-1.5 rounded-full text-xs font-medium text-slate-500 shadow-sm flex items-center gap-2">
-         <div className="w-2 h-2 rounded-full bg-orange-400"></div>
-         Demo Mode (Mock Backend)
+      {/* Status Pill - Floating iOS Style */}
+      <div className="fixed bottom-6 right-6 z-50">
+        <div className="glass-panel px-4 py-2 rounded-full flex items-center gap-2.5 shadow-[0_8px_32px_rgba(0,0,0,0.12)] transition-transform hover:scale-105 cursor-default">
+           <div className="w-2 h-2 rounded-full bg-orange-500 shadow-[0_0_10px_rgba(249,115,22,0.5)] animate-pulse"></div>
+           <span className="text-[11px] font-semibold tracking-wide text-gray-600 uppercase">Demo Environment</span>
+        </div>
       </div>
     </div>
   );
