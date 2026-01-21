@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Sparkles, Send, Calendar as CalendarIcon, RotateCcw, Image as ImageIcon, ChevronDown, CheckCircle, Briefcase, Smile, Rocket, GraduationCap, X, FileVideo, Clock, Save, AlertCircle, Check, Zap, Eye, Copy } from 'lucide-react';
+import { Sparkles, Send, Calendar as CalendarIcon, RotateCcw, Image as ImageIcon, ChevronDown, CheckCircle, Briefcase, Smile, Rocket, GraduationCap, X, FileVideo, Clock, Save, AlertCircle, Check, Zap, Eye, Copy, Hash, MoreHorizontal, ThumbsUp, MessageSquare, Share2, Repeat, Bookmark, Globe, Heart } from 'lucide-react';
 import { generatePostContent } from '../services/geminiService';
 import { store } from '../services/mockStore';
 import { Platform, PostStatus, MediaItem, Post } from '../types';
 import { PlatformIcon } from '../components/PlatformIcon';
 import { MediaPicker } from '../components/MediaPicker';
 
-// --- Constants (Shared Logic with Calendar) ---
+// --- Constants ---
 
 const PLATFORM_LIMITS: Record<Platform, number> = {
   [Platform.Twitter]: 280,
@@ -20,17 +20,25 @@ const PLATFORM_LIMITS: Record<Platform, number> = {
 
 const TONES = ['Professional', 'Funny', 'Viral', 'Educational', 'Empathetic', 'Controversial'];
 
+const HASHTAG_SUGGESTIONS = ['#TechTrends', '#Innovation', '#FutureOfWork', '#AI', '#Growth', '#StartupLife'];
+const EMOJI_LIST = ['🚀', '💡', '🔥', '✨', '🤖', '📈', '💪', '🎯'];
+
 export const CreatorStudio: React.FC = () => {
   // --- AI State ---
   const [topic, setTopic] = useState('');
   const [tone, setTone] = useState('Professional');
   const [isGenerating, setIsGenerating] = useState(false);
-  const [generationPlatform, setGenerationPlatform] = useState<Platform>(Platform.Twitter); // Primary platform for generation context
+  const [generationPlatform, setGenerationPlatform] = useState<Platform>(Platform.Twitter);
 
   // --- Composer State ---
   const [content, setContent] = useState('');
+  const [youtubeTitle, setYoutubeTitle] = useState(''); // Specific for YouTube
   const [selectedPlatforms, setSelectedPlatforms] = useState<Platform[]>([Platform.Twitter]);
   const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(null);
+  
+  // --- Tools State ---
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [showHashtags, setShowHashtags] = useState(false);
   
   // --- Scheduling State ---
   const [scheduleMode, setScheduleMode] = useState<'now' | 'later'>('now');
@@ -49,13 +57,10 @@ export const CreatorStudio: React.FC = () => {
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Sync preview platform with selection
+  // Sync preview platform
   useEffect(() => {
     if (selectedPlatforms.length > 0 && !selectedPlatforms.includes(previewPlatform)) {
       setPreviewPlatform(selectedPlatforms[0]);
-    }
-    if (selectedPlatforms.length === 0) {
-      // Keep preview platform but it won't show much
     }
   }, [selectedPlatforms]);
 
@@ -67,26 +72,36 @@ export const CreatorStudio: React.FC = () => {
       if (content.length > limit) {
         errors.push(`${p} limit exceeded (${content.length}/${limit})`);
       }
+      if (p === Platform.YouTube && !youtubeTitle) {
+        errors.push("YouTube requires a video title.");
+      }
+      if (p === Platform.Instagram && selectedMedia && selectedMedia.type !== 'image' && selectedMedia.type !== 'video') {
+         // Mock aspect ratio check
+      }
     });
     setValidationErrors(errors);
-  }, [content, selectedPlatforms]);
+  }, [content, selectedPlatforms, youtubeTitle, selectedMedia]);
 
   // --- Handlers ---
 
   const handleGenerate = async () => {
     if (!topic) return;
     setIsGenerating(true);
-    // Use the first selected platform or the specific generation dropdown for context
     const contextPlatform = selectedPlatforms.length > 0 ? selectedPlatforms[0] : generationPlatform;
-    
     const generated = await generatePostContent(topic, contextPlatform, tone);
     setContent(generated);
+    if(contextPlatform === Platform.YouTube) setYoutubeTitle(`${topic} - Official Video`);
     setIsAiGenerated(true);
     setIsGenerating(false);
   };
 
+  const handleInsertText = (text: string) => {
+    setContent(prev => prev + (prev.length > 0 ? ' ' : '') + text);
+    setShowEmojiPicker(false);
+    setShowHashtags(false);
+  };
+
   const constructPostObject = (status: PostStatus): Post => {
-    // Calculate Scheduled Time
     let finalDate = new Date();
     if (scheduleMode === 'later') {
       finalDate = new Date(scheduledDate);
@@ -98,6 +113,7 @@ export const CreatorStudio: React.FC = () => {
 
     return {
       id: Date.now().toString(),
+      title: youtubeTitle,
       content: content,
       platforms: selectedPlatforms,
       scheduledFor: finalDate.toISOString(),
@@ -105,20 +121,16 @@ export const CreatorStudio: React.FC = () => {
       generatedByAi: isAiGenerated,
       mediaUrl: selectedMedia?.url,
       mediaType: selectedMedia?.type,
-      engagement: { likes: 0, shares: 0, comments: 0 } // Init empty stats
+      engagement: { likes: 0, shares: 0, comments: 0 }
     };
   };
 
   const handlePublish = async () => {
     if (validationErrors.length > 0 || !content) return;
     setIsSaving(true);
-    
     const status = scheduleMode === 'now' ? PostStatus.Published : PostStatus.Scheduled;
     const newPost = constructPostObject(status);
-    
     await store.addPost(newPost);
-    
-    // Reset or Redirect (here we just alert/reset)
     alert(scheduleMode === 'now' ? 'Published successfully!' : 'Scheduled successfully!');
     resetForm();
     setIsSaving(false);
@@ -127,17 +139,20 @@ export const CreatorStudio: React.FC = () => {
   const handleSaveDraft = async () => {
     if (!content) return;
     setIsSaving(true);
-    
     const newPost = constructPostObject(PostStatus.Draft);
     await store.addPost(newPost);
-    
     alert('Saved to drafts.');
-    resetForm();
     setIsSaving(false);
+  };
+
+  const handleDuplicate = () => {
+    // Logic just to keep content but maybe change platform
+    alert("Draft duplicated! You can now edit this version.");
   };
 
   const resetForm = () => {
     setContent('');
+    setYoutubeTitle('');
     setTopic('');
     setSelectedMedia(null);
     setIsAiGenerated(false);
@@ -161,10 +176,171 @@ export const CreatorStudio: React.FC = () => {
     return `${y}-${m}-${d}`;
   };
 
-  // Preview Truncation Logic
+  // Preview Truncation
   const previewLimit = PLATFORM_LIMITS[previewPlatform] || 500;
   const displayContent = content ? content.slice(0, previewLimit) : '';
   const isTruncated = content.length > previewLimit;
+
+  // Render Logic for specific platforms
+  const renderPreviewContent = () => {
+    const commonMedia = selectedMedia && (
+        <div className="w-full bg-black flex items-center justify-center relative overflow-hidden bg-gray-100">
+           {selectedMedia.type === 'image' ? (
+              <img src={selectedMedia.url} className="w-full h-full object-cover" alt="Preview" />
+           ) : (
+              <video src={selectedMedia.url} className="w-full h-full object-cover" controls />
+           )}
+        </div>
+    );
+
+    switch (previewPlatform) {
+      case Platform.Twitter:
+        return (
+          <div className="bg-white">
+            <div className="px-4 py-3 flex gap-3">
+              <div className="w-10 h-10 rounded-full bg-gray-200 flex-shrink-0"></div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1 text-[15px] leading-5">
+                   <span className="font-bold text-gray-900">Your Brand</span>
+                   <span className="text-gray-500">@brand</span>
+                   <span className="text-gray-500">·</span>
+                   <span className="text-gray-500">2h</span>
+                </div>
+                <div className="mt-1 text-[15px] text-gray-900 leading-normal whitespace-pre-wrap break-words">
+                   {displayContent || <span className="text-gray-300">Your post text...</span>}
+                </div>
+                {selectedMedia && <div className="mt-3 rounded-2xl overflow-hidden border border-gray-100">{commonMedia}</div>}
+                
+                <div className="flex justify-between mt-3 text-gray-500 max-w-md pr-4">
+                   <MessageSquare className="w-4 h-4" />
+                   <Repeat className="w-4 h-4" />
+                   <Heart className="w-4 h-4" />
+                   <Share2 className="w-4 h-4" />
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+
+      case Platform.Instagram:
+        return (
+          <div className="bg-white">
+            <div className="flex items-center justify-between px-3 py-2">
+               <div className="flex items-center gap-2">
+                 <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-yellow-400 to-purple-600 p-[2px]">
+                   <div className="w-full h-full bg-white rounded-full p-[2px]">
+                     <div className="w-full h-full bg-gray-200 rounded-full"></div>
+                   </div>
+                 </div>
+                 <span className="text-sm font-semibold">your_brand</span>
+               </div>
+               <MoreHorizontal className="w-5 h-5 text-gray-600" />
+            </div>
+            
+            <div className="aspect-square bg-gray-100">
+               {selectedMedia ? (
+                 selectedMedia.type === 'image' ? <img src={selectedMedia.url} className="w-full h-full object-cover" /> : <video src={selectedMedia.url} className="w-full h-full object-cover" />
+               ) : (
+                 <div className="w-full h-full flex items-center justify-center text-gray-300 bg-gray-50">No Media</div>
+               )}
+            </div>
+
+            <div className="p-3">
+               <div className="flex justify-between mb-2">
+                  <div className="flex gap-4">
+                     <Heart className="w-6 h-6 text-black" />
+                     <MessageSquare className="w-6 h-6 text-black" />
+                     <Send className="w-6 h-6 text-black" />
+                  </div>
+                  <Bookmark className="w-6 h-6 text-black" />
+               </div>
+               <div className="font-semibold text-sm mb-1">1,234 likes</div>
+               <div className="text-sm">
+                  <span className="font-semibold mr-2">your_brand</span>
+                  <span className="whitespace-pre-wrap">{displayContent}</span>
+               </div>
+            </div>
+          </div>
+        );
+      
+      case Platform.LinkedIn:
+        return (
+          <div className="bg-white border-y border-gray-200 mt-2">
+             <div className="px-4 py-3 flex gap-3">
+                <div className="w-12 h-12 rounded-full bg-gray-200"></div>
+                <div>
+                   <div className="text-sm font-semibold text-gray-900">Your Name</div>
+                   <div className="text-xs text-gray-500">Marketing Director at Brand</div>
+                   <div className="text-xs text-gray-500 flex items-center gap-1">2h • <Globe className="w-3 h-3" /></div>
+                </div>
+             </div>
+             <div className="px-4 pb-2 text-sm text-gray-900 whitespace-pre-wrap break-words">
+                {displayContent}
+             </div>
+             {selectedMedia && <div className="w-full">{commonMedia}</div>}
+             <div className="px-4 py-2 border-t border-gray-100 flex justify-between">
+                {['Like', 'Comment', 'Repost', 'Send'].map(action => (
+                   <div key={action} className="flex flex-col items-center justify-center px-2 py-1 hover:bg-gray-100 rounded cursor-pointer text-gray-500">
+                      <span className="text-xs font-semibold">{action}</span>
+                   </div>
+                ))}
+             </div>
+          </div>
+        );
+
+      case Platform.YouTube:
+        return (
+          <div className="bg-white h-full flex flex-col">
+             <div className="aspect-video bg-black w-full flex items-center justify-center">
+                {selectedMedia ? (
+                   selectedMedia.type === 'image' ? <img src={selectedMedia.url} className="w-full h-full object-cover opacity-80" /> : <video src={selectedMedia.url} className="w-full h-full object-cover" />
+                ) : (
+                   <div className="text-gray-500">Video Player</div>
+                )}
+             </div>
+             <div className="p-4">
+                <h3 className="text-lg font-bold text-gray-900 leading-tight mb-2 line-clamp-2">{youtubeTitle || "Video Title Goes Here"}</h3>
+                <div className="flex items-center justify-between mb-4">
+                   <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-full bg-gray-200"></div>
+                      <div>
+                         <div className="text-sm font-semibold text-gray-800">Your Channel</div>
+                         <div className="text-xs text-gray-500">100K subscribers</div>
+                      </div>
+                   </div>
+                   <button className="bg-black text-white text-xs font-bold px-3 py-1.5 rounded-full uppercase">Subscribe</button>
+                </div>
+                <div className="bg-gray-100 rounded-xl p-3 text-sm text-gray-700 whitespace-pre-wrap">
+                   <span className="font-semibold">15K views • 2 hours ago</span>
+                   <br />
+                   {displayContent}
+                </div>
+             </div>
+          </div>
+        );
+
+      default:
+         // Generic Facebook/Thread style
+         return (
+          <div className="bg-white p-4">
+             <div className="flex gap-3 mb-3">
+               <div className="w-10 h-10 rounded-full bg-gray-200"></div>
+               <div>
+                  <div className="font-bold text-gray-900 text-sm">Your Brand</div>
+                  <div className="text-xs text-gray-500">Just now</div>
+               </div>
+             </div>
+             <div className="mb-3 text-sm text-gray-800 whitespace-pre-wrap">{displayContent}</div>
+             {selectedMedia && <div className="rounded-lg overflow-hidden border border-gray-100">{commonMedia}</div>}
+             <div className="flex justify-between mt-3 pt-3 border-t border-gray-100 text-gray-500 text-sm font-semibold">
+                <span>Like</span>
+                <span>Comment</span>
+                <span>Share</span>
+             </div>
+          </div>
+         );
+    }
+  };
 
   return (
     <div className="h-full flex flex-col gap-6 animate-in fade-in duration-500 pb-10">
@@ -176,6 +352,12 @@ export const CreatorStudio: React.FC = () => {
            <p className="text-gray-500 font-medium">Draft, optimize, and schedule your content across channels.</p>
          </div>
          <div className="flex gap-2">
+            <button 
+               onClick={handleDuplicate}
+               className="px-4 py-2 bg-white border border-gray-200 text-gray-700 font-bold rounded-full shadow-sm hover:bg-gray-50 transition-colors flex items-center gap-2 text-sm"
+            >
+               <Copy className="w-4 h-4" /> Duplicate
+            </button>
             <button 
                onClick={handleSaveDraft}
                className="px-5 py-2.5 bg-white border border-gray-200 text-gray-700 font-bold rounded-full shadow-sm hover:bg-gray-50 transition-colors flex items-center gap-2"
@@ -206,7 +388,7 @@ export const CreatorStudio: React.FC = () => {
                          type="text" 
                          value={topic}
                          onChange={(e) => setTopic(e.target.value)}
-                         placeholder="What do you want to post about? (e.g., New feature launch)"
+                         placeholder="What do you want to post about?"
                          className="w-full bg-gray-50 border-transparent focus:border-blue-500 focus:bg-white focus:ring-0 rounded-xl px-4 py-3 text-sm font-medium transition-colors"
                        />
                     </div>
@@ -260,12 +442,26 @@ export const CreatorStudio: React.FC = () => {
                        );
                     })}
                  </div>
-                 {selectedPlatforms.length === 0 && (
-                    <p className="text-xs text-red-500 mt-2 font-medium flex items-center gap-1">
-                       <AlertCircle className="w-3 h-3" /> Select at least one platform.
-                    </p>
+                 {selectedPlatforms.includes(Platform.Instagram) && (
+                    <div className="mt-2 text-xs text-orange-600 bg-orange-50 px-3 py-2 rounded-lg inline-flex items-center gap-2 font-medium">
+                       <AlertCircle className="w-3 h-3" /> Instagram Warning: Ensure media is 1:1 or 4:5 aspect ratio.
+                    </div>
                  )}
               </div>
+              
+              {/* Conditional YouTube Title */}
+              {selectedPlatforms.includes(Platform.YouTube) && (
+                 <div className="animate-in slide-in-from-top-2">
+                    <label className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 block">Video Title <span className="text-red-500">*</span></label>
+                    <input 
+                      type="text" 
+                      value={youtubeTitle}
+                      onChange={(e) => setYoutubeTitle(e.target.value)}
+                      placeholder="Enter an engaging title for your video..."
+                      className="w-full bg-gray-50 border-transparent focus:border-red-500 focus:bg-white rounded-xl px-4 py-3 text-sm font-bold text-gray-900 transition-colors"
+                    />
+                 </div>
+              )}
 
               {/* Editor */}
               <div className="flex-1 min-h-[200px] flex flex-col relative">
@@ -278,60 +474,67 @@ export const CreatorStudio: React.FC = () => {
                           const limit = PLATFORM_LIMITS[p];
                           const count = content.length;
                           const isOver = count > limit;
-                          const isClose = count > limit * 0.9;
                           
                           return (
                              <div key={p} className={`
                                 flex items-center gap-1.5 px-2 py-1 rounded-md border text-[10px] font-bold transition-colors
-                                ${isOver 
-                                  ? 'bg-red-50 border-red-100 text-red-600' 
-                                  : isClose 
-                                     ? 'bg-orange-50 border-orange-100 text-orange-600'
-                                     : 'bg-white border-gray-200 text-gray-500'}
+                                ${isOver ? 'bg-red-50 border-red-100 text-red-600' : 'bg-white border-gray-200 text-gray-500'}
                              `}>
                                 <PlatformIcon platform={p} size={10} />
                                 <span>{count}/{limit}</span>
-                                {isOver ? (
-                                  <AlertCircle className="w-3 h-3" />
-                                ) : (
-                                  <Check className="w-3 h-3 text-green-500" />
-                                )}
+                                {isOver ? <AlertCircle className="w-3 h-3" /> : <Check className="w-3 h-3 text-green-500" />}
                              </div>
                           );
                        })}
                     </div>
                  </div>
-                 <textarea
-                    value={content}
-                    onChange={(e) => setContent(e.target.value)}
-                    placeholder="Write your masterpiece..."
-                    className={`
-                       w-full flex-1 bg-gray-50 rounded-2xl p-5 text-gray-900 placeholder:text-gray-400 border-none focus:ring-2 transition-colors resize-none leading-relaxed text-base
-                       ${validationErrors.length > 0 ? 'focus:ring-red-500/20 ring-2 ring-red-500/10' : 'focus:ring-blue-500/20 focus:bg-white'}
-                    `}
-                 />
                  
-                 {/* Quick Insert Tools */}
-                 <div className="absolute bottom-4 left-4 flex gap-2">
-                    <button onClick={() => setIsMediaPickerOpen(true)} className="p-2 bg-white rounded-lg shadow-sm text-gray-500 hover:text-blue-600 border border-gray-200 transition-colors" title="Add Media">
-                       <ImageIcon className="w-4 h-4" />
-                    </button>
-                    <button className="p-2 bg-white rounded-lg shadow-sm text-gray-500 hover:text-purple-600 border border-gray-200 transition-colors" title="AI Rewrite">
-                       <Zap className="w-4 h-4" />
-                    </button>
+                 <div className="relative flex-1">
+                    <textarea
+                        value={content}
+                        onChange={(e) => setContent(e.target.value)}
+                        placeholder="Write your masterpiece..."
+                        className={`
+                        w-full h-full min-h-[160px] bg-gray-50 rounded-2xl p-5 pb-12 text-gray-900 placeholder:text-gray-400 border-none focus:ring-2 transition-colors resize-none leading-relaxed text-base
+                        ${validationErrors.length > 0 ? 'focus:ring-red-500/20 ring-2 ring-red-500/10' : 'focus:ring-blue-500/20 focus:bg-white'}
+                        `}
+                    />
+                    
+                    {/* Toolbar */}
+                    <div className="absolute bottom-3 left-3 right-3 flex justify-between items-center">
+                        <div className="flex gap-1">
+                            <button onClick={() => setIsMediaPickerOpen(true)} className="p-2 hover:bg-white rounded-lg text-gray-500 hover:text-blue-600 transition-colors" title="Add Media">
+                                <ImageIcon className="w-4 h-4" />
+                            </button>
+                            <div className="relative">
+                                <button onClick={() => setShowEmojiPicker(!showEmojiPicker)} className="p-2 hover:bg-white rounded-lg text-gray-500 hover:text-yellow-500 transition-colors" title="Add Emoji">
+                                    <Smile className="w-4 h-4" />
+                                </button>
+                                {showEmojiPicker && (
+                                    <div className="absolute bottom-full left-0 mb-2 bg-white shadow-xl border border-gray-100 rounded-xl p-2 grid grid-cols-4 gap-1 z-20 w-48">
+                                        {EMOJI_LIST.map(e => <button key={e} onClick={() => handleInsertText(e)} className="hover:bg-gray-100 p-2 rounded text-xl">{e}</button>)}
+                                    </div>
+                                )}
+                            </div>
+                            <div className="relative">
+                                <button onClick={() => setShowHashtags(!showHashtags)} className="p-2 hover:bg-white rounded-lg text-gray-500 hover:text-blue-500 transition-colors" title="Add Hashtags">
+                                    <Hash className="w-4 h-4" />
+                                </button>
+                                {showHashtags && (
+                                    <div className="absolute bottom-full left-0 mb-2 bg-white shadow-xl border border-gray-100 rounded-xl p-2 flex flex-col gap-1 z-20 w-40">
+                                        {HASHTAG_SUGGESTIONS.map(h => 
+                                            <button key={h} onClick={() => handleInsertText(h)} className="text-left px-3 py-1.5 hover:bg-blue-50 text-xs font-bold text-blue-600 rounded-lg">{h}</button>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                        <button className="p-2 bg-white rounded-lg shadow-sm text-gray-500 hover:text-purple-600 border border-gray-200 transition-colors" title="AI Rewrite">
+                           <Zap className="w-4 h-4" />
+                        </button>
+                    </div>
                  </div>
               </div>
-
-              {/* Validation Messages */}
-              {validationErrors.length > 0 && (
-                 <div className="bg-red-50 border border-red-100 rounded-xl p-3">
-                    {validationErrors.map((err, i) => (
-                       <div key={i} className="flex items-center gap-2 text-xs text-red-600 font-bold">
-                          <AlertCircle className="w-3 h-3" /> {err}
-                       </div>
-                    ))}
-                 </div>
-              )}
 
               {/* Media Preview */}
               {selectedMedia && (
@@ -342,8 +545,8 @@ export const CreatorStudio: React.FC = () => {
                     >
                        <X className="w-4 h-4" />
                     </button>
-                    <div className="flex h-48">
-                       <div className="w-48 shrink-0 bg-black flex items-center justify-center">
+                    <div className="flex h-32">
+                       <div className="w-32 shrink-0 bg-black flex items-center justify-center">
                           {selectedMedia.type === 'image' ? (
                              <img src={selectedMedia.url} className="w-full h-full object-cover" alt="Selected" />
                           ) : (
@@ -353,9 +556,6 @@ export const CreatorStudio: React.FC = () => {
                        <div className="flex-1 bg-gray-50 p-4 flex flex-col justify-center border-l border-gray-200">
                           <p className="font-bold text-gray-900 text-sm truncate">{selectedMedia.name}</p>
                           <p className="text-xs text-gray-500 mt-1">{selectedMedia.type.toUpperCase()} • {formatBytes(selectedMedia.size)}</p>
-                          <div className="flex gap-2 mt-3">
-                             <span className="px-2 py-1 bg-green-100 text-green-700 text-[10px] font-bold rounded">Ready to upload</span>
-                          </div>
                        </div>
                     </div>
                  </div>
@@ -397,12 +597,9 @@ export const CreatorStudio: React.FC = () => {
                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-in slide-in-from-top-2">
                     <label className="relative flex items-center bg-gray-50 rounded-xl p-3 border border-gray-200 group hover:border-blue-300 transition-colors cursor-pointer">
                        <CalendarIcon className="w-5 h-5 text-gray-400 mr-3 group-hover:text-blue-500 transition-colors pointer-events-none" />
-                       
                        <span className="text-sm font-bold text-gray-900 pointer-events-none">
                           {scheduledDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                        </span>
-
-                       {/* Overlayed Input for Full Clickability */}
                        <input 
                           ref={dateInputRef}
                           type="date"
@@ -411,21 +608,13 @@ export const CreatorStudio: React.FC = () => {
                           onChange={(e) => {
                              if(e.target.value) {
                                 const parts = e.target.value.split('-').map(Number);
-                                // Set to noon to avoid any timezone rolling issues (00:00 -> 23:00 prev day)
                                 setScheduledDate(new Date(parts[0], parts[1]-1, parts[2], 12, 0, 0));
                              }
                           }}
-                          onClick={(e) => {
-                            try {
-                              e.currentTarget.showPicker();
-                            } catch (err) {
-                              // Fallback is default behavior
-                            }
-                          }}
+                          onClick={(e) => {try{e.currentTarget.showPicker()}catch(err){}}}
                           className="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10"
                        />
                     </label>
-                    
                     <div className="relative">
                        <button 
                           onClick={() => setIsTimePickerOpen(!isTimePickerOpen)}
@@ -483,9 +672,9 @@ export const CreatorStudio: React.FC = () => {
         {/* RIGHT COLUMN: Live Preview */}
         <div className="w-full xl:w-[420px] flex flex-col gap-4">
            
-           <div className="bg-[#1d1d1f] rounded-[32px] p-2 pb-0 shadow-2xl border border-gray-800 flex flex-col h-[700px] sticky top-6">
+           <div className="bg-[#1d1d1f] rounded-[32px] p-2 pb-0 shadow-2xl border border-gray-800 flex flex-col h-[700px] sticky top-6 overflow-hidden">
               {/* Phone Status Bar Mock */}
-              <div className="h-10 flex justify-between items-center px-6 pt-2">
+              <div className="h-10 flex justify-between items-center px-6 pt-2 shrink-0">
                  <span className="text-white text-xs font-medium">9:41</span>
                  <div className="flex gap-1.5">
                     <div className="w-4 h-2.5 bg-white rounded-[1px]"></div>
@@ -495,7 +684,7 @@ export const CreatorStudio: React.FC = () => {
 
               {/* Platform Switcher Tabs */}
               {selectedPlatforms.length > 0 ? (
-                 <div className="flex gap-2 px-4 py-2 overflow-x-auto no-scrollbar">
+                 <div className="flex gap-2 px-4 py-2 overflow-x-auto no-scrollbar shrink-0">
                     {selectedPlatforms.map(p => (
                        <button
                           key={p}
@@ -520,55 +709,13 @@ export const CreatorStudio: React.FC = () => {
                     <div className="w-1/3 h-full bg-blue-500"></div>
                  </div>
                  
-                 <div className="h-full overflow-y-auto custom-scrollbar p-0">
-                    {/* Header */}
-                    <div className="px-5 py-4 border-b border-gray-50 flex items-center justify-between">
-                       <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 border border-gray-100"></div>
-                          <div>
-                             <p className="text-sm font-bold text-gray-900 leading-none">Your Page</p>
-                             <div className="flex items-center gap-1 mt-1">
-                                <PlatformIcon platform={previewPlatform} size={10} className="text-gray-400" />
-                                <span className="text-[10px] text-gray-400 font-medium">Sponsored • Just now</span>
-                             </div>
-                          </div>
-                       </div>
-                       <MoreVerticalDots />
-                    </div>
-
-                    {/* Body */}
-                    <div className="px-5 py-3">
-                       <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap break-words">
-                          {displayContent || <span className="text-gray-300 italic">Start typing to see your preview here...</span>}
-                          {isTruncated && <span className="text-red-500 font-bold ml-1" title={`Text truncated at ${previewLimit} chars based on ${previewPlatform} limit`}>...</span>}
-                       </p>
-                    </div>
-
-                    {/* Media */}
-                    {selectedMedia && (
-                       <div className="w-full bg-black aspect-square flex items-center justify-center relative overflow-hidden">
-                          {selectedMedia.type === 'image' ? (
-                             <img src={selectedMedia.url} className="w-full h-full object-cover" alt="Preview" />
-                          ) : (
-                             <video src={selectedMedia.url} className="w-full h-full object-cover" controls />
-                          )}
-                       </div>
-                    )}
-
-                    {/* Footer Actions */}
-                    <div className="px-5 py-3 flex items-center justify-between border-t border-gray-50">
-                        <div className="flex gap-4 text-gray-500">
-                           <HeartIcon />
-                           <MessageIcon />
-                           <ShareIcon />
-                        </div>
-                        <span className="text-xs font-bold text-gray-400">0 Likes</span>
-                    </div>
+                 <div className="h-full overflow-y-auto custom-scrollbar p-0 bg-gray-50">
+                    {renderPreviewContent()}
                  </div>
                  
                  {/* Live Warning Overlay */}
                  {validationErrors.length > 0 && (
-                    <div className="absolute bottom-4 left-4 right-4 bg-red-500/90 backdrop-blur-md text-white p-3 rounded-xl shadow-lg animate-in slide-in-from-bottom-2">
+                    <div className="absolute bottom-4 left-4 right-4 bg-red-500/90 backdrop-blur-md text-white p-3 rounded-xl shadow-lg animate-in slide-in-from-bottom-2 z-50">
                        <div className="flex items-start gap-2">
                           <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
                           <div className="text-xs font-medium">
@@ -589,34 +736,3 @@ export const CreatorStudio: React.FC = () => {
     </div>
   );
 };
-
-// --- Icons Helpers for Preview ---
-const MoreVerticalDots = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M12 13C12.5523 13 13 12.5523 13 12C13 11.4477 12.5523 11 12 11C11.4477 11 11 11.4477 11 12C11 12.5523 11.4477 13 12 13Z" stroke="#9CA3AF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-    <path d="M12 6C12.5523 6 13 5.55228 13 5C13 4.44772 12.5523 4 12 4C11.4477 4 11 4.44772 11 5C11 5.55228 11.4477 6 12 6Z" stroke="#9CA3AF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-    <path d="M12 20C12.5523 20 13 19.5523 13 19C13 18.4477 12.5523 18 12 18C11.4477 18 11 18.4477 11 19C11 19.5523 11.4477 20 12 20Z" stroke="#9CA3AF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-  </svg>
-);
-
-const HeartIcon = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
-  </svg>
-);
-
-const MessageIcon = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path>
-  </svg>
-);
-
-const ShareIcon = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="18" cy="5" r="3"></circle>
-    <circle cx="6" cy="12" r="3"></circle>
-    <circle cx="18" cy="19" r="3"></circle>
-    <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
-    <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
-  </svg>
-);

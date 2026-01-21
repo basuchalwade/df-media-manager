@@ -49,12 +49,12 @@ ContentCaster is engineered to support multi-channel publishing across the most 
 
 | Platform | Type | Key Capabilities |
 | :--- | :--- | :--- |
-| **X (Twitter)** | Microblogging | • Thread creation & scheduling<br>• Reply automation via Engagement Bot<br>• Trend-based content generation |
-| **LinkedIn** | Professional | • Company Page & Personal Profile support<br>• Rich article formatting<br>• PDF/Carousel document support |
-| **Instagram** | Visual | • Direct publishing to Feed<br>• **Smart Resize** for Stories (9:16) and Square (1:1)<br>• Reels scheduling |
-| **Threads** | Microblogging | • Seamless integration with Instagram ecosystem<br>• Text updates & conversation starters<br>• 500 character limit handling |
+| **X (Twitter)** | Microblogging | • Thread creation & scheduling<br>• Reply automation via Engagement Bot<br>• **Visual Preview**: Accurate tweet rendering |
+| **LinkedIn** | Professional | • Company Page & Personal Profile support<br>• **Formatting**: Professional formatting preservation |
+| **Instagram** | Visual | • Direct publishing to Feed<br>• **Validation**: Aspect ratio warnings (1:1, 4:5)<br>• Feed Grid preview |
+| **Threads** | Microblogging | • Seamless integration with Instagram ecosystem<br>• 500 character limit enforcement |
 | **Facebook** | Social Network | • Page management<br>• Group posting<br>• Link preview customization |
-| **YouTube** | Video | • Community Tab posts<br>• YouTube Shorts scheduling<br>• SEO tag generation via AI |
+| **YouTube** | Video | • **Video Support**: Title & Description fields<br>• Community Tab posts<br>• SEO tag generation via AI |
 | **Discord** | Community | • Webhook integration for server announcements<br>• Rich Embed builder<br>• Automated role-based updates |
 
 ---
@@ -66,10 +66,13 @@ ContentCaster is engineered to support multi-channel publishing across the most 
 - Live activity logs streaming from backend bots.
 - Weekly performance trend visualization.
 
-### 2. 🎨 Creator Studio (AI Engine)
-- **Powered by Gemini**: Generate high-converting posts for Twitter, LinkedIn, Instagram, etc.
-- **Tone Adjustment**: Choose between Professional, Funny, Viral, or Educational tones.
-- **Multi-Channel Support**: Tailor content for specific platform constraints.
+### 2. 🎨 Creator Studio (Updated)
+- **High-Fidelity Previews**: See exactly how posts look on Twitter vs. Instagram vs. LinkedIn before publishing.
+- **Smart Tools**: Integrated **Emoji Picker** and **AI Hashtag Generator**.
+- **Platform Validation**: Real-time character counting (e.g., 280 for Twitter) and media aspect ratio checks.
+- **YouTube Support**: Dedicated fields for Video Titles.
+- **Drafts & Duplication**: Save drafts or duplicate successful posts for A/B testing.
+- **Powered by Gemini**: Generate high-converting posts tailored to specific platform tones.
 
 ### 3. 🤖 Bot Manager (Growth Engine)
 - **Creator Bot**: Auto-generates and posts content based on trending topics.
@@ -79,8 +82,9 @@ ContentCaster is engineered to support multi-channel publishing across the most 
 
 ### 4. 📅 Content Calendar
 - Drag-and-drop scheduling interface.
+- **Unified Preview**: Editing a scheduled post shows the same high-fidelity preview as the Studio.
 - Monthly view of all scheduled, published, and drafted posts.
-- Quick-schedule modal for rapid content planning.
+- Conflict detection for high-frequency posting.
 
 ### 5. 📈 Advanced Analytics
 - Platform-specific insights (Twitter vs LinkedIn vs Instagram).
@@ -93,7 +97,7 @@ ContentCaster is engineered to support multi-channel publishing across the most 
 - Isolated connection data per user.
 
 ### 7. 🖼️ Media Library
-- **Secure Upload**: Drag-and-drop upload for Images (JPG, PNG, WEBP) and Video (MP4).
+- **Batch Upload**: Drag-and-drop upload for multiple Images (JPG, PNG, WEBP) and Videos (MP4).
 - **Smart Optimization**: Auto-crop/resize tools to generate "Story", "Square", or "Landscape" variants of assets.
 - **File Management**: Metadata tracking (size, type, dimensions).
 
@@ -164,10 +168,10 @@ To switch to **Live Mode**:
 
 ```
 contentcaster/
-├── components/       # Reusable UI components (Sidebar, Charts, etc.)
-├── pages/            # Main application views (Overview, Studio, etc.)
+├── components/       # Reusable UI components (Sidebar, MediaPicker, PlatformIcon, etc.)
+├── pages/            # Main application views (Overview, Studio, Calendar, etc.)
 ├── services/         # API calls and Mock Data store
-├── types.ts          # TypeScript interfaces
+├── types.ts          # TypeScript interfaces (Post, User, BotConfig)
 ├── App.tsx           # Main Router
 ├── index.html        # Entry HTML
 ├── vite.config.ts    # Vite Configuration

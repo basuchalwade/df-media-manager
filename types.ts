@@ -25,12 +25,13 @@ export enum PostStatus {
 
 export interface Post {
   id: string;
+  title?: string; // Added for YouTube/Long-form
   content: string;
   platforms: Platform[];
   scheduledFor: string; // ISO date string
   status: PostStatus;
   mediaUrl?: string;
-  mediaType?: 'image' | 'video'; // Added explicit type
+  mediaType?: 'image' | 'video'; // Explicit type
   generatedByAi: boolean;
   engagement?: {
     likes: number;
