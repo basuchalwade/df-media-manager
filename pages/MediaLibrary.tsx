@@ -112,20 +112,30 @@ export const MediaLibrary: React.FC = () => {
                 {item.type === 'image' ? (
                   <img src={item.url} className="w-full h-full object-cover" alt={item.name} />
                 ) : (
-                  <div className="w-full h-full flex flex-col items-center justify-center bg-slate-50 text-slate-400">
-                    <FileVideo className="w-10 h-10 mb-2" />
-                    <span className="text-[10px] font-bold uppercase tracking-widest">Video</span>
+                  <div className="w-full h-full bg-black">
+                    <video 
+                      src={item.url} 
+                      className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" 
+                      muted 
+                      loop 
+                      playsInline
+                      onMouseOver={e => e.currentTarget.play().catch(() => {})} 
+                      onMouseOut={e => { e.currentTarget.pause(); e.currentTarget.currentTime = 0; }}
+                    />
+                    <div className="absolute top-2 right-2 p-1 bg-black/50 backdrop-blur rounded-md pointer-events-none">
+                      <FileVideo className="w-3 h-3 text-white" />
+                    </div>
                   </div>
                 )}
                 
-                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-4 translate-y-full group-hover:translate-y-0 transition-transform duration-300">
+                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-4 translate-y-full group-hover:translate-y-0 transition-transform duration-300 pointer-events-none">
                    <p className="text-white text-sm font-medium truncate">{item.name}</p>
                    <p className="text-white/60 text-xs">{formatBytes(item.size)}</p>
                 </div>
 
                 <button 
                   onClick={(e) => handleDelete(e, item.id)}
-                  className="absolute top-2 right-2 p-2 bg-white/90 backdrop-blur text-red-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-50"
+                  className="absolute top-2 right-2 p-2 bg-white/90 backdrop-blur text-red-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-50 z-10"
                 >
                    <Trash2 className="w-4 h-4" />
                 </button>
@@ -145,7 +155,7 @@ export const MediaLibrary: React.FC = () => {
                 <X className="w-6 h-6" />
               </button>
 
-              <div className="flex-1 bg-slate-100 flex items-center justify-center p-8">
+              <div className="flex-1 bg-slate-100 flex items-center justify-center p-8 bg-black">
                  {selectedItem.type === 'image' ? (
                    <img src={selectedItem.url} className="max-w-full max-h-full object-contain shadow-lg rounded-lg" alt="Preview" />
                  ) : (
