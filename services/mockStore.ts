@@ -34,10 +34,60 @@ const INITIAL_POSTS: Post[] = [
 ];
 
 const INITIAL_BOTS: BotConfig[] = [
-  { type: BotType.Creator, enabled: false, intervalMinutes: 60, status: 'Idle', logs: [] },
-  { type: BotType.Engagement, enabled: true, intervalMinutes: 15, status: 'Running', logs: ['Replied to @user123', 'Liked post #455'] },
-  { type: BotType.Finder, enabled: false, intervalMinutes: 240, status: 'Idle', logs: [] },
-  { type: BotType.Growth, enabled: false, intervalMinutes: 30, status: 'Idle', logs: [] },
+  { 
+    type: BotType.Creator, 
+    enabled: false, 
+    intervalMinutes: 60, 
+    status: 'Idle', 
+    logs: [],
+    config: {
+      contentTopics: ['SaaS', 'AI', 'Marketing'],
+      targetPlatforms: [Platform.Twitter, Platform.LinkedIn],
+      generationMode: 'AI',
+      workHoursStart: '09:00',
+      workHoursEnd: '17:00'
+    }
+  },
+  { 
+    type: BotType.Engagement, 
+    enabled: true, 
+    intervalMinutes: 15, 
+    status: 'Running', 
+    logs: ['Replied to @user123', 'Liked post #455'],
+    config: {
+      replyToMentions: true,
+      replyToComments: true,
+      watchHashtags: ['#TechNews', '#StartupLife'],
+      enableAutoLike: true,
+      maxDailyInteractions: 50,
+      mutedKeywords: ['NSFW', 'Spam', 'Crypto']
+    }
+  },
+  { 
+    type: BotType.Finder, 
+    enabled: false, 
+    intervalMinutes: 240, 
+    status: 'Idle', 
+    logs: [],
+    config: {
+      trackKeywords: ['Artificial Intelligence', 'Machine Learning'],
+      trackAccounts: ['@TechCrunch', '@Verge'],
+      autoSaveToDrafts: true
+    }
+  },
+  { 
+    type: BotType.Growth, 
+    enabled: false, 
+    intervalMinutes: 30, 
+    status: 'Idle', 
+    logs: [],
+    config: {
+      growthTags: ['#FollowFriday', '#TechCommunity'],
+      interactWithCompetitors: true,
+      unfollowAfterDays: 7,
+      hourlyActionLimit: 10
+    }
+  },
 ];
 
 const DEFAULT_SETTINGS: UserSettings = {
@@ -92,7 +142,7 @@ const INITIAL_USERS: User[] = [
 // Simple in-memory store to simulate backend persistence in the frontend demo
 class MockStore {
   private posts: Post[] = [];
-  private bots: BotConfig[] = [...INITIAL_BOTS];
+  private bots: BotConfig[] = [];
   private settings: UserSettings;
   private users: User[];
   private media: MediaItem[] = []; // In-memory media storage
@@ -108,6 +158,9 @@ class MockStore {
 
     const savedPosts = localStorage.getItem('postmaster_posts');
     this.posts = savedPosts ? JSON.parse(savedPosts) : [...INITIAL_POSTS];
+
+    const savedBots = localStorage.getItem('postmaster_bots');
+    this.bots = savedBots ? JSON.parse(savedBots) : [...INITIAL_BOTS];
   }
 
   // --- Session Simulation ---
@@ -177,7 +230,18 @@ class MockStore {
     this.bots = this.bots.map(b => 
       b.type === type ? { ...b, enabled: !b.enabled, status: !b.enabled ? 'Running' : 'Idle' } : b
     );
+    this.saveBots();
     return Promise.resolve([...this.bots]);
+  }
+
+  updateBot(updatedBot: BotConfig): Promise<BotConfig[]> {
+    this.bots = this.bots.map(b => b.type === updatedBot.type ? updatedBot : b);
+    this.saveBots();
+    return Promise.resolve([...this.bots]);
+  }
+
+  private saveBots() {
+    localStorage.setItem('postmaster_bots', JSON.stringify(this.bots));
   }
 
   // --- Stats ---

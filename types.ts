@@ -43,6 +43,34 @@ export interface Post {
   };
 }
 
+export interface BotSpecificConfig {
+  // Creator Bot
+  contentTopics?: string[];
+  targetPlatforms?: Platform[];
+  generationMode?: 'AI' | 'Drafts';
+  workHoursStart?: string;
+  workHoursEnd?: string;
+
+  // Engagement Bot
+  replyToMentions?: boolean;
+  replyToComments?: boolean;
+  watchHashtags?: string[];
+  enableAutoLike?: boolean;
+  maxDailyInteractions?: number;
+  mutedKeywords?: string[];
+
+  // Finder Bot
+  trackKeywords?: string[];
+  trackAccounts?: string[];
+  autoSaveToDrafts?: boolean;
+
+  // Growth Bot
+  growthTags?: string[];
+  interactWithCompetitors?: boolean;
+  unfollowAfterDays?: number;
+  hourlyActionLimit?: number;
+}
+
 export interface BotConfig {
   type: BotType;
   enabled: boolean;
@@ -50,6 +78,7 @@ export interface BotConfig {
   lastRun?: string;
   status: 'Idle' | 'Running' | 'Cooldown';
   logs: string[];
+  config: BotSpecificConfig;
 }
 
 export interface DashboardStats {
