@@ -1,4 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
+import { Platform } from '../types';
 
 const API_KEY = process.env.API_KEY || '';
 
@@ -102,5 +103,75 @@ export const generateHashtags = async (
   } catch (error) {
     console.error("Gemini Hashtag Error:", error);
     return ['#Error', '#TryAgain'];
+  }
+};
+
+export const validateContentSafety = async (
+  content: string,
+  platforms: Platform[]
+): Promise<{ safe: boolean; issues: string[] }> => {
+  if (!API_KEY) {
+    // Mock local checks for demo purposes without API key
+    const issues: string[] = [];
+    const lower = content.toLowerCase();
+    
+    // Mock Profanity
+    const profanity = ['damn', 'hell', 'crap', 'shit']; 
+    if (profanity.some(w => lower.includes(w))) {
+      issues.push("Contains profanity or strong language.");
+    }
+
+    // Mock Hate/Aggression
+    if (lower.includes('hate') || lower.includes('stupid') || lower.includes('kill')) {
+      issues.push("Potential hostile or aggressive language detected.");
+    }
+
+    // Mock Platform Policy
+    if (platforms.includes(Platform.Twitter) && content.length > 280) {
+       issues.push("Exceeds Twitter character limit.");
+    }
+
+    return { safe: issues.length === 0, issues };
+  }
+
+  try {
+    const prompt = `
+      You are a Trust & Safety AI for a social media management platform.
+      
+      Task: Analyze the text for safety and compliance.
+      Target Platforms: ${platforms.join(', ')}
+      Content: "${content}"
+
+      Check for:
+      1. Profanity or Offensive Language
+      2. Hate Speech or Harassment
+      3. Dangerous Content
+      4. Platform-specific policy violations (e.g. clickbait, scams, prohibited terms)
+
+      Return JSON:
+      {
+        "safe": boolean, // true if completely safe to post, false if any risks found
+        "issues": string[] // Concise list of specific warnings. Empty if safe.
+      }
+    `;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: prompt,
+      config: {
+        responseMimeType: 'application/json'
+      }
+    });
+
+    const text = response.text || "{}";
+    const cleaned = text.replace(/```json|```/g, '').trim();
+    const result = JSON.parse(cleaned);
+    return {
+        safe: result.safe ?? true,
+        issues: result.issues || []
+    };
+  } catch (error) {
+    console.error("Safety Check Error:", error);
+    return { safe: true, issues: [] };
   }
 };

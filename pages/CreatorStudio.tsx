@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Sparkles, Send, Calendar as CalendarIcon, RotateCcw, Image as ImageIcon, ChevronDown, CheckCircle, Briefcase, Smile, Rocket, GraduationCap, X, FileVideo, Clock, Save, AlertCircle, Check, Zap, Eye, Copy, Hash, MoreHorizontal, ThumbsUp, MessageSquare, Share2, Repeat, Bookmark, Globe, Heart, Layers, UploadCloud, RefreshCw } from 'lucide-react';
-import { generatePostContent, generateHashtags } from '../services/geminiService';
+import { Sparkles, Send, Calendar as CalendarIcon, RotateCcw, Image as ImageIcon, ChevronDown, CheckCircle, Briefcase, Smile, Rocket, GraduationCap, X, FileVideo, Clock, Save, AlertCircle, Check, Zap, Eye, Copy, Hash, MoreHorizontal, ThumbsUp, MessageSquare, Share2, Repeat, Bookmark, Globe, Heart, Layers, UploadCloud, RefreshCw, ShieldCheck, AlertTriangle } from 'lucide-react';
+import { generatePostContent, generateHashtags, validateContentSafety } from '../services/geminiService';
 import { store } from '../services/mockStore';
 import { Platform, PostStatus, MediaItem, Post } from '../types';
 import { PlatformIcon } from '../components/PlatformIcon';
@@ -35,6 +35,7 @@ export const CreatorStudio: React.FC = () => {
   const [generationPlatform, setGenerationPlatform] = useState<Platform>(Platform.Twitter);
 
   // --- Composer State ---
+  const [currentPostId, setCurrentPostId] = useState<string | null>(null); // Track if editing an existing draft
   const [content, setContent] = useState('');
   const [youtubeTitle, setYoutubeTitle] = useState(''); 
   const [youtubeThumbnail, setYoutubeThumbnail] = useState<MediaItem | null>(null);
@@ -66,6 +67,11 @@ export const CreatorStudio: React.FC = () => {
   const [mediaPickerMode, setMediaPickerMode] = useState<'main' | 'thumbnail'>('main');
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+  
+  // --- Safety Check State ---
+  const [isCheckingSafety, setIsCheckingSafety] = useState(false);
+  const [safetyIssues, setSafetyIssues] = useState<string[]>([]);
+  const [showSafetyModal, setShowSafetyModal] = useState(false);
 
   // Sync preview platform
   useEffect(() => {
@@ -160,7 +166,7 @@ export const CreatorStudio: React.FC = () => {
     }
   };
 
-  const constructPostObject = (status: PostStatus): Post => {
+  const constructPostObject = (status: PostStatus, forceNewId: boolean = false): Post => {
     let finalDate = new Date();
     if (scheduleMode === 'later') {
       finalDate = new Date(scheduledDate);
@@ -170,8 +176,10 @@ export const CreatorStudio: React.FC = () => {
       finalDate.setHours(hours, parseInt(timeState.minute), 0, 0);
     }
 
+    const id = (currentPostId && !forceNewId) ? currentPostId : Date.now().toString() + Math.random().toString(36).substr(2, 5);
+
     return {
-      id: Date.now().toString(),
+      id: id,
       title: youtubeTitle,
       description: content, // Reuse content as description
       thumbnailUrl: youtubeThumbnail?.url,
@@ -187,28 +195,80 @@ export const CreatorStudio: React.FC = () => {
     };
   };
 
-  const handlePublish = async () => {
+  const performSafetyCheck = async (): Promise<boolean> => {
+    setIsCheckingSafety(true);
+    const result = await validateContentSafety(content, selectedPlatforms);
+    setIsCheckingSafety(false);
+    
+    if (!result.safe) {
+      setSafetyIssues(result.issues);
+      setShowSafetyModal(true);
+      return false;
+    }
+    return true;
+  };
+
+  const handlePublish = async (skipSafety: boolean = false) => {
     if (validationErrors.length > 0 || !content) return;
+    
+    if (!skipSafety) {
+      const isSafe = await performSafetyCheck();
+      if (!isSafe) return; // Modal will show
+    }
+
     setIsSaving(true);
     const status = scheduleMode === 'now' ? PostStatus.Published : PostStatus.Scheduled;
     const newPost = constructPostObject(status);
-    await store.addPost(newPost);
+    
+    // If we have a current ID, we update, otherwise add
+    if (currentPostId) {
+      await store.updatePost(newPost);
+    } else {
+      await store.addPost(newPost);
+    }
+    
     alert(scheduleMode === 'now' ? 'Published successfully!' : 'Scheduled successfully!');
     resetForm();
     setIsSaving(false);
+    setShowSafetyModal(false);
   };
 
   const handleSaveDraft = async () => {
     if (!content) return;
     setIsSaving(true);
+    
     const newPost = constructPostObject(PostStatus.Draft);
-    await store.addPost(newPost);
-    alert('Saved to drafts.');
+    
+    if (currentPostId) {
+       await store.updatePost(newPost);
+       // Simple visual feedback
+       const btn = document.getElementById('save-draft-btn');
+       if(btn) {
+         const originalText = btn.innerText;
+         btn.innerText = 'Saved!';
+         setTimeout(() => btn.innerText = originalText, 2000);
+       }
+    } else {
+       const saved = await store.addPost(newPost);
+       setCurrentPostId(saved.id);
+       alert('Draft saved. You can continue editing.');
+    }
+    
     setIsSaving(false);
   };
 
-  const handleDuplicate = () => {
-    alert("Draft duplicated! You can now edit this version.");
+  const handleDuplicate = async () => {
+    if (!content) return;
+    setIsSaving(true);
+    // Force new ID to create a copy
+    const newPost = constructPostObject(PostStatus.Draft, true);
+    if (newPost.title) newPost.title = `${newPost.title} (Copy)`;
+    
+    const saved = await store.addPost(newPost);
+    setCurrentPostId(saved.id); // Switch context to the new copy
+    
+    alert("Version duplicated! You are now editing the copy.");
+    setIsSaving(false);
   };
 
   const resetForm = () => {
@@ -222,6 +282,8 @@ export const CreatorStudio: React.FC = () => {
     setSelectedPlatforms([Platform.Twitter]);
     setValidationErrors([]);
     setScheduleMode('now');
+    setCurrentPostId(null); // Clear current ID
+    setSafetyIssues([]);
   };
 
   const formatBytes = (bytes: number) => {
@@ -417,7 +479,7 @@ export const CreatorStudio: React.FC = () => {
   };
 
   return (
-    <div className="h-full flex flex-col gap-6 animate-in fade-in duration-500 pb-10">
+    <div className="h-full flex flex-col gap-6 animate-in fade-in duration-500 pb-10 relative">
       
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -429,10 +491,12 @@ export const CreatorStudio: React.FC = () => {
             <button 
                onClick={handleDuplicate}
                className="px-4 py-2 bg-white border border-gray-200 text-gray-700 font-bold rounded-full shadow-sm hover:bg-gray-50 transition-colors flex items-center gap-2 text-sm"
+               title="Create a copy (A/B Test)"
             >
                <Copy className="w-4 h-4" /> Duplicate
             </button>
             <button 
+               id="save-draft-btn"
                onClick={handleSaveDraft}
                className="px-5 py-2.5 bg-white border border-gray-200 text-gray-700 font-bold rounded-full shadow-sm hover:bg-gray-50 transition-colors flex items-center gap-2"
             >
@@ -800,12 +864,16 @@ export const CreatorStudio: React.FC = () => {
               )}
 
               <button
-                 onClick={handlePublish}
-                 disabled={isSaving || !content || selectedPlatforms.length === 0 || validationErrors.length > 0}
+                 onClick={() => handlePublish(false)}
+                 disabled={isSaving || isCheckingSafety || !content || selectedPlatforms.length === 0 || validationErrors.length > 0}
                  className="w-full py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl font-bold text-base shadow-lg shadow-blue-500/30 hover:shadow-blue-500/40 hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:grayscale disabled:pointer-events-none"
               >
-                 {isSaving ? <RotateCcw className="w-5 h-5 animate-spin" /> : (scheduleMode === 'now' ? <Send className="w-5 h-5" /> : <CalendarIcon className="w-5 h-5" />)}
-                 {scheduleMode === 'now' ? 'Publish Immediately' : 'Schedule Post'}
+                 {isSaving || isCheckingSafety ? (
+                    <RefreshCw className="w-5 h-5 animate-spin" />
+                 ) : (
+                    scheduleMode === 'now' ? <Send className="w-5 h-5" /> : <CalendarIcon className="w-5 h-5" />
+                 )}
+                 {isCheckingSafety ? 'Running Compliance Check...' : (scheduleMode === 'now' ? 'Publish Immediately' : 'Schedule Post')}
               </button>
            </div>
         </div>
@@ -873,6 +941,49 @@ export const CreatorStudio: React.FC = () => {
         </div>
       </div>
       
+      {/* Safety Compliance Modal */}
+      {showSafetyModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
+           <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+              <div className="bg-red-50 p-6 flex flex-col items-center text-center border-b border-red-100">
+                 <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4 text-red-600">
+                    <ShieldCheck className="w-8 h-8" />
+                 </div>
+                 <h3 className="text-xl font-bold text-red-900">Safety Check Warning</h3>
+                 <p className="text-sm text-red-700 mt-2">
+                    Our AI detected potential compliance issues with your content.
+                 </p>
+              </div>
+              <div className="p-6">
+                 <div className="bg-gray-50 rounded-xl p-4 border border-gray-100 mb-6">
+                    <ul className="space-y-2">
+                       {safetyIssues.map((issue, idx) => (
+                          <li key={idx} className="flex items-start gap-2 text-sm text-gray-700 font-medium">
+                             <AlertTriangle className="w-4 h-4 text-orange-500 shrink-0 mt-0.5" />
+                             {issue}
+                          </li>
+                       ))}
+                    </ul>
+                 </div>
+                 <div className="flex gap-3">
+                    <button 
+                       onClick={() => setShowSafetyModal(false)}
+                       className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl transition-colors"
+                    >
+                       Edit Post
+                    </button>
+                    <button 
+                       onClick={() => handlePublish(true)}
+                       className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl transition-colors"
+                    >
+                       Publish Anyway
+                    </button>
+                 </div>
+              </div>
+           </div>
+        </div>
+      )}
+
       <MediaPicker isOpen={isMediaPickerOpen} onClose={() => setIsMediaPickerOpen(false)} onSelect={handleMediaSelect} />
     </div>
   );

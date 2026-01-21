@@ -7,6 +7,7 @@ export const Settings: React.FC = () => {
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+  const systemTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   useEffect(() => {
     store.getSettings().then(setSettings);
@@ -83,7 +84,7 @@ export const Settings: React.FC = () => {
                  </div>
                  <div>
                    <h3 className="font-semibold text-slate-900">Region</h3>
-                   <p className="text-xs text-slate-500">US-East (N. Virginia)</p>
+                   <p className="text-xs text-slate-500">{systemTz} (System Default)</p>
                  </div>
                </div>
                <ChevronRight className="w-5 h-5 text-slate-300" />

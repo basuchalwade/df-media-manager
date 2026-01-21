@@ -4,10 +4,10 @@ import {
   ChevronDown, Image as ImageIcon, Trash2, Zap, Copy, Filter, Eye, Heart, 
   MessageCircle, Share, MoreHorizontal, AlertTriangle, LayoutList, Grid3X3,
   Bot, RefreshCw, ArrowRight, Globe, BarChart3, AlertCircle, CheckCircle,
-  MessageSquare, Repeat, Heart as HeartOutline, Share2, Bookmark, Send, Layers, Smile, Hash
+  MessageSquare, Repeat, Heart as HeartOutline, Share2, Bookmark, Send, Layers, Smile, Hash, Save, ShieldCheck
 } from 'lucide-react';
 import { store } from '../services/mockStore';
-import { generateHashtags } from '../services/geminiService';
+import { generateHashtags, validateContentSafety } from '../services/geminiService';
 import { Post, Platform, PostStatus, MediaItem, BotType } from '../types';
 import { PlatformIcon } from '../components/PlatformIcon';
 import { MediaPicker } from '../components/MediaPicker';
@@ -25,10 +25,12 @@ const PLATFORM_LIMITS: Record<Platform, number> = {
 };
 
 const TIMEZONES = [
-  { label: 'UTC-5 (EST)', value: 'America/New_York' },
-  { label: 'UTC-8 (PST)', value: 'America/Los_Angeles' },
-  { label: 'UTC+0 (GMT)', value: 'Europe/London' },
-  { label: 'UTC+5:30 (IST)', value: 'Asia/Kolkata' },
+  { label: 'New York (EST)', value: 'America/New_York' },
+  { label: 'Los Angeles (PST)', value: 'America/Los_Angeles' },
+  { label: 'London (GMT)', value: 'Europe/London' },
+  { label: 'India (IST)', value: 'Asia/Kolkata' },
+  { label: 'Tokyo (JST)', value: 'Asia/Tokyo' },
+  { label: 'Sydney (AEDT)', value: 'Australia/Sydney' },
 ];
 
 const EMOJI_CATEGORIES = {
@@ -69,7 +71,10 @@ export const Calendar: React.FC = () => {
   const [filterPlatform, setFilterPlatform] = useState<Platform | 'All'>('All');
   const [filterStatus, setFilterStatus] = useState<PostStatus | 'All'>('All');
   const [viewMode, setViewMode] = useState<'Month' | 'Agenda'>('Month');
-  const [selectedTimezone, setSelectedTimezone] = useState(TIMEZONES[0].value);
+  
+  // Timezone - Auto detect system default
+  const systemTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const [selectedTimezone, setSelectedTimezone] = useState(systemTz);
 
   // Drag & Drop State
   const [draggedPost, setDraggedPost] = useState<Post | null>(null);
@@ -102,6 +107,9 @@ export const Calendar: React.FC = () => {
   const [isMediaPickerOpen, setIsMediaPickerOpen] = useState(false);
   const [mediaPickerMode, setMediaPickerMode] = useState<'main' | 'thumbnail'>('main');
   const [isTimePickerOpen, setIsTimePickerOpen] = useState(false);
+  const [isCheckingSafety, setIsCheckingSafety] = useState(false);
+  const [showSafetyModal, setShowSafetyModal] = useState(false);
+  const [safetyIssues, setSafetyIssues] = useState<string[]>([]);
 
   useEffect(() => {
     loadPosts();
@@ -138,6 +146,7 @@ export const Calendar: React.FC = () => {
     setSelectedPlatforms([Platform.Twitter]);
     setPreviewPlatform(Platform.Twitter);
     setTimeState({ hour: '09', minute: '00', period: 'AM' });
+    setSafetyIssues([]);
   };
 
   const handleCreateEvent = () => {
@@ -279,36 +288,83 @@ export const Calendar: React.FC = () => {
     }
   };
 
-  const handleSavePost = async () => {
+  const getPostObject = (status: PostStatus, forceNewId: boolean = false): Post => {
+      let hours = parseInt(timeState.hour);
+      if (timeState.period === 'PM' && hours !== 12) hours += 12;
+      else if (timeState.period === 'AM' && hours === 12) hours = 0;
+
+      const scheduledDateTime = new Date(selectedDate);
+      scheduledDateTime.setHours(hours, parseInt(timeState.minute), 0, 0);
+
+      // Determine ID
+      let id = (editingPost && !forceNewId) ? editingPost.id : `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+      return {
+        id,
+        title: newPostTitle,
+        description: newPostContent,
+        thumbnailUrl: youtubeThumbnail?.url,
+        isCarousel,
+        content: newPostContent,
+        platforms: selectedPlatforms,
+        scheduledFor: scheduledDateTime.toISOString(),
+        status: status,
+        generatedByAi: editingPost ? editingPost.generatedByAi : false,
+        mediaUrl: selectedMedia?.url,
+        mediaType: selectedMedia?.type,
+      };
+  };
+
+  const performSafetyCheck = async (): Promise<boolean> => {
+    setIsCheckingSafety(true);
+    const result = await validateContentSafety(newPostContent, selectedPlatforms);
+    setIsCheckingSafety(false);
+    
+    if (!result.safe) {
+      setSafetyIssues(result.issues);
+      setShowSafetyModal(true);
+      return false;
+    }
+    return true;
+  };
+
+  const handleSavePost = async (skipSafety: boolean = false) => {
     if (!newPostContent && !selectedMedia) return;
 
-    let hours = parseInt(timeState.hour);
-    if (timeState.period === 'PM' && hours !== 12) hours += 12;
-    else if (timeState.period === 'AM' && hours === 12) hours = 0;
+    if (!skipSafety) {
+      const isSafe = await performSafetyCheck();
+      if (!isSafe) return;
+    }
 
-    const scheduledDateTime = new Date(selectedDate);
-    scheduledDateTime.setHours(hours, parseInt(timeState.minute), 0, 0);
-
-    const postData: Post = {
-      id: editingPost ? editingPost.id : `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      title: newPostTitle,
-      description: newPostContent, // Default content to desc for consistency
-      thumbnailUrl: youtubeThumbnail?.url,
-      isCarousel,
-      content: newPostContent,
-      platforms: selectedPlatforms,
-      scheduledFor: scheduledDateTime.toISOString(),
-      status: editingPost ? editingPost.status : PostStatus.Scheduled,
-      generatedByAi: editingPost ? editingPost.generatedByAi : false,
-      mediaUrl: selectedMedia?.url,
-      mediaType: selectedMedia?.type,
-    };
+    // Preserve existing status if editing, unless it's new
+    const status = editingPost ? editingPost.status : PostStatus.Scheduled;
+    const postData = getPostObject(status);
 
     if (editingPost) await store.updatePost(postData);
     else await store.addPost(postData);
 
     await loadPosts();
     setIsModalOpen(false);
+    setShowSafetyModal(false);
+  };
+
+  const handleSaveDraft = async () => {
+     if (!newPostContent && !selectedMedia) return;
+     const postData = getPostObject(PostStatus.Draft);
+     if (editingPost) await store.updatePost(postData);
+     else await store.addPost(postData);
+     await loadPosts();
+     setIsModalOpen(false);
+  };
+
+  const handleDuplicate = async () => {
+     if (!newPostContent && !selectedMedia) return;
+     const postData = getPostObject(PostStatus.Draft, true);
+     if (postData.title) postData.title += " (Copy)";
+     await store.addPost(postData);
+     await loadPosts();
+     alert("Version copied to Drafts!");
+     setIsModalOpen(false);
   };
 
   // --- Logic & Filtering ---
@@ -533,7 +589,10 @@ export const Calendar: React.FC = () => {
                onChange={(e) => setSelectedTimezone(e.target.value)}
                className="bg-transparent text-sm font-medium text-gray-500 hover:text-gray-800 outline-none cursor-pointer"
              >
-                {TIMEZONES.map(tz => <option key={tz.value} value={tz.value}>{tz.label}</option>)}
+                <option value={systemTz}>System ({systemTz})</option>
+                {TIMEZONES.filter(t => t.value !== systemTz).map(tz => (
+                  <option key={tz.value} value={tz.value}>{tz.label}</option>
+                ))}
              </select>
           </div>
         </div>
@@ -765,7 +824,14 @@ export const Calendar: React.FC = () => {
            <div className="absolute inset-0 bg-gray-900/30 backdrop-blur-sm transition-opacity" onClick={() => setIsModalOpen(false)} />
            <div className="relative bg-white w-full max-w-5xl rounded-[32px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col h-[90vh]">
               <div className="px-8 py-5 border-b border-gray-100 flex justify-between items-center bg-white sticky top-0 z-10">
-                 <h2 className="text-xl font-bold text-gray-900">{editingPost ? 'Edit Post' : 'New Post'}</h2>
+                 <div className="flex items-center gap-3">
+                    <h2 className="text-xl font-bold text-gray-900">{editingPost ? 'Edit Post' : 'New Post'}</h2>
+                    {editingPost && (
+                       <button onClick={handleDuplicate} className="text-xs bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-full font-bold text-gray-600 flex items-center gap-1 transition-colors">
+                          <Copy className="w-3 h-3" /> Duplicate
+                       </button>
+                    )}
+                 </div>
                  <button onClick={() => setIsModalOpen(false)} className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-200 transition-colors">
                     <X className="w-4 h-4" />
                  </button>
@@ -963,9 +1029,16 @@ export const Calendar: React.FC = () => {
                     <button onClick={handleDeleteFromModal} className="text-red-500 hover:text-red-700 font-bold text-sm flex items-center gap-2"><Trash2 className="w-4 h-4" /> Delete</button>
                  ) : <div></div>}
                  <div className="flex gap-3">
-                    <button onClick={() => setIsModalOpen(false)} className="px-6 py-3 rounded-full font-bold text-gray-500 hover:bg-gray-100">Cancel</button>
-                    <button onClick={handleSavePost} disabled={(!newPostContent && !selectedMedia) || isOverLimit} className="px-8 py-3 bg-black text-white rounded-full font-bold shadow-xl hover:scale-105 active:scale-95 transition-all disabled:opacity-50">
-                       {editingPost ? 'Update' : 'Schedule'}
+                    <button onClick={handleSaveDraft} className="px-5 py-3 rounded-full font-bold text-gray-500 hover:bg-gray-100 transition-colors flex items-center gap-2 text-sm">
+                       <Save className="w-4 h-4" /> Save Draft
+                    </button>
+                    <button onClick={() => setIsModalOpen(false)} className="px-5 py-3 rounded-full font-bold text-gray-500 hover:bg-gray-100">Cancel</button>
+                    <button 
+                       onClick={() => handleSavePost(false)}
+                       disabled={isCheckingSafety || (!newPostContent && !selectedMedia) || isOverLimit}
+                       className="px-8 py-3 bg-black text-white rounded-full font-bold shadow-xl hover:scale-105 active:scale-95 transition-all disabled:opacity-50 flex items-center gap-2"
+                    >
+                       {isCheckingSafety ? <RefreshCw className="w-4 h-4 animate-spin" /> : (editingPost ? 'Update' : 'Schedule')}
                     </button>
                  </div>
               </div>
@@ -973,6 +1046,49 @@ export const Calendar: React.FC = () => {
         </div>
       )}
       
+      {/* Safety Compliance Modal */}
+      {showSafetyModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
+           <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+              <div className="bg-red-50 p-6 flex flex-col items-center text-center border-b border-red-100">
+                 <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4 text-red-600">
+                    <ShieldCheck className="w-8 h-8" />
+                 </div>
+                 <h3 className="text-xl font-bold text-red-900">Safety Check Warning</h3>
+                 <p className="text-sm text-red-700 mt-2">
+                    Our AI detected potential compliance issues with your content.
+                 </p>
+              </div>
+              <div className="p-6">
+                 <div className="bg-gray-50 rounded-xl p-4 border border-gray-100 mb-6">
+                    <ul className="space-y-2">
+                       {safetyIssues.map((issue, idx) => (
+                          <li key={idx} className="flex items-start gap-2 text-sm text-gray-700 font-medium">
+                             <AlertTriangle className="w-4 h-4 text-orange-500 shrink-0 mt-0.5" />
+                             {issue}
+                          </li>
+                       ))}
+                    </ul>
+                 </div>
+                 <div className="flex gap-3">
+                    <button 
+                       onClick={() => setShowSafetyModal(false)}
+                       className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl transition-colors"
+                    >
+                       Edit Post
+                    </button>
+                    <button 
+                       onClick={() => handleSavePost(true)}
+                       className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl transition-colors"
+                    >
+                       Schedule Anyway
+                    </button>
+                 </div>
+              </div>
+           </div>
+        </div>
+      )}
+
       <MediaPicker isOpen={isMediaPickerOpen} onClose={() => setIsMediaPickerOpen(false)} onSelect={handleMediaSelect} />
     </div>
   );
