@@ -1,6 +1,6 @@
 # PostMaster - AI-Powered Social Media Automation Platform
 
-**PostMaster** is an enterprise-grade social media management dashboard designed to automate content creation, scheduling, and analytics using advanced AI agents (Gemini) and smart growth bots.
+**PostMaster** is an enterprise-grade social media management dashboard designed to automate content creation, scheduling, and analytics using advanced AI agents (Gemini) and smart growth bots. It serves as a unified command center for all your social channels.
 
 ![Version](https://img.shields.io/badge/version-1.2.0-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
@@ -40,6 +40,21 @@ graph TD
     Backend -->|Generate Content| Gemini["Google Gemini API"]
     Backend -->|Post Content| Socials["Social Media APIs"]
 ```
+
+---
+
+## 📱 Supported Platforms
+
+PostMaster is engineered to support multi-channel publishing across the most popular social networks.
+
+| Platform | Type | Key Capabilities |
+| :--- | :--- | :--- |
+| **X (Twitter)** | Microblogging | • Thread creation & scheduling<br>• Reply automation via Engagement Bot<br>• Trend-based content generation |
+| **LinkedIn** | Professional | • Company Page & Personal Profile support<br>• Rich article formatting<br>• PDF/Carousel document support |
+| **Instagram** | Visual | • Direct publishing to Feed<br>• **Smart Resize** for Stories (9:16) and Square (1:1)<br>• Reels scheduling |
+| **Facebook** | Social Network | • Page management<br>• Group posting<br>• Link preview customization |
+| **YouTube** | Video | • Community Tab posts<br>• YouTube Shorts scheduling<br>• SEO tag generation via AI |
+| **Discord** | Community | • Webhook integration for server announcements<br>• Rich Embed builder<br>• Automated role-based updates |
 
 ---
 
