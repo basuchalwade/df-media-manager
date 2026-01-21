@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, PenTool, Calendar, Settings, Bot, BarChart3, Radio, Users, Link, Image } from 'lucide-react';
+import { LayoutDashboard, PenTool, Calendar, Settings, Bot, BarChart3, Cast, Users, Link, Image } from 'lucide-react';
 
 interface SidebarProps {
   currentPage: string;
@@ -30,12 +30,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, onNavigate }) => 
       {/* Header */}
       <div className="p-6 pb-2">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-b from-gray-800 to-black text-white flex items-center justify-center shadow-lg shadow-black/20">
-            <Radio className="w-4 h-4" strokeWidth={2.5} />
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-600 via-purple-600 to-orange-500 text-white flex items-center justify-center shadow-lg shadow-purple-500/20">
+            <Cast className="w-4 h-4" strokeWidth={2.5} />
           </div>
           <div>
-            <h1 className="text-[15px] font-bold tracking-tight text-[#1d1d1f] leading-none">PostMaster</h1>
-            <span className="text-[11px] text-gray-500 font-medium">Enterprise</span>
+            <h1 className="text-[15px] font-bold tracking-tight text-[#1d1d1f] leading-none">ContentCaster</h1>
+            <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wide">by DOSSIEFOYER</span>
           </div>
         </div>
       </div>

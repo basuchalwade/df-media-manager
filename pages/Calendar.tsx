@@ -146,7 +146,16 @@ export const Calendar: React.FC = () => {
     setPreviewPlatform(post.platforms[0] || Platform.Twitter);
     
     if (post.mediaUrl) {
-       setSelectedMedia({ id: 'mock', name: 'Existing Media', type: 'image', url: post.mediaUrl, size: 0, createdAt: '' });
+       // Prefer explicit type, fallback to extension check for legacy/mock data
+       const isVideo = post.mediaType === 'video' || post.mediaUrl.toLowerCase().endsWith('.mp4');
+       setSelectedMedia({ 
+         id: 'mock', 
+         name: 'Existing Media', 
+         type: isVideo ? 'video' : 'image', 
+         url: post.mediaUrl, 
+         size: 0, 
+         createdAt: '' 
+       });
     } else {
       setSelectedMedia(null);
     }
@@ -281,6 +290,7 @@ export const Calendar: React.FC = () => {
       status: editingPost ? editingPost.status : PostStatus.Scheduled,
       generatedByAi: editingPost ? editingPost.generatedByAi : false,
       mediaUrl: selectedMedia?.url,
+      mediaType: selectedMedia?.type, // Save the type
     };
 
     if (editingPost) {
@@ -737,9 +747,16 @@ export const Calendar: React.FC = () => {
                               {/* Media Thumbnail (Right Side) */}
                               {post.mediaUrl && (
                                  <div className="shrink-0 w-16 h-16 rounded-lg overflow-hidden border border-gray-100 shadow-sm bg-gray-50 relative group/media">
-                                    {post.mediaUrl.endsWith('.mp4') ? (
-                                       <div className="w-full h-full flex items-center justify-center bg-gray-900">
-                                          <div className="w-0 h-0 border-t-[4px] border-t-transparent border-l-[8px] border-l-white border-b-[4px] border-b-transparent ml-0.5"></div>
+                                    {(post.mediaType === 'video' || post.mediaUrl.endsWith('.mp4')) ? (
+                                       <div className="w-full h-full bg-black flex items-center justify-center">
+                                          <video 
+                                             src={post.mediaUrl} 
+                                             className="w-full h-full object-cover" 
+                                             muted 
+                                             loop 
+                                             onMouseOver={e => e.currentTarget.play()} 
+                                             onMouseOut={e => { e.currentTarget.pause(); e.currentTarget.currentTime = 0; }} 
+                                          />
                                        </div>
                                     ) : (
                                        <img src={post.mediaUrl} className="w-full h-full object-cover transition-transform group-hover/media:scale-110" alt="Post Media" />
@@ -811,8 +828,12 @@ export const Calendar: React.FC = () => {
                             <div className="p-6 bg-white border border-slate-200 rounded-2xl">
                                <p className="text-slate-800 text-lg leading-relaxed">{editingPost.content}</p>
                                {editingPost.mediaUrl && (
-                                 <div className="mt-4 rounded-xl overflow-hidden">
-                                    <img src={editingPost.mediaUrl} className="max-w-full max-h-64 object-cover" alt="Post media" />
+                                 <div className="mt-4 rounded-xl overflow-hidden bg-black">
+                                    {(editingPost.mediaType === 'video' || editingPost.mediaUrl.endsWith('.mp4')) ? (
+                                      <video src={editingPost.mediaUrl} className="w-full max-h-64 object-contain" controls />
+                                    ) : (
+                                      <img src={editingPost.mediaUrl} className="max-w-full max-h-64 object-cover" alt="Post media" />
+                                    )}
                                  </div>
                                )}
                             </div>
@@ -976,12 +997,18 @@ export const Calendar: React.FC = () => {
                                {selectedMedia.type === 'image' ? (
                                   <img src={selectedMedia.url} className="w-full h-48 object-cover" alt="Preview" />
                                ) : (
-                                  <div className="w-full h-48 bg-gray-900 flex items-center justify-center text-white"><span className="font-bold">VIDEO FILE</span></div>
+                                  <div className="w-full h-48 bg-gray-900 flex items-center justify-center">
+                                     <video 
+                                        src={selectedMedia.url} 
+                                        className="w-full h-full object-cover" 
+                                        controls 
+                                     />
+                                  </div>
                                )}
-                               <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-4">
+                               <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-4 pointer-events-none">
                                   <p className="text-white font-medium text-sm truncate">{selectedMedia.name}</p>
                                </div>
-                               <button onClick={() => setSelectedMedia(null)} className="absolute top-2 right-2 p-1.5 bg-black/40 text-white rounded-full backdrop-blur-md hover:bg-black/60">
+                               <button onClick={() => setSelectedMedia(null)} className="absolute top-2 right-2 p-1.5 bg-black/40 text-white rounded-full backdrop-blur-md hover:bg-black/60 z-20">
                                   <X className="w-4 h-4" />
                                </button>
                             </div>
@@ -1020,7 +1047,7 @@ export const Calendar: React.FC = () => {
                    </div>
 
                    {/* Right Column: Live Preview */}
-                   <div className="hidden lg:flex w-[400px] bg-slate-100 p-6 flex-col border-l border-gray-200">
+                   <div className="hidden lg:flex flex-1 min-w-[320px] max-w-[400px] bg-slate-100 p-6 flex-col border-l border-gray-200">
                       <div className="flex items-center justify-between mb-6">
                          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Live Preview</h3>
                          
@@ -1062,15 +1089,15 @@ export const Calendar: React.FC = () => {
                                   </p>
                                   
                                   {selectedMedia && (
-                                     <div className="rounded-xl overflow-hidden border border-slate-100 bg-slate-50 mb-3">
+                                     <div className="rounded-xl overflow-hidden border border-slate-100 bg-slate-50 mb-3 bg-black">
                                         {selectedMedia.type === 'image' ? (
                                            <img src={selectedMedia.url} className="w-full object-cover max-h-60" alt="Preview" />
                                         ) : (
-                                           <div className="w-full h-40 bg-black flex items-center justify-center text-white">
-                                              <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center backdrop-blur-sm">
-                                                 <div className="w-0 h-0 border-t-[6px] border-t-transparent border-l-[10px] border-l-white border-b-[6px] border-b-transparent ml-1"></div>
-                                              </div>
-                                           </div>
+                                           <video 
+                                              src={selectedMedia.url} 
+                                              className="w-full max-h-60 bg-black" 
+                                              controls 
+                                           />
                                         )}
                                      </div>
                                   )}

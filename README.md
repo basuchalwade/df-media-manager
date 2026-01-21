@@ -1,6 +1,6 @@
-# PostMaster - AI-Powered Social Media Automation Platform
+# ContentCaster - AI-Powered Social Media Automation Platform
 
-**PostMaster** is an enterprise-grade social media management dashboard designed to automate content creation, scheduling, and analytics using advanced AI agents (Gemini) and smart growth bots. It serves as a unified command center for all your social channels.
+**ContentCaster** (by Dossiefoyer Private Limited) is an enterprise-grade social media management dashboard designed to automate content creation, scheduling, and analytics using advanced AI agents (Gemini) and smart growth bots. It serves as a unified command center for all your social channels.
 
 ![Version](https://img.shields.io/badge/version-1.2.0-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
@@ -29,7 +29,7 @@
 
 ## 🏗️ Architecture
 
-PostMaster follows a modern client-server architecture designed for scalability and ease of deployment.
+ContentCaster follows a modern client-server architecture designed for scalability and ease of deployment.
 
 ```mermaid
 graph TD
@@ -45,7 +45,7 @@ graph TD
 
 ## 📱 Supported Platforms
 
-PostMaster is engineered to support multi-channel publishing across the most popular social networks.
+ContentCaster is engineered to support multi-channel publishing across the most popular social networks.
 
 | Platform | Type | Key Capabilities |
 | :--- | :--- | :--- |
@@ -115,8 +115,8 @@ PostMaster is engineered to support multi-channel publishing across the most pop
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/yourusername/postmaster.git
-   cd postmaster
+   git clone https://github.com/yourusername/contentcaster.git
+   cd contentcaster
    ```
 
 2. **Configure Environment**
@@ -163,7 +163,7 @@ To switch to **Live Mode**:
 ## 📂 Project Structure
 
 ```
-postmaster/
+contentcaster/
 ├── components/       # Reusable UI components (Sidebar, Charts, etc.)
 ├── pages/            # Main application views (Overview, Studio, etc.)
 ├── services/         # API calls and Mock Data store

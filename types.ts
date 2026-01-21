@@ -1,3 +1,4 @@
+
 export enum Platform {
   Twitter = 'Twitter',
   Facebook = 'Facebook',
@@ -29,6 +30,7 @@ export interface Post {
   scheduledFor: string; // ISO date string
   status: PostStatus;
   mediaUrl?: string;
+  mediaType?: 'image' | 'video'; // Added explicit type
   generatedByAi: boolean;
   engagement?: {
     likes: number;

@@ -145,7 +145,8 @@ export const Settings: React.FC = () => {
         </div>
 
         <div className="pt-4 text-center">
-          <p className="text-xs text-slate-400">PostMaster Enterprise v1.2.0 (8492)</p>
+          <p className="text-xs text-slate-400">ContentCaster Enterprise v1.2.0 (8492)</p>
+          <p className="text-[10px] text-slate-300 mt-1">Powered by Dossiefoyer Private Limited</p>
         </div>
       </div>
     </div>

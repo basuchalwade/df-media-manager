@@ -9,6 +9,8 @@ const INITIAL_POSTS: Post[] = [
     scheduledFor: new Date().toISOString(),
     status: PostStatus.Published,
     generatedByAi: false,
+    mediaUrl: 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80',
+    mediaType: 'image',
     engagement: { likes: 120, shares: 34, comments: 12 }
   },
   {
@@ -18,6 +20,16 @@ const INITIAL_POSTS: Post[] = [
     scheduledFor: new Date(Date.now() + 86400000).toISOString(),
     status: PostStatus.Scheduled,
     generatedByAi: true,
+  },
+  {
+    id: '3',
+    content: 'Check out this amazing view! 🎥 #Nature',
+    platforms: [Platform.Instagram],
+    scheduledFor: new Date(Date.now() + 172800000).toISOString(),
+    status: PostStatus.Draft,
+    generatedByAi: false,
+    mediaUrl: 'https://www.w3schools.com/html/mov_bbb.mp4',
+    mediaType: 'video'
   }
 ];
 
@@ -37,7 +49,7 @@ const INITIAL_USERS: User[] = [
   { 
     id: '1', 
     name: 'Admin User', 
-    email: 'admin@postmaster.ai', 
+    email: 'admin@contentcaster.ai', 
     role: UserRole.Admin, 
     status: UserStatus.Active, 
     lastActive: 'Just now',
@@ -49,7 +61,7 @@ const INITIAL_USERS: User[] = [
   { 
     id: '2', 
     name: 'Sarah Monitor', 
-    email: 'sarah@postmaster.ai', 
+    email: 'sarah@contentcaster.ai', 
     role: UserRole.Monitor, 
     status: UserStatus.Active, 
     lastActive: '2 hours ago',

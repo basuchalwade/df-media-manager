@@ -36,6 +36,7 @@ export const CreatorStudio: React.FC = () => {
       status: PostStatus.Published,
       generatedByAi: true,
       mediaUrl: selectedMedia?.url,
+      mediaType: selectedMedia?.type, // Added explicit media type save
       engagement: { likes: 0, shares: 0, comments: 0 }
     });
     setTopic('');
@@ -128,15 +129,19 @@ export const CreatorStudio: React.FC = () => {
                     <p className="text-gray-800 text-lg leading-relaxed whitespace-pre-wrap">{generatedContent}</p>
 
                     {selectedMedia && (
-                       <div className="mt-4 rounded-2xl overflow-hidden border border-gray-100 relative group">
+                       <div className="mt-4 rounded-2xl overflow-hidden border border-gray-100 relative group bg-black">
                           {selectedMedia.type === 'image' ? (
                              <img src={selectedMedia.url} className="w-full object-cover max-h-[300px]" alt="media" />
                           ) : (
-                             <div className="w-full h-48 bg-black flex items-center justify-center"><FileVideo className="text-white w-8 h-8"/></div>
+                             <video 
+                                src={selectedMedia.url} 
+                                className="w-full max-h-[300px]" 
+                                controls 
+                             />
                           )}
                           <button 
                              onClick={() => setSelectedMedia(null)} 
-                             className="absolute top-2 right-2 p-1.5 bg-black/50 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-md"
+                             className="absolute top-2 right-2 p-1.5 bg-black/50 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-md z-10"
                           >
                              <X className="w-4 h-4"/>
                           </button>

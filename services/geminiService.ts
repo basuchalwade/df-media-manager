@@ -17,7 +17,7 @@ export const generatePostContent = async (
 
   try {
     const prompt = `
-      You are an expert social media manager using the PostMaster platform.
+      You are an expert social media manager using the ContentCaster platform by Dossiefoyer.
       Task: Write a ${tone.toLowerCase()} social media post about "${topic}".
       Platform: ${platform}.
       
