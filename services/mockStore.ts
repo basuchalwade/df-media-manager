@@ -240,35 +240,43 @@ class MockStore {
   // Simulate file upload validation and storage
   uploadMedia(file: File): Promise<MediaItem> {
     return new Promise((resolve, reject) => {
-      // 1. Validate Types
+      // 1. Validate Types (Security: Whitelist only)
       const allowedImages = ['image/jpeg', 'image/png', 'image/webp'];
       const allowedVideos = ['video/mp4'];
-      const isImage = allowedImages.includes(file.type);
-      const isVideo = allowedVideos.includes(file.type);
+      const allowedTypes = [...allowedImages, ...allowedVideos];
 
-      if (!isImage && !isVideo) {
-        reject(new Error("Invalid file type. Only JPG, PNG, WEBP images and MP4 videos are allowed."));
+      if (!allowedTypes.includes(file.type)) {
+        reject(new Error(`Invalid file type: ${file.type}. Only JPG, PNG, WEBP images and MP4 videos are allowed.`));
         return;
       }
 
-      // 2. Validate Size (Max 50MB for video)
+      // 2. Validate Size (Max 50MB for all types to prevent DOS/Storage issues)
       const MAX_SIZE = 50 * 1024 * 1024; // 50MB
-      if (isVideo && file.size > MAX_SIZE) {
-        reject(new Error("Video exceeds the 50MB limit."));
+      if (file.size > MAX_SIZE) {
+        reject(new Error(`File "${file.name}" exceeds the 50MB limit.`));
         return;
       }
       
-      // 3. Create Object URL (Simulating cloud upload)
+      // 3. Sanitize Filename (Security: Prevent path traversal, scripts, spaces)
+      // Replace spaces with underscores, remove non-alphanumeric chars except dots/underscores/hyphens
+      const sanitizedName = file.name
+        .replace(/\s+/g, '_')
+        .replace(/[^a-zA-Z0-9._-]/g, '');
+
+      // 4. Create Object URL (Simulating cloud upload)
       const url = URL.createObjectURL(file);
       
+      // Use random ID suffix to handle rapid bulk uploads
+      const id = Date.now().toString() + '-' + Math.random().toString(36).substr(2, 6);
+
       const newItem: MediaItem = {
-        id: Date.now().toString(),
-        name: file.name,
-        type: isImage ? 'image' : 'video',
+        id,
+        name: sanitizedName,
+        type: allowedImages.includes(file.type) ? 'image' : 'video',
         url,
         size: file.size,
         createdAt: new Date().toISOString(),
-        dimensions: isImage ? 'Original' : undefined
+        dimensions: allowedImages.includes(file.type) ? 'Original' : undefined
       };
 
       this.media.unshift(newItem);
@@ -288,7 +296,7 @@ class MockStore {
 
     const newItem: MediaItem = {
       ...original,
-      id: Date.now().toString(),
+      id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
       name: `${variantName}_${original.name}`,
       createdAt: new Date().toISOString(),
       dimensions: variantName === 'Square' ? '1080x1080' : variantName === 'Story' ? '1080x1920' : 'Optimized'

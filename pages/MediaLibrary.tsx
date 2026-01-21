@@ -20,23 +20,36 @@ export const MediaLibrary: React.FC = () => {
   };
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      await processUpload(file);
+    if (e.target.files && e.target.files.length > 0) {
+      await processUploads(Array.from(e.target.files));
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
-  const processUpload = async (file: File) => {
+  const processUploads = async (files: File[]) => {
     setIsUploading(true);
     setError(null);
-    try {
-      await store.uploadMedia(file);
-      await loadMedia();
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setIsUploading(false);
+    let successCount = 0;
+    let errors: string[] = [];
+
+    for (const file of files) {
+      try {
+        await store.uploadMedia(file);
+        successCount++;
+      } catch (err: any) {
+        errors.push(err.message);
+      }
+    }
+
+    await loadMedia();
+    setIsUploading(false);
+
+    if (errors.length > 0) {
+      setError(errors.length === 1 ? errors[0] : `Uploaded ${successCount} files. ${errors.length} failed. Check console or file limits.`);
+      if (successCount > 0) {
+          // Clear error after 5s if partial success
+          setTimeout(() => setError(null), 5000);
+      }
     }
   };
 
@@ -87,10 +100,19 @@ export const MediaLibrary: React.FC = () => {
         </button>
       </header>
 
-      <input type="file" ref={fileInputRef} className="hidden" accept="image/*,video/mp4" onChange={handleFileSelect} />
+      {/* Added 'multiple' attribute here */}
+      <input type="file" ref={fileInputRef} className="hidden" accept="image/png, image/jpeg, image/webp, video/mp4" multiple onChange={handleFileSelect} />
+
+      {error && (
+        <div className="bg-red-50 text-red-600 px-4 py-3 rounded-xl border border-red-100 flex items-center gap-2 text-sm font-medium animate-in slide-in-from-top-2">
+           <AlertTriangle className="w-4 h-4" />
+           {error}
+           <button onClick={() => setError(null)} className="ml-auto p-1 hover:bg-red-100 rounded-full"><X className="w-4 h-4" /></button>
+        </div>
+      )}
 
       {/* Grid */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto custom-scrollbar">
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
            {/* Upload Placeholder */}
            <div 
@@ -100,7 +122,7 @@ export const MediaLibrary: React.FC = () => {
              <div className="w-12 h-12 rounded-full bg-slate-50 group-hover:bg-blue-100 flex items-center justify-center mb-3 transition-colors">
                {isUploading ? <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"/> : <UploadCloud className="w-6 h-6" />}
              </div>
-             <span className="text-sm font-semibold">New Asset</span>
+             <span className="text-sm font-semibold">{isUploading ? 'Uploading...' : 'New Asset'}</span>
            </div>
 
            {mediaItems.map((item) => (
@@ -164,7 +186,7 @@ export const MediaLibrary: React.FC = () => {
               </div>
 
               <div className="w-96 bg-white border-l border-slate-100 flex flex-col p-8">
-                 <h3 className="text-xl font-bold text-slate-900 mb-1 line-clamp-2">{selectedItem.name}</h3>
+                 <h3 className="text-xl font-bold text-slate-900 mb-1 line-clamp-2 break-all">{selectedItem.name}</h3>
                  <p className="text-sm text-slate-400 font-medium mb-6">Added on {new Date(selectedItem.createdAt).toLocaleDateString()}</p>
                  
                  <div className="space-y-4 mb-8">

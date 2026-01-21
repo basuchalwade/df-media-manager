@@ -25,21 +25,26 @@ export const MediaPicker: React.FC<MediaPickerProps> = ({ isOpen, onClose, onSel
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
 
     setIsUploading(true);
-    try {
-      const newItem = await store.uploadMedia(file);
-      setMediaItems(prev => [newItem, ...prev]);
-    } catch (err: any) {
-      console.error("Upload failed", err);
-      alert(err.message || "Failed to upload file");
-    } finally {
-      setIsUploading(false);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
+    // Batch process uploads
+    for (const file of Array.from(files)) {
+      try {
+        await store.uploadMedia(file);
+      } catch (err: any) {
+        console.error("Upload failed for file " + file.name, err);
+        // Alert only on first failure for simplicity or log it
+        if (files.length === 1) alert(err.message || "Failed to upload file");
       }
+    }
+    
+    // Refresh list
+    await loadMedia();
+    setIsUploading(false);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   };
 
@@ -72,12 +77,13 @@ export const MediaPicker: React.FC<MediaPickerProps> = ({ isOpen, onClose, onSel
           </div>
         </div>
         
-        {/* Hidden File Input */}
+        {/* Hidden File Input with multiple attribute */}
         <input 
           type="file" 
           ref={fileInputRef} 
           className="hidden" 
           accept="image/png, image/jpeg, image/webp, video/mp4" 
+          multiple
           onChange={handleFileUpload}
         />
 
