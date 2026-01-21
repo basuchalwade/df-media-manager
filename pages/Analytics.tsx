@@ -3,6 +3,7 @@ import { BarChart3, TrendingUp, Users, Eye, ArrowUp, ArrowDown, Activity } from 
 import { store } from '../services/mockStore';
 import { PlatformAnalytics, Platform } from '../types';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend } from 'recharts';
+import { PlatformIcon } from '../components/PlatformIcon';
 
 export const Analytics: React.FC = () => {
   const [selectedPlatform, setSelectedPlatform] = useState<Platform | 'All'>('All');
@@ -37,19 +38,23 @@ export const Analytics: React.FC = () => {
 
       {/* Platform Selector */}
       <div className="flex overflow-x-auto pb-2 gap-2 border-b border-slate-200">
-        {tabs.map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setSelectedPlatform(tab as Platform | 'All')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all ${
-              selectedPlatform === tab
-                ? 'bg-blue-600 text-white shadow-md'
-                : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
-            }`}
-          >
-            {tab === 'All' ? 'All Networks' : tab}
-          </button>
-        ))}
+        {tabs.map((tab) => {
+          const isActive = selectedPlatform === tab;
+          return (
+            <button
+              key={tab}
+              onClick={() => setSelectedPlatform(tab as Platform | 'All')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all flex items-center gap-2 ${
+                isActive
+                  ? 'bg-blue-600 text-white shadow-md'
+                  : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
+              }`}
+            >
+              <PlatformIcon platform={tab} size={16} white={isActive} />
+              {tab === 'All' ? 'All Networks' : tab}
+            </button>
+          );
+        })}
       </div>
 
       {isLoading || !data ? (

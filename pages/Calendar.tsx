@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon, X, Clock, CheckCircle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon, X, Clock, CheckCircle, ChevronDown } from 'lucide-react';
 import { store } from '../services/mockStore';
 import { Post, Platform, PostStatus } from '../types';
+import { PlatformIcon } from '../components/PlatformIcon';
 
 export const Calendar: React.FC = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -10,6 +11,7 @@ export const Calendar: React.FC = () => {
   
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [newPostContent, setNewPostContent] = useState('');
   const [newPostTime, setNewPostTime] = useState('09:00');
   const [selectedPlatform, setSelectedPlatform] = useState<Platform>(Platform.Twitter);
@@ -41,6 +43,7 @@ export const Calendar: React.FC = () => {
     setSelectedDate(clickedDate);
     setIsModalOpen(true);
     setNewPostContent('');
+    setIsDropdownOpen(false);
   };
 
   const handleQuickSchedule = async () => {
@@ -71,6 +74,19 @@ export const Calendar: React.FC = () => {
       const d = new Date(post.scheduledFor);
       return d.getDate() === day && d.getMonth() === month && d.getFullYear() === year;
     });
+  };
+
+  const getPlatformStyles = (platform: Platform) => {
+    switch (platform) {
+      case Platform.Twitter: return 'bg-sky-100 border-sky-200 text-sky-800 hover:bg-sky-200';
+      case Platform.Facebook: return 'bg-blue-100 border-blue-200 text-blue-800 hover:bg-blue-200';
+      case Platform.Instagram: return 'bg-pink-100 border-pink-200 text-pink-800 hover:bg-pink-200';
+      case Platform.LinkedIn: return 'bg-indigo-100 border-indigo-200 text-indigo-800 hover:bg-indigo-200';
+      case Platform.YouTube: return 'bg-red-100 border-red-200 text-red-800 hover:bg-red-200';
+      case Platform.Discord: return 'bg-violet-100 border-violet-200 text-violet-800 hover:bg-violet-200';
+      case Platform.Threads: return 'bg-slate-100 border-slate-300 text-slate-800 hover:bg-slate-200';
+      default: return 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100';
+    }
   };
 
   // Generate Grid Cells
@@ -108,18 +124,21 @@ export const Calendar: React.FC = () => {
           </div>
           
           <div className="space-y-1 overflow-y-auto max-h-[calc(100%-30px)] custom-scrollbar">
-            {dayPosts.map(post => (
-              <div key={post.id} className={`text-xs p-1.5 rounded border truncate ${
-                post.status === PostStatus.Published 
-                  ? 'bg-green-50 border-green-200 text-green-800' 
-                  : 'bg-blue-50 border-blue-200 text-blue-800'
-              }`}>
-                <div className="flex items-center gap-1 mb-0.5">
-                   <span className="font-bold text-[10px] uppercase opacity-75">{post.platforms[0]}</span>
+            {dayPosts.map(post => {
+              const platform = post.platforms[0];
+              return (
+                <div 
+                  key={post.id} 
+                  className={`text-xs p-1.5 rounded border truncate flex items-center gap-1.5 shadow-sm transition-colors ${getPlatformStyles(platform)}`}
+                  title={`${platform}: ${post.content}`}
+                >
+                  <div className="shrink-0">
+                    <PlatformIcon platform={platform} size={14} />
+                  </div>
+                  <span className="truncate font-medium">{post.content}</span>
                 </div>
-                {post.content}
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       );
@@ -200,13 +219,47 @@ export const Calendar: React.FC = () => {
                 </div>
                 <div>
                    <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Platform</label>
-                   <select 
-                     value={selectedPlatform}
-                     onChange={(e) => setSelectedPlatform(e.target.value as Platform)}
-                     className="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                   >
-                     {Object.values(Platform).map(p => <option key={p} value={p}>{p}</option>)}
-                   </select>
+                   <div className="relative">
+                     {/* Custom Select Trigger */}
+                     <button
+                       type="button"
+                       onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                       className="w-full pl-9 p-2 text-left border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white flex items-center justify-between"
+                     >
+                       <span className="text-slate-900 text-sm font-medium truncate">{selectedPlatform}</span>
+                       <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
+                     </button>
+
+                     {/* Icon Overlay */}
+                     <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                        <PlatformIcon platform={selectedPlatform} size={16} />
+                     </div>
+
+                     {/* Custom Dropdown Menu */}
+                     {isDropdownOpen && (
+                       <div className="absolute z-10 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-xl max-h-48 overflow-y-auto animate-in fade-in zoom-in-95 duration-100">
+                         {Object.values(Platform).map(p => (
+                           <button
+                             key={p}
+                             type="button"
+                             onClick={() => {
+                               setSelectedPlatform(p);
+                               setIsDropdownOpen(false);
+                             }}
+                             className={`w-full px-3 py-2.5 flex items-center gap-3 text-left text-sm transition-colors border-b border-slate-50 last:border-0 ${
+                               selectedPlatform === p 
+                                 ? 'bg-blue-50 text-blue-700' 
+                                 : 'text-slate-700 hover:bg-slate-50'
+                             }`}
+                           >
+                             <PlatformIcon platform={p} size={16} />
+                             <span className="font-medium">{p}</span>
+                             {selectedPlatform === p && <CheckCircle className="w-3.5 h-3.5 ml-auto text-blue-600" />}
+                           </button>
+                         ))}
+                       </div>
+                     )}
+                   </div>
                 </div>
               </div>
 

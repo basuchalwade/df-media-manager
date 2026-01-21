@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Link, CheckCircle, ExternalLink, RefreshCw, AlertCircle, Twitter, Facebook, Instagram, Linkedin, Youtube, Disc } from 'lucide-react';
+import { Link, CheckCircle, ExternalLink, RefreshCw, AlertCircle } from 'lucide-react';
 import { store } from '../services/mockStore';
 import { Platform, User } from '../types';
+import { PlatformIcon } from '../components/PlatformIcon';
 
 export const Integrations: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | undefined>(undefined);
@@ -26,18 +27,6 @@ export const Integrations: React.FC = () => {
     await loadUser();
     
     setLoadingMap(prev => ({ ...prev, [platform]: false }));
-  };
-
-  const getPlatformIcon = (platform: Platform) => {
-    switch (platform) {
-      case Platform.Twitter: return <Twitter className="w-8 h-8 text-blue-400" />;
-      case Platform.Facebook: return <Facebook className="w-8 h-8 text-blue-600" />;
-      case Platform.Instagram: return <Instagram className="w-8 h-8 text-pink-600" />;
-      case Platform.LinkedIn: return <Linkedin className="w-8 h-8 text-blue-700" />;
-      case Platform.YouTube: return <Youtube className="w-8 h-8 text-red-600" />;
-      case Platform.Discord: return <Disc className="w-8 h-8 text-indigo-500" />;
-      default: return <Link className="w-8 h-8 text-slate-400" />;
-    }
   };
 
   if (!currentUser) return <div className="p-8 text-slate-500">Loading user profile...</div>;
@@ -74,7 +63,7 @@ export const Integrations: React.FC = () => {
 
               <div className="flex items-start justify-between mb-6 relative">
                 <div className="p-3 bg-white rounded-xl shadow-sm border border-slate-100">
-                  {getPlatformIcon(platform)}
+                  <PlatformIcon platform={platform} size={32} />
                 </div>
                 {isConnected && (
                   <div className="flex items-center gap-1.5 px-2.5 py-1 bg-green-50 text-green-700 rounded-full text-xs font-medium border border-green-100">

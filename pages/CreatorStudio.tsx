@@ -3,6 +3,7 @@ import { Sparkles, Send, Calendar as CalendarIcon, RotateCcw, Image as ImageIcon
 import { generatePostContent } from '../services/geminiService';
 import { store } from '../services/mockStore';
 import { Platform, PostStatus } from '../types';
+import { PlatformIcon } from '../components/PlatformIcon';
 
 export const CreatorStudio: React.FC = () => {
   const [topic, setTopic] = useState('');
@@ -73,13 +74,18 @@ export const CreatorStudio: React.FC = () => {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <label className="text-sm font-medium text-slate-700">Primary Platform</label>
-              <select 
-                className="w-full p-2.5 border border-slate-300 rounded-lg"
-                value={platform}
-                onChange={(e) => setPlatform(e.target.value as Platform)}
-              >
-                {Object.values(Platform).map(p => <option key={p} value={p}>{p}</option>)}
-              </select>
+              <div className="relative">
+                <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                  <PlatformIcon platform={platform} size={16} />
+                </div>
+                <select 
+                  className="w-full pl-10 p-2.5 border border-slate-300 rounded-lg appearance-none bg-white"
+                  value={platform}
+                  onChange={(e) => setPlatform(e.target.value as Platform)}
+                >
+                  {Object.values(Platform).map(p => <option key={p} value={p}>{p}</option>)}
+                </select>
+              </div>
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium text-slate-700">Tone</label>
@@ -136,7 +142,9 @@ export const CreatorStudio: React.FC = () => {
             ) : (
               <div className="animate-fade-in">
                  <div className="flex items-center gap-3 mb-4">
-                    <div className="w-10 h-10 rounded-full bg-slate-200"></div>
+                    <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center border border-slate-200">
+                      <PlatformIcon platform={platform} size={20} />
+                    </div>
                     <div>
                       <div className="h-4 w-32 bg-slate-200 rounded mb-1"></div>
                       <div className="h-3 w-20 bg-slate-100 rounded"></div>
@@ -157,19 +165,23 @@ export const CreatorStudio: React.FC = () => {
              <div className="space-y-2">
                 <label className="text-sm font-medium text-slate-700">Publish to:</label>
                 <div className="flex flex-wrap gap-2">
-                  {Object.values(Platform).map(p => (
-                    <button
-                      key={p}
-                      onClick={() => togglePlatform(p)}
-                      className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
-                        selectedPlatforms.includes(p)
-                          ? 'bg-blue-600 text-white border-blue-600'
-                          : 'bg-white text-slate-600 border-slate-300 hover:border-slate-400'
-                      }`}
-                    >
-                      {p}
-                    </button>
-                  ))}
+                  {Object.values(Platform).map(p => {
+                    const isSelected = selectedPlatforms.includes(p);
+                    return (
+                      <button
+                        key={p}
+                        onClick={() => togglePlatform(p)}
+                        className={`pl-2 pr-3 py-1.5 rounded-full text-xs font-medium border transition-colors flex items-center gap-1.5 ${
+                          isSelected
+                            ? 'bg-blue-600 text-white border-blue-600'
+                            : 'bg-white text-slate-600 border-slate-300 hover:border-slate-400'
+                        }`}
+                      >
+                        <PlatformIcon platform={p} size={14} white={isSelected} />
+                        {p}
+                      </button>
+                    );
+                  })}
                 </div>
              </div>
 

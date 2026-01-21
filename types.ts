@@ -2,6 +2,7 @@ export enum Platform {
   Twitter = 'Twitter',
   Facebook = 'Facebook',
   Instagram = 'Instagram',
+  Threads = 'Threads',
   LinkedIn = 'LinkedIn',
   YouTube = 'YouTube',
   Discord = 'Discord',

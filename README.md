@@ -52,6 +52,7 @@ PostMaster is engineered to support multi-channel publishing across the most pop
 | **X (Twitter)** | Microblogging | • Thread creation & scheduling<br>• Reply automation via Engagement Bot<br>• Trend-based content generation |
 | **LinkedIn** | Professional | • Company Page & Personal Profile support<br>• Rich article formatting<br>• PDF/Carousel document support |
 | **Instagram** | Visual | • Direct publishing to Feed<br>• **Smart Resize** for Stories (9:16) and Square (1:1)<br>• Reels scheduling |
+| **Threads** | Microblogging | • Seamless integration with Instagram ecosystem<br>• Text updates & conversation starters<br>• 500 character limit handling |
 | **Facebook** | Social Network | • Page management<br>• Group posting<br>• Link preview customization |
 | **YouTube** | Video | • Community Tab posts<br>• YouTube Shorts scheduling<br>• SEO tag generation via AI |
 | **Discord** | Community | • Webhook integration for server announcements<br>• Rich Embed builder<br>• Automated role-based updates |
