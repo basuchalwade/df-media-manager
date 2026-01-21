@@ -1,8 +1,8 @@
 
 import React, { useEffect, useState } from 'react';
-import { Bot, Power, Clock, Zap, Target, TrendingUp, Search, Activity, Pause, Play, ChevronRight, Settings, X, Save, Check, Shield, AlertTriangle, AlertOctagon, Hourglass } from 'lucide-react';
+import { Bot, Power, Clock, Zap, Target, TrendingUp, Search, Activity, Pause, Play, ChevronRight, Settings, X, Save, Check, Shield, AlertTriangle, AlertOctagon, Hourglass, FileText, Download, Filter, Calendar } from 'lucide-react';
 import { store } from '../services/mockStore';
-import { BotConfig, BotType, Platform, BotSpecificConfig } from '../types';
+import { BotConfig, BotType, Platform, BotSpecificConfig, BotLogEntry, LogLevel } from '../types';
 import { PlatformIcon } from '../components/PlatformIcon';
 
 const BOT_DESCRIPTIONS: Record<BotType, string> = {
@@ -15,6 +15,7 @@ const BOT_DESCRIPTIONS: Record<BotType, string> = {
 export const BotManager: React.FC = () => {
   const [bots, setBots] = useState<BotConfig[]>([]);
   const [selectedBot, setSelectedBot] = useState<BotConfig | null>(null);
+  const [viewLogsBot, setViewLogsBot] = useState<BotConfig | null>(null);
 
   useEffect(() => {
     store.getBots().then(setBots);
@@ -57,6 +58,7 @@ export const BotManager: React.FC = () => {
             bot={bot} 
             onToggle={() => handleToggle(bot.type)} 
             onConfigure={() => setSelectedBot(bot)}
+            onViewLogs={() => setViewLogsBot(bot)}
           />
         ))}
       </div>
@@ -69,12 +71,20 @@ export const BotManager: React.FC = () => {
           onSave={handleSaveConfig} 
         />
       )}
+
+      {/* Audit Logs Modal */}
+      {viewLogsBot && (
+        <BotLogsModal 
+          bot={viewLogsBot}
+          onClose={() => setViewLogsBot(null)}
+        />
+      )}
     </div>
   );
 };
 
 // Sub-component for Apple-style Tile
-const BotCard = ({ bot, onToggle, onConfigure }: { bot: BotConfig; onToggle: () => void; onConfigure: () => void }) => {
+const BotCard = ({ bot, onToggle, onConfigure, onViewLogs }: { bot: BotConfig; onToggle: () => void; onConfigure: () => void; onViewLogs: () => void }) => {
   const isRunning = bot.enabled && bot.status === 'Running';
   const isCooldown = bot.status === 'Cooldown';
   const isLimitReached = bot.status === 'LimitReached';
@@ -138,6 +148,13 @@ const BotCard = ({ bot, onToggle, onConfigure }: { bot: BotConfig; onToggle: () 
           </div>
           
           <div className="flex items-center gap-3">
+             <button 
+                onClick={onViewLogs}
+                className="w-10 h-10 rounded-full bg-white hover:bg-gray-50 text-gray-500 hover:text-black flex items-center justify-center transition-colors shadow-sm border border-black/5"
+                title="View Audit Logs"
+             >
+                <FileText className="w-5 h-5" />
+             </button>
              <button 
                 onClick={onConfigure}
                 className="w-10 h-10 rounded-full bg-white hover:bg-gray-50 text-gray-500 hover:text-black flex items-center justify-center transition-colors shadow-sm border border-black/5"
@@ -207,12 +224,15 @@ const BotCard = ({ bot, onToggle, onConfigure }: { bot: BotConfig; onToggle: () 
           </div>
           <div className="flex-1 p-3 overflow-y-auto custom-scrollbar space-y-3">
              {bot.logs.length > 0 ? (
-               bot.logs.map((log, i) => (
+               bot.logs.slice(0, 5).map((log, i) => (
                  <div key={i} className="flex gap-3 items-start animate-in slide-in-from-bottom-2 duration-300">
                     <div className={`mt-1 w-1.5 h-1.5 rounded-full shrink-0 shadow-[0_0_8px_rgba(0,0,0,0.1)] 
-                       ${log.includes('Error') || log.includes('Limit') ? 'bg-red-400' : 'bg-blue-400'}
+                       ${log.level === 'Error' ? 'bg-red-400' : log.level === 'Warning' ? 'bg-orange-400' : 'bg-blue-400'}
                     `}></div>
-                    <p className="text-xs text-gray-600 font-medium leading-relaxed">{log}</p>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-gray-600 font-medium leading-relaxed truncate">{log.message}</p>
+                      <p className="text-[9px] text-gray-400 font-mono mt-0.5">{new Date(log.timestamp).toLocaleTimeString()}</p>
+                    </div>
                  </div>
                ))
              ) : (
@@ -224,6 +244,179 @@ const BotCard = ({ bot, onToggle, onConfigure }: { bot: BotConfig; onToggle: () 
           </div>
         </div>
 
+      </div>
+    </div>
+  );
+};
+
+// --- Logs Modal ---
+
+interface BotLogsModalProps {
+  bot: BotConfig;
+  onClose: () => void;
+}
+
+const BotLogsModal: React.FC<BotLogsModalProps> = ({ bot, onClose }) => {
+  const [filterLevel, setFilterLevel] = useState<LogLevel | 'All'>('All');
+  const [filterPeriod, setFilterPeriod] = useState<'24h' | '7d' | 'All'>('24h');
+  const [filteredLogs, setFilteredLogs] = useState<BotLogEntry[]>([]);
+
+  useEffect(() => {
+    let logs = bot.logs;
+
+    // Filter by Level
+    if (filterLevel !== 'All') {
+      logs = logs.filter(l => l.level === filterLevel);
+    }
+
+    // Filter by Time
+    const now = new Date();
+    if (filterPeriod === '24h') {
+      const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+      logs = logs.filter(l => new Date(l.timestamp) > yesterday);
+    } else if (filterPeriod === '7d') {
+      const lastWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      logs = logs.filter(l => new Date(l.timestamp) > lastWeek);
+    }
+
+    setFilteredLogs(logs);
+  }, [bot, filterLevel, filterPeriod]);
+
+  const handleExport = () => {
+    const headers = ['Timestamp', 'Level', 'Message'];
+    const csvContent = [
+      headers.join(','),
+      ...filteredLogs.map(l => `${new Date(l.timestamp).toLocaleString()},${l.level},"${l.message.replace(/"/g, '""')}"`)
+    ].join('\n');
+    
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${bot.type.replace(/\s/g, '_')}_AuditLog_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+  };
+
+  const getLevelBadgeColor = (level: LogLevel) => {
+    switch (level) {
+      case 'Error': return 'bg-red-100 text-red-700';
+      case 'Warning': return 'bg-orange-100 text-orange-700';
+      case 'Success': return 'bg-green-100 text-green-700';
+      default: return 'bg-blue-100 text-blue-700';
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
+      <div className="bg-white rounded-[32px] w-full max-w-4xl shadow-2xl flex flex-col h-[85vh] animate-in zoom-in-95 duration-200">
+        
+        {/* Header */}
+        <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+          <div>
+             <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+               <FileText className="w-5 h-5 text-gray-500" />
+               Audit Trail: {bot.type}
+             </h2>
+             <p className="text-sm text-gray-500">Historical logs and system events.</p>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full text-gray-500 transition-colors">
+             <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Toolbar */}
+        <div className="px-6 py-4 bg-gray-50 border-b border-gray-100 flex flex-wrap gap-4 items-center justify-between">
+          <div className="flex items-center gap-4">
+            {/* Time Filter */}
+            <div className="flex items-center bg-white rounded-lg border border-gray-200 p-1">
+              {['24h', '7d', 'All'].map((p) => (
+                <button
+                  key={p}
+                  onClick={() => setFilterPeriod(p as any)}
+                  className={`px-3 py-1.5 text-xs font-bold rounded-md transition-colors ${filterPeriod === p ? 'bg-black text-white' : 'text-gray-500 hover:text-gray-900'}`}
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
+
+            {/* Level Filter */}
+            <div className="relative group">
+               <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-lg border border-gray-200 text-xs font-bold text-gray-700 cursor-pointer">
+                 <Filter className="w-3.5 h-3.5" />
+                 {filterLevel === 'All' ? 'All Events' : filterLevel}
+               </div>
+               <div className="absolute top-full left-0 mt-1 w-32 bg-white rounded-xl shadow-lg border border-gray-100 hidden group-hover:block z-20 py-1">
+                  {['All', 'Info', 'Success', 'Warning', 'Error'].map(lvl => (
+                    <button 
+                      key={lvl} 
+                      onClick={() => setFilterLevel(lvl as any)}
+                      className="w-full text-left px-4 py-2 text-xs font-medium hover:bg-gray-50 text-gray-700"
+                    >
+                      {lvl}
+                    </button>
+                  ))}
+               </div>
+            </div>
+          </div>
+
+          <button 
+            onClick={handleExport}
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-xs font-bold text-gray-700 hover:bg-gray-50 shadow-sm"
+          >
+            <Download className="w-3.5 h-3.5" /> Export CSV
+          </button>
+        </div>
+
+        {/* Log Table */}
+        <div className="flex-1 overflow-auto custom-scrollbar p-0 bg-white">
+          <table className="w-full text-left border-collapse">
+            <thead className="bg-gray-50 sticky top-0 z-10 shadow-sm">
+              <tr>
+                <th className="px-6 py-3 text-[10px] font-bold text-gray-400 uppercase tracking-wider w-40">Timestamp</th>
+                <th className="px-6 py-3 text-[10px] font-bold text-gray-400 uppercase tracking-wider w-24">Level</th>
+                <th className="px-6 py-3 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Message</th>
+                <th className="px-6 py-3 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right">Event ID</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {filteredLogs.length > 0 ? (
+                filteredLogs.map((log) => (
+                  <tr key={log.id} className="hover:bg-blue-50/50 transition-colors group">
+                    <td className="px-6 py-3 text-xs font-mono text-gray-500 whitespace-nowrap">
+                       {new Date(log.timestamp).toLocaleString()}
+                    </td>
+                    <td className="px-6 py-3">
+                       <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide ${getLevelBadgeColor(log.level)}`}>
+                         {log.level}
+                       </span>
+                    </td>
+                    <td className="px-6 py-3 text-sm text-gray-700 font-medium">
+                       {log.message}
+                    </td>
+                    <td className="px-6 py-3 text-right text-xs text-gray-300 font-mono group-hover:text-gray-400">
+                       {log.id}
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                   <td colSpan={4} className="px-6 py-12 text-center text-gray-400">
+                      <div className="flex flex-col items-center gap-2">
+                        <Search className="w-8 h-8 opacity-20" />
+                        <p>No logs found for the selected criteria.</p>
+                      </div>
+                   </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="px-6 py-3 border-t border-gray-100 bg-gray-50 rounded-b-[32px] flex justify-between items-center text-xs text-gray-400">
+           <span>Showing {filteredLogs.length} events</span>
+           <span>Server Time: {new Date().toLocaleTimeString()}</span>
+        </div>
       </div>
     </div>
   );

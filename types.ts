@@ -78,6 +78,14 @@ export interface BotSpecificConfig {
 }
 
 export type BotStatus = 'Idle' | 'Running' | 'Cooldown' | 'LimitReached' | 'Error';
+export type LogLevel = 'Info' | 'Warning' | 'Error' | 'Success';
+
+export interface BotLogEntry {
+  id: string;
+  timestamp: string;
+  level: LogLevel;
+  message: string;
+}
 
 export interface BotConfig {
   type: BotType;
@@ -85,7 +93,7 @@ export interface BotConfig {
   intervalMinutes: number;
   lastRun?: string;
   status: BotStatus;
-  logs: string[];
+  logs: BotLogEntry[]; // Structured logs
   config: BotSpecificConfig;
   
   // Safety & Usage Stats

@@ -1,5 +1,5 @@
 
-import { BotConfig, BotType, DashboardStats, Platform, Post, PostStatus, UserSettings, PlatformAnalytics, AnalyticsDataPoint, User, UserRole, UserStatus, MediaItem } from '../types';
+import { BotConfig, BotType, DashboardStats, Platform, Post, PostStatus, UserSettings, PlatformAnalytics, AnalyticsDataPoint, User, UserRole, UserStatus, MediaItem, BotLogEntry, LogLevel } from '../types';
 
 // Initial Mock Data
 const INITIAL_POSTS: Post[] = [
@@ -34,13 +34,47 @@ const INITIAL_POSTS: Post[] = [
   }
 ];
 
+// Helper to generate logs
+const generateLogs = (count: number, type: BotType): BotLogEntry[] => {
+  const logs: BotLogEntry[] = [];
+  const now = new Date();
+  
+  const messages = {
+    [BotType.Creator]: ['Drafted post for LinkedIn', 'Checked content calendar', 'Analyzing trending topics', 'Content generation successful'],
+    [BotType.Engagement]: ['Replied to @user123', 'Liked post #882', 'Checked for new mentions', 'Daily limit warning'],
+    [BotType.Finder]: ['Scanned 50 tweets', 'Found new competitor activity', 'Saved draft to library', 'Keyword alert: "AI"'],
+    [BotType.Growth]: ['Followed @dev_jane', 'Unfollowed inactive user', 'API Rate Limit (429) detected', 'Cooling down']
+  };
+
+  const levels: LogLevel[] = ['Info', 'Success', 'Info', 'Warning', 'Error'];
+
+  for (let i = 0; i < count; i++) {
+    const time = new Date(now.getTime() - i * 1000 * 60 * (Math.random() * 30 + 5)); // Random interval back in time
+    const msgList = messages[type];
+    const msg = msgList[Math.floor(Math.random() * msgList.length)];
+    
+    let level: LogLevel = 'Info';
+    if (msg.includes('warning') || msg.includes('Limit')) level = 'Warning';
+    if (msg.includes('Error') || msg.includes('Failed')) level = 'Error';
+    if (msg.includes('Successful') || msg.includes('Saved') || msg.includes('Drafted')) level = 'Success';
+
+    logs.push({
+      id: `log-${i}-${type}`,
+      timestamp: time.toISOString(),
+      level,
+      message: msg
+    });
+  }
+  return logs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+};
+
 const INITIAL_BOTS: BotConfig[] = [
   { 
     type: BotType.Creator, 
     enabled: true, 
     intervalMinutes: 60, 
     status: 'Running', 
-    logs: ['Drafted post for LinkedIn', 'Checked content calendar'],
+    logs: generateLogs(25, BotType.Creator),
     stats: {
       currentDailyActions: 12,
       maxDailyActions: 50,
@@ -60,7 +94,7 @@ const INITIAL_BOTS: BotConfig[] = [
     enabled: true, 
     intervalMinutes: 15, 
     status: 'LimitReached', 
-    logs: ['Daily limit reached (150/150). Paused until 00:00 UTC.', 'Liked post #882', 'Replied to @user123'],
+    logs: generateLogs(40, BotType.Engagement),
     stats: {
       currentDailyActions: 150,
       maxDailyActions: 150,
@@ -81,7 +115,7 @@ const INITIAL_BOTS: BotConfig[] = [
     enabled: false, 
     intervalMinutes: 240, 
     status: 'Idle', 
-    logs: [],
+    logs: generateLogs(10, BotType.Finder),
     stats: {
       currentDailyActions: 0,
       maxDailyActions: 100,
@@ -99,7 +133,7 @@ const INITIAL_BOTS: BotConfig[] = [
     enabled: true, 
     intervalMinutes: 30, 
     status: 'Cooldown', 
-    logs: ['API Rate Limit (429) detected.', 'Cooling down for 45 minutes.', 'Followed @dev_jane'],
+    logs: generateLogs(35, BotType.Growth),
     stats: {
       currentDailyActions: 45,
       maxDailyActions: 200,
