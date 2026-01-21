@@ -4,6 +4,13 @@ import { store } from '../services/mockStore';
 import { BotConfig, BotType, Platform, BotSpecificConfig } from '../types';
 import { PlatformIcon } from '../components/PlatformIcon';
 
+const BOT_DESCRIPTIONS: Record<BotType, string> = {
+  [BotType.Creator]: "Autonomous content engine that drafts and posts based on your topics.",
+  [BotType.Engagement]: "Community manager that handles replies, likes, and interactions.",
+  [BotType.Finder]: "Trend scout that monitors keywords and competitors for insights.",
+  [BotType.Growth]: "Audience builder that executes safe follow/unfollow strategies."
+};
+
 export const BotManager: React.FC = () => {
   const [bots, setBots] = useState<BotConfig[]>([]);
   const [selectedBot, setSelectedBot] = useState<BotConfig | null>(null);
@@ -104,7 +111,7 @@ const BotCard = ({ bot, onToggle, onConfigure }: { bot: BotConfig; onToggle: () 
       <div className="flex flex-col h-full relative z-10">
         
         {/* Top Row: Icon & Toggle */}
-        <div className="flex justify-between items-start mb-6">
+        <div className="flex justify-between items-start mb-4">
           <div className={`w-14 h-14 rounded-[18px] flex items-center justify-center shadow-lg transition-transform duration-300 group-hover:scale-110 ${getColor()}`}>
             {getIcon()}
           </div>
@@ -132,6 +139,9 @@ const BotCard = ({ bot, onToggle, onConfigure }: { bot: BotConfig; onToggle: () 
         {/* Info */}
         <div className="mb-6">
           <h3 className="text-xl font-bold text-[#1d1d1f] tracking-tight mb-1">{bot.type}</h3>
+          <p className="text-xs text-gray-500 mb-3 font-medium leading-relaxed max-w-[95%]">
+             {BOT_DESCRIPTIONS[bot.type]}
+          </p>
           <div className="flex items-center gap-2">
             <div className={`w-2 h-2 rounded-full ${isRunning ? 'bg-green-500 animate-pulse' : 'bg-gray-300'}`}></div>
             <span className="text-sm font-semibold text-gray-500">
@@ -375,7 +385,7 @@ const BotConfigModal: React.FC<BotConfigModalProps> = ({ bot, onClose, onSave })
           <div className="p-6 border-b border-gray-100 flex items-center justify-between">
              <div>
                 <h2 className="text-xl font-bold text-gray-900">Configure {bot.type}</h2>
-                <p className="text-sm text-gray-500">Adjust behavior rules and limits.</p>
+                <p className="text-sm text-gray-500">{BOT_DESCRIPTIONS[bot.type]}</p>
              </div>
              <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full text-gray-500 transition-colors">
                 <X className="w-5 h-5" />
