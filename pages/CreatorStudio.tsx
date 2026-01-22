@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Sparkles, Send, Calendar as CalendarIcon, RotateCcw, Image as ImageIcon, ChevronDown, CheckCircle, Briefcase, Smile, Rocket, GraduationCap, X, FileVideo, Clock, Save, AlertCircle, Check, Zap, Eye, Copy, Hash, MoreHorizontal, ThumbsUp, MessageSquare, Share2, Repeat, Bookmark, Globe, Heart, Layers, UploadCloud, RefreshCw, ShieldCheck, AlertTriangle, Bot, Info, Cloud } from 'lucide-react';
+import { Sparkles, Send, Calendar as CalendarIcon, RotateCcw, Image as ImageIcon, ChevronDown, CheckCircle, Briefcase, Smile, Rocket, GraduationCap, X, FileVideo, Clock, Save, AlertCircle, Check, Zap, Eye, Copy, Hash, MoreHorizontal, ThumbsUp, MessageSquare, Share2, Repeat, Bookmark, Globe, Heart, Layers, UploadCloud, RefreshCw, ShieldCheck, AlertTriangle, Bot, Info, Cloud, CheckSquare } from 'lucide-react';
 import { generatePostContent, generateHashtags, validateContentSafety } from '../services/geminiService';
 import { validatePost, PLATFORM_LIMITS } from '../services/validationService';
 import { store } from '../services/mockStore';
@@ -38,6 +38,7 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
   const [selectedPlatforms, setSelectedPlatforms] = useState<Platform[]>([Platform.Twitter]);
   const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(null);
   const [postAuthor, setPostAuthor] = useState<'User' | BotType>('User'); // Track if this is bot content
+  const [postStatus, setPostStatus] = useState<PostStatus>(PostStatus.Draft); // Track status locally
   
   // --- Tools State ---
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -87,6 +88,7 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
             setIsCarousel(post.isCarousel || false);
             setIsAiGenerated(post.generatedByAi);
             setPostAuthor(post.author || 'User');
+            setPostStatus(post.status); // Hydrate Status
             
             // Deep Sync: Auto-Ops & Safety
             setAutoEngage(!!post.autoOps?.autoEngage);
@@ -169,15 +171,12 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
 
   // Change Detection for Sync Status
   useEffect(() => {
-    // Simple check: if we have content and it's different from original (or original is null), it's modified.
-    // In a real app, you'd do deep comparison. For now, any change to these triggers 'modified'.
     if (!originalPost && !content) return; // Fresh state
 
     const isModified = 
         content !== (originalPost?.content || '') ||
         selectedPlatforms.length !== (originalPost?.platforms?.length || 1) ||
         youtubeTitle !== (originalPost?.title || '') ||
-        // Check schedule change crudely
         (scheduleMode === 'later' && originalPost?.scheduledFor && Math.abs(new Date(originalPost.scheduledFor).getTime() - scheduledDate.getTime()) > 60000);
 
     if (isModified) {
@@ -202,6 +201,8 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
     setIsAiGenerated(true);
     setIsGenerating(false);
     setSyncStatus('modified');
+    setPostAuthor(BotType.Creator); // Explicitly mark as bot content
+    setPostStatus(PostStatus.NeedsReview); // Bot content needs review
   };
 
   const handleFetchHashtags = async () => {
@@ -234,7 +235,7 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
   };
 
   // DEEP SYNC: Merges original post data with new form changes to prevent data loss
-  const constructPostObject = (status: PostStatus, forceNewId: boolean = false): Post => {
+  const constructPostObject = (targetStatus: PostStatus, forceNewId: boolean = false): Post => {
     let finalDate = new Date();
     if (scheduleMode === 'later') {
       finalDate = new Date(scheduledDate);
@@ -259,7 +260,7 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
       content: content,
       platforms: selectedPlatforms,
       scheduledFor: finalDate.toISOString(),
-      status: status,
+      status: targetStatus,
       generatedByAi: isAiGenerated,
       mediaUrl: selectedMedia?.url,
       mediaType: selectedMedia?.type,
@@ -284,8 +285,6 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
   };
 
   const performSafetyCheck = async (): Promise<boolean> => {
-    // If previously bypassed, do we re-check? Yes, unless strict override logic.
-    // For now, always re-check if not strictly just saving draft without changes.
     setIsCheckingSafety(true);
     const result = await validateContentSafety(content, selectedPlatforms);
     setIsCheckingSafety(false);
@@ -325,10 +324,10 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
     setShowSafetyModal(false);
     
     setOriginalPost(newPost); // Update local reference
+    setPostStatus(status);
     setSyncStatus('synced'); // Update Status
     
     // Optional: Navigate back to calendar if that's where we came from?
-    // For now, reset or stay.
     if (!currentPostId) resetForm(true);
   };
 
@@ -336,12 +335,14 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
     if (!content) return;
     setIsSaving(true);
     
-    const newPost = constructPostObject(PostStatus.Draft);
+    // Preserve current status if it's already a draft type, otherwise revert to Draft
+    const targetStatus = (postStatus === PostStatus.NeedsReview) ? PostStatus.NeedsReview : PostStatus.Draft;
+    const newPost = constructPostObject(targetStatus);
     
     if (currentPostId) {
        await store.updatePost(newPost);
-       // Update originalPost so subsequent saves don't lose the latest state
        setOriginalPost(newPost);
+       setPostStatus(targetStatus);
        
        const btn = document.getElementById('save-draft-btn');
        if(btn) {
@@ -353,11 +354,19 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
        const saved = await store.addPost(newPost);
        setCurrentPostId(saved.id);
        setOriginalPost(saved);
+       setPostStatus(targetStatus);
        alert('Draft saved. You can continue editing.');
     }
     
     setSyncStatus('synced'); // Update Status
     setIsSaving(false);
+  };
+
+  const handleReviewApprove = () => {
+      // Transition from Needs Review -> Draft (Human ownership) or Approved
+      setPostAuthor('User');
+      setPostStatus(PostStatus.Approved);
+      setSyncStatus('modified'); // Mark as modified so user saves
   };
 
   const handleDuplicate = async () => {
@@ -368,9 +377,10 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
     
     const saved = await store.addPost(newPost);
     setCurrentPostId(saved.id);
-    setPostAuthor('User'); // Cloned post is owned by user
-    setOriginalPost(saved); // Update context to new copy
-    setBypassSafety(false); // Reset safety for new copy
+    setPostAuthor('User'); 
+    setPostStatus(PostStatus.Draft);
+    setOriginalPost(saved); 
+    setBypassSafety(false); 
     setSyncStatus('synced');
     
     alert("Version duplicated! You are now editing the copy.");
@@ -393,6 +403,7 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
     setCurrentPostId(null);
     setSafetyIssues([]);
     setPostAuthor('User');
+    setPostStatus(PostStatus.Draft);
     setBypassSafety(false);
     setAutoEngage(false);
     setPostTimezone(undefined);
@@ -607,6 +618,13 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
                 {syncStatus === 'synced' ? <CheckCircle className="w-3.5 h-3.5" /> : <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse" />}
                 <span>{syncStatus === 'synced' ? 'In Sync' : 'Unsaved Changes'}</span>
               </div>
+              
+              {/* Lifecycle Badge */}
+              {postStatus !== PostStatus.Draft && (
+                  <div className="px-3 py-1.5 bg-gray-100 text-gray-600 rounded-full text-xs font-bold uppercase tracking-wide border border-gray-200">
+                      {postStatus}
+                  </div>
+              )}
            </div>
          </div>
          <div className="flex gap-2">
@@ -639,16 +657,16 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
       )}
 
       {/* Bot Review Mode Banner */}
-      {postAuthor !== 'User' && (
-         <div className="bg-orange-50 border border-orange-100 rounded-2xl p-4 flex items-start gap-4 animate-in slide-in-from-top-2">
-             <div className="bg-orange-100 p-2 rounded-xl text-orange-600">
+      {postStatus === PostStatus.NeedsReview && (
+         <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-4 animate-in slide-in-from-top-2 shadow-sm">
+             <div className="bg-amber-100 p-2 rounded-xl text-amber-700">
                 <Bot className="w-6 h-6" />
              </div>
              <div className="flex-1">
-                <h3 className="text-sm font-bold text-orange-800 uppercase tracking-wide">Bot Generated Content</h3>
-                <p className="text-sm text-orange-700 mt-1">
-                   This draft was automatically created by the <strong>{postAuthor}</strong>. 
-                   Please review facts, hashtags, and tone before publishing.
+                <h3 className="text-sm font-bold text-amber-900 uppercase tracking-wide">AI Content Review</h3>
+                <p className="text-sm text-amber-800 mt-1">
+                   This content was generated by <strong>{postAuthor}</strong>. 
+                   Review and approve it to enable scheduling.
                 </p>
                 {bypassSafety && (
                     <div className="mt-2 text-xs text-red-600 font-bold flex items-center gap-1">
@@ -658,10 +676,10 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
              </div>
              <div className="flex gap-2">
                 <button 
-                   onClick={() => { setPostAuthor('User'); setSyncStatus('modified'); }} // Acknowledge review
-                   className="px-4 py-2 bg-orange-200 text-orange-800 text-xs font-bold rounded-lg hover:bg-orange-300 transition-colors"
+                   onClick={handleReviewApprove} 
+                   className="px-4 py-2 bg-amber-600 text-white text-xs font-bold rounded-lg hover:bg-amber-700 transition-colors flex items-center gap-2 shadow-md"
                 >
-                   Mark Reviewed
+                   <CheckSquare className="w-4 h-4" /> Approve & Edit
                 </button>
              </div>
          </div>
@@ -1046,7 +1064,7 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
 
               <button
                  onClick={() => handlePublish(false)}
-                 disabled={isSaving || isCheckingSafety || !content || selectedPlatforms.length === 0 || validationErrors.length > 0}
+                 disabled={isSaving || isCheckingSafety || !content || selectedPlatforms.length === 0 || validationErrors.length > 0 || postStatus === PostStatus.NeedsReview}
                  className="w-full py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl font-bold text-base shadow-lg shadow-blue-500/30 hover:shadow-blue-500/40 hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:grayscale disabled:pointer-events-none"
               >
                  {isSaving || isCheckingSafety ? (
@@ -1054,7 +1072,9 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
                  ) : (
                     scheduleMode === 'now' ? <Send className="w-5 h-5" /> : <CalendarIcon className="w-5 h-5" />
                  )}
-                 {isCheckingSafety ? 'Running Compliance Check...' : (scheduleMode === 'now' ? 'Publish Immediately' : 'Schedule Post')}
+                 {isCheckingSafety ? 'Running Compliance Check...' : 
+                  postStatus === PostStatus.NeedsReview ? 'Review Required' :
+                  (scheduleMode === 'now' ? 'Publish Immediately' : 'Schedule Post')}
               </button>
            </div>
         </div>

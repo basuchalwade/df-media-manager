@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon, 
   Eye, Filter, LayoutList, Grid3X3,
-  Globe, Zap, CheckCircle2, RotateCcw
+  Globe, Zap, CheckCircle2, RotateCcw, AlertTriangle, Archive, FileEdit, Check
 } from 'lucide-react';
 import { store } from '../services/mockStore';
 import { Post, Platform, PostStatus, PageProps, BotType } from '../types';
@@ -20,15 +20,28 @@ const TIMEZONES = [
   { label: 'Sydney (AEDT)', value: 'Australia/Sydney' },
 ];
 
-const getStatusStyle = (status: PostStatus) => {
+const getStatusStyle = (status: PostStatus, author?: string) => {
   switch (status) {
     case PostStatus.Published: return 'bg-green-100 text-green-700 border-green-200';
     case PostStatus.Scheduled: return 'bg-blue-100 text-blue-700 border-blue-200';
-    case PostStatus.Draft: return 'bg-gray-100 text-gray-700 border-gray-200';
+    case PostStatus.Approved: return 'bg-indigo-100 text-indigo-700 border-indigo-200';
+    case PostStatus.NeedsReview: return 'bg-amber-100 text-amber-700 border-amber-200';
+    case PostStatus.Draft: 
+        return author === 'User' 
+            ? 'bg-gray-100 text-gray-600 border-gray-200' // Human Draft
+            : 'bg-purple-50 text-purple-600 border-purple-100'; // Bot Draft (Active)
     case PostStatus.Failed: return 'bg-red-100 text-red-700 border-red-200';
+    case PostStatus.Archived: return 'bg-slate-100 text-slate-500 border-slate-200 dashed-border';
     default: return 'bg-gray-100 text-gray-700 border-gray-200';
   }
 };
+
+const getStatusLabel = (status: PostStatus, author?: string) => {
+    if (status === PostStatus.Draft) {
+        return author === 'User' ? 'Draft (Human)' : 'Draft (Bot)';
+    }
+    return status;
+}
 
 const isPastDate = (date: Date) => {
   const today = new Date();
@@ -106,6 +119,15 @@ export const Calendar: React.FC<PageProps> = ({ onNavigate, params }) => {
     }
   };
 
+  const handleArchive = async (e: React.MouseEvent, post: Post) => {
+    e.stopPropagation();
+    if(window.confirm('Archive this post? It will be hidden from main views.')) {
+        const updated = { ...post, status: PostStatus.Archived };
+        await store.updatePost(updated);
+        await loadPosts();
+    }
+  };
+
   // --- Drag & Drop Handlers ---
   const handleDragStart = (e: React.DragEvent, post: Post) => {
     setDraggedPost(post);
@@ -122,7 +144,7 @@ export const Calendar: React.FC<PageProps> = ({ onNavigate, params }) => {
     e.preventDefault();
     if (!draggedPost) return;
 
-    if (isPastDate(date) && draggedPost.status === PostStatus.Scheduled) {
+    if (isPastDate(date) && (draggedPost.status === PostStatus.Scheduled || draggedPost.status === PostStatus.Published)) {
        alert("Cannot schedule posts in the past.");
        setDraggedPost(null);
        return;
@@ -278,8 +300,11 @@ export const Calendar: React.FC<PageProps> = ({ onNavigate, params }) => {
                            <span className={`text-sm font-bold ${isSelected ? 'text-white' : isPast ? 'text-gray-400' : 'text-gray-900'}`}>{day}</span>
                            {/* Dot indicator if there are posts */}
                            <div className="flex gap-0.5">
-                              {dayPosts.some(p => p.author === BotType.Creator) && (
-                                <div className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-yellow-300' : 'bg-orange-500'}`} title="Bot Created Content"></div>
+                              {dayPosts.some(p => p.status === PostStatus.NeedsReview) && (
+                                <div className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-yellow-300' : 'bg-amber-500'}`} title="Needs Review"></div>
+                              )}
+                              {dayPosts.some(p => p.status === PostStatus.Published) && (
+                                <div className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-green-300' : 'bg-green-500'}`} title="Published"></div>
                               )}
                               {isSuggested && !isSelected && !isPast && (
                                 <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse" title="AI Suggested Day"></div>
@@ -332,9 +357,9 @@ export const Calendar: React.FC<PageProps> = ({ onNavigate, params }) => {
                                </div>
                              ))}
                           </div>
-                          {post.author === BotType.Creator && (
-                              <span className="text-[10px] font-bold bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded flex items-center gap-1">
-                                <Zap className="w-3 h-3" /> Bot
+                          {post.status === PostStatus.NeedsReview && (
+                              <span className="text-[10px] font-bold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded flex items-center gap-1">
+                                <AlertTriangle className="w-3 h-3" /> Review
                               </span>
                           )}
                        </div>
@@ -428,15 +453,12 @@ export const Calendar: React.FC<PageProps> = ({ onNavigate, params }) => {
                 <>
                 <div className="absolute left-9 top-4 bottom-4 w-px bg-gradient-to-b from-transparent via-gray-200 to-transparent z-0 hidden lg:block" />
                 {filteredPosts.map((post, idx) => {
-                  const isReviewed = post.creationContext?.source && 
-                                     post.creationContext.source !== 'Manual' && 
-                                     post.author === 'User';
-
+                  const label = getStatusLabel(post.status, post.author);
                   return (
                   <div 
                      key={post.id} 
                      className="relative z-10 animate-in slide-in-from-right-4 duration-500" 
-                     draggable={post.status !== PostStatus.Published}
+                     draggable={post.status !== PostStatus.Published && post.status !== PostStatus.Archived}
                      onDragStart={(e) => handleDragStart(e, post)}
                      onClick={() => handleEditPost(post)}
                   >
@@ -447,7 +469,7 @@ export const Calendar: React.FC<PageProps> = ({ onNavigate, params }) => {
                            </span>
                            <div className={`w-2.5 h-2.5 rounded-full border-2 z-10 bg-white border-gray-300 group-hover:border-blue-500`}></div>
                         </div>
-                        <div className={`flex-1 bg-white rounded-2xl shadow-sm border p-3 transition-colors ${post.author === BotType.Creator ? 'border-orange-100 bg-orange-50/30' : 'border-gray-100 hover:border-blue-100'}`}>
+                        <div className={`flex-1 bg-white rounded-2xl shadow-sm border p-3 transition-colors ${post.author === BotType.Creator ? 'border-purple-50 bg-purple-50/20' : 'border-gray-100 hover:border-blue-100'}`}>
                            <div className="flex justify-between items-center mb-2">
                               <div className="flex -space-x-2 pl-1">
                                  {post.platforms.map((p, i) => (
@@ -458,29 +480,33 @@ export const Calendar: React.FC<PageProps> = ({ onNavigate, params }) => {
                               </div>
                               <div className="flex gap-1 items-center">
                                 {post.author === BotType.Creator && (
-                                    <div className="bg-orange-100 text-orange-700 p-1 rounded-full" title="Drafted by Creator Bot">
+                                    <div className="bg-purple-100 text-purple-700 p-1 rounded-full" title="Drafted by Creator Bot">
                                         <Zap className="w-3 h-3" />
                                     </div>
                                 )}
-                                {isReviewed && (
-                                    <div className="flex items-center gap-1 bg-green-50 text-green-700 px-1.5 py-0.5 rounded-md border border-green-100" title="Bot content reviewed by human">
-                                        <CheckCircle2 className="w-3 h-3" />
-                                        <span className="text-[9px] font-bold uppercase">Reviewed</span>
-                                    </div>
-                                )}
-                                <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${getStatusStyle(post.status)}`}>{post.status}</span>
+                                <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${getStatusStyle(post.status, post.author)}`}>{label}</span>
                               </div>
                            </div>
-                           <p className="text-sm font-medium text-gray-700 line-clamp-2">{post.content}</p>
+                           <p className={`text-sm font-medium line-clamp-2 ${post.status === PostStatus.Archived ? 'text-gray-400' : 'text-gray-700'}`}>{post.content}</p>
                            
                            {/* Quick Actions on Hover */}
-                           <div className="mt-2 pt-2 border-t border-gray-100 flex justify-end opacity-0 group-hover:opacity-100 transition-opacity">
-                              {post.status === PostStatus.Scheduled && (
+                           <div className="mt-2 pt-2 border-t border-gray-100 flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                              {(post.status === PostStatus.Scheduled || post.status === PostStatus.NeedsReview) && (
                                   <button 
                                     onClick={(e) => handleRevertToDraft(e, post)}
                                     className="text-xs font-bold text-gray-400 hover:text-red-500 flex items-center gap-1"
+                                    title="Move to Drafts"
                                   >
-                                    <RotateCcw className="w-3 h-3" /> Move to Drafts
+                                    <RotateCcw className="w-3 h-3" /> Draft
+                                  </button>
+                              )}
+                              {post.status !== PostStatus.Archived && (
+                                  <button 
+                                    onClick={(e) => handleArchive(e, post)}
+                                    className="text-xs font-bold text-gray-400 hover:text-slate-600 flex items-center gap-1"
+                                    title="Archive"
+                                  >
+                                    <Archive className="w-3 h-3" />
                                   </button>
                               )}
                            </div>

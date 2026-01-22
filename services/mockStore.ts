@@ -40,18 +40,35 @@ const INITIAL_POSTS: Post[] = [
     content: '5 Tips for Better Productivity using AI Tools. 🧵👇 #Productivity',
     platforms: [Platform.Twitter, Platform.LinkedIn],
     scheduledFor: new Date(Date.now() + 250000000).toISOString(),
-    status: PostStatus.Draft,
+    status: PostStatus.NeedsReview,
     generatedByAi: true,
     author: BotType.Creator,
+    creationContext: {
+        source: BotType.Creator,
+        topic: 'Productivity Hacks'
+    }
   },
   {
     id: '5',
     content: 'Why Design Systems Matter in 2025. A deep dive.',
     platforms: [Platform.LinkedIn],
     scheduledFor: new Date(Date.now() + 300000000).toISOString(),
-    status: PostStatus.Draft,
+    status: PostStatus.Approved,
     generatedByAi: true,
     author: BotType.Creator,
+    creationContext: {
+        source: BotType.Creator,
+        topic: 'Design Systems'
+    }
+  },
+  {
+    id: '6',
+    content: 'Old announcement from last year.',
+    platforms: [Platform.Facebook],
+    scheduledFor: new Date(Date.now() - 1000000000).toISOString(),
+    status: PostStatus.Archived,
+    generatedByAi: false,
+    author: 'User'
   }
 ];
 

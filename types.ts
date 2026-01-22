@@ -18,9 +18,12 @@ export enum BotType {
 
 export enum PostStatus {
   Draft = 'Draft',
+  NeedsReview = 'Needs Review',
+  Approved = 'Approved',
   Scheduled = 'Scheduled',
   Published = 'Published',
   Failed = 'Failed',
+  Archived = 'Archived',
 }
 
 export interface Post {
