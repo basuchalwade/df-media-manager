@@ -35,7 +35,7 @@ Our bots don't just post; they *think* before they act.
 - **Calendar Awareness**: Bots scan your existing calendar load before creating drafts. If a day is marked as full (via the Capacity Indicator), the bot holds back to prevent spamming.
 - **Blackout Dates**: Define holidays, launch days, or crisis periods where bots automatically silence themselves.
 - **Granular Strategy**:
-  - **Creator Bot**: Autonomous drafting based on brand voice (Professional, Viral, Empathetic).
+  - **Creator Bot**: Autonomous drafting based on brand voice (Professional, Viral, Empathetic)..
   - **Engagement Bot**: Handles replies and likes with daily safety caps.
   - **Growth Bot**: Executes safe follow/unfollow strategies with cool-down periods.
 - **Safety Throttling**: "Circuit breakers" stop bots immediately upon consecutive API errors or rate limits.
