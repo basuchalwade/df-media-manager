@@ -248,6 +248,7 @@ export const Calendar: React.FC<PageProps> = ({ onNavigate, params }) => {
 
   const handleDrop = async (e: React.DragEvent, date: Date) => {
     e.preventDefault();
+    e.stopPropagation();
     if (!draggedPost) return;
 
     if (isPastDate(date) && (draggedPost.status === PostStatus.Scheduled || draggedPost.status === PostStatus.Published)) {
@@ -258,12 +259,13 @@ export const Calendar: React.FC<PageProps> = ({ onNavigate, params }) => {
 
     const originalDate = new Date(draggedPost.scheduledFor);
     const newDate = new Date(date);
+    // Auto-update: Keep original time
     newDate.setHours(originalDate.getHours(), originalDate.getMinutes(), 0, 0);
 
     const updatedPost = {
       ...draggedPost,
       scheduledFor: newDate.toISOString(),
-      status: PostStatus.Scheduled
+      status: PostStatus.Scheduled // Auto-switch to scheduled if it was Draft
     };
 
     // Optimistic Update
@@ -456,7 +458,16 @@ export const Calendar: React.FC<PageProps> = ({ onNavigate, params }) => {
                         )}
                         <div className="flex flex-wrap gap-1 mt-1 justify-end">
                            {dayPosts.slice(0, 6).map((p, idx) => (
-                              <div key={idx} className="relative group/icon" onClick={(e) => toggleSelection(e, p.id)}>
+                              <div 
+                                key={idx} 
+                                className="relative group/icon cursor-grab active:cursor-grabbing" 
+                                onClick={(e) => toggleSelection(e, p.id)}
+                                draggable={p.status !== PostStatus.Published && p.status !== PostStatus.Archived}
+                                onDragStart={(e) => {
+                                    e.stopPropagation();
+                                    handleDragStart(e, p);
+                                }}
+                              >
                                 <PlatformIcon 
                                   platform={p.platforms[0]} 
                                   size={10} 
@@ -500,6 +511,8 @@ export const Calendar: React.FC<PageProps> = ({ onNavigate, params }) => {
                         isSelected ? 'bg-blue-50/50 border-blue-200 shadow-sm' : 'bg-white border-gray-100 hover:border-blue-200 hover:shadow-sm'
                     }`}
                     onClick={() => handleEditPost(post)}
+                    draggable={post.status !== PostStatus.Published && post.status !== PostStatus.Archived}
+                    onDragStart={(e) => handleDragStart(e, post)}
                  >
                     {/* Selection Checkbox */}
                     <div className="flex items-center justify-center pl-1" onClick={(e) => toggleSelection(e, post.id)}>
@@ -534,7 +547,7 @@ export const Calendar: React.FC<PageProps> = ({ onNavigate, params }) => {
                           </div>
 
                           {/* Status Badge */}
-                          <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${statusStyle}`}>
+                          <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${getStatusStyle(post.status, post.author)}`}>
                              {getStatusLabel(post.status, post.author)}
                           </span>
 
@@ -637,7 +650,11 @@ export const Calendar: React.FC<PageProps> = ({ onNavigate, params }) => {
         </div>
 
         {/* Right: Day View / Detail Sidebar */}
-        <div className="w-full lg:w-[400px] bg-[#F5F5F7]/80 backdrop-blur-xl rounded-[32px] border border-white/60 flex flex-col h-full overflow-hidden shadow-xl shadow-gray-200/50">
+        <div 
+            className="w-full lg:w-[400px] bg-[#F5F5F7]/80 backdrop-blur-xl rounded-[32px] border border-white/60 flex flex-col h-full overflow-hidden shadow-xl shadow-gray-200/50"
+            onDragOver={handleDragOver}
+            onDrop={(e) => handleDrop(e, selectedDate)}
+        >
            {/* Sidebar Timeline Content */}
            <div className="p-6 border-b border-gray-200/50 bg-white/60 sticky top-0 z-20 backdrop-blur-md">
               <div className="flex items-center justify-between mb-2">
