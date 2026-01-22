@@ -195,7 +195,32 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
     if (!topic) return;
     setIsGenerating(true);
     const contextPlatform = selectedPlatforms.length > 0 ? selectedPlatforms[0] : generationPlatform;
-    const generated = await generatePostContent(topic, contextPlatform, tone);
+    
+    // 1. Gather Context: Date & Time
+    let timeContext = "Immediate Publication (Right Now)";
+    if (scheduleMode === 'later') {
+        const day = scheduledDate.toLocaleDateString('en-US', { weekday: 'long' });
+        const date = scheduledDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+        timeContext = `${day}, ${date} at ${timeState.hour}:${timeState.minute} ${timeState.period}`;
+        if (postTimezone) timeContext += ` (${postTimezone})`;
+    }
+
+    // 2. Gather Context: Constraints
+    const charLimit = PLATFORM_LIMITS[contextPlatform];
+    let constraints = `Strictly keep under ${charLimit} characters.`;
+    if (contextPlatform === Platform.LinkedIn) constraints += " Use professional spacing, bullet points, and a 'hook' in the first line.";
+    if (contextPlatform === Platform.Twitter) constraints += " Use thread-style brevity if needed, focus on impact. No intro fluff.";
+    if (contextPlatform === Platform.Instagram) constraints += " Write an engaging caption. Assume visuals are attached.";
+    if (contextPlatform === Platform.YouTube) constraints += " Write a compelling video description with a clear CTA.";
+
+    // 3. Generate
+    const generated = await generatePostContent(topic, contextPlatform, tone, {
+        scheduledTime: timeContext,
+        platformConstraints: constraints,
+        brandVoice: tone, // Mapping tone to voice
+        safetyLevel: bypassSafety ? "Relaxed (User Override)" : "Strict Brand Safety",
+    });
+
     setContent(generated);
     if(contextPlatform === Platform.YouTube) setYoutubeTitle(`${topic} - Official Video`);
     setIsAiGenerated(true);

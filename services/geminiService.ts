@@ -7,43 +7,62 @@ const API_KEY = process.env.API_KEY || '';
 // Initialize client securely
 const ai = new GoogleGenAI({ apiKey: API_KEY });
 
+export interface GenerationContext {
+  scheduledTime?: string;
+  platformConstraints?: string;
+  brandVoice?: string;
+  safetyLevel?: string;
+  keywords?: string[];
+}
+
 export const generatePostContent = async (
   topic: string,
   platform: string,
   tone: string = 'Professional',
-  strategy?: AIStrategyConfig
+  context?: GenerationContext
 ): Promise<string> => {
   if (!API_KEY) {
     console.warn("Gemini API Key missing. Returning mock data.");
-    return `[MOCK] This is a simulated AI post about ${topic} for ${platform} with a ${tone} tone. Please configure API_KEY in .env to use real Gemini AI.`;
+    return `[MOCK] This is a simulated AI post about ${topic} for ${platform} with a ${tone} tone. Context: ${JSON.stringify(context)}. Please configure API_KEY in .env to use real Gemini AI.`;
   }
 
   // Map Creativity to Temperature
   let temperature = 0.7;
-  if (strategy?.creativityLevel === 'Low') temperature = 0.2;
-  if (strategy?.creativityLevel === 'High') temperature = 1.0;
+  if (tone === 'Viral' || tone === 'Funny') temperature = 0.9;
+  if (tone === 'Professional' || tone === 'Educational') temperature = 0.5;
 
   try {
     let prompt = `
       You are an expert social media manager using the ContentCaster platform by Dossiefoyer.
-      Task: Write a social media post about "${topic}".
-      Platform: ${platform}.
-      Tone: ${strategy?.brandVoice || tone}.
+      
+      **TASK**: Write a high-quality social media post.
+      
+      **CORE PARAMETERS**:
+      - **Topic**: "${topic}"
+      - **Platform**: ${platform}
+      - **Tone**: ${tone}
     `;
 
-    if (strategy?.keywordsToInclude?.length) {
-      prompt += `\nInclude these keywords: ${strategy.keywordsToInclude.join(', ')}.`;
+    if (context) {
+       prompt += `\n
+      **CONTEXTUAL AWARENESS (CRITICAL)**:
+      - **Scheduled Time**: ${context.scheduledTime || 'Unscheduled'}. (Tailor the opening hook to this time if relevant, e.g., "Good Morning" or "Weekend Vibes").
+      - **Platform Constraints**: ${context.platformConstraints || 'Standard limits'}. (Strictly adhere to character counts).
+      - **Brand Voice**: ${context.brandVoice || tone}.
+      - **Safety Level**: ${context.safetyLevel || 'Standard'}.
+       `;
+       
+       if (context.keywords && context.keywords.length > 0) {
+         prompt += `\n- **Keywords to Include**: ${context.keywords.join(', ')}`;
+       }
     }
 
-    if (strategy?.topicsToAvoid?.length) {
-      prompt += `\nStrictly AVOID mentioning: ${strategy.topicsToAvoid.join(', ')}.`;
-    }
-
-    prompt += `
-      Constraints:
-      - Language: English only
-      - Length: Optimized for ${platform}
-      - Do not include introductory text, just the post content.
+    prompt += `\n
+      **OUTPUT INSTRUCTIONS**:
+      - Write ONLY the post content. No introductory phrases like "Here is a post".
+      - Use formatting specific to ${platform} (e.g., threads for Twitter/X if long, clear paragraphs for LinkedIn).
+      - Include 2-3 relevant hashtags at the end.
+      - Use emojis to enhance engagement, matching the ${tone} tone.
     `;
 
     const response = await ai.models.generateContent({
