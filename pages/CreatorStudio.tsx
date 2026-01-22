@@ -622,7 +622,7 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
            {selectedMedia.type === 'image' ? (
               <img src={selectedMedia.url} className="w-full h-full object-cover" alt="Preview" />
            ) : (
-              <video src={selectedMedia.url} className="w-full h-full object-cover" controls />
+              <video src={selectedMedia.url} className="w-full h-full object-cover" controls playsInline />
            )}
         </div>
     );
@@ -673,7 +673,7 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
             
             <div className="aspect-square bg-gray-100 relative">
                {selectedMedia ? (
-                 selectedMedia.type === 'image' ? <img src={selectedMedia.url} className="w-full h-full object-cover" /> : <video src={selectedMedia.url} className="w-full h-full object-cover" />
+                 selectedMedia.type === 'image' ? <img src={selectedMedia.url} className="w-full h-full object-cover" /> : <video src={selectedMedia.url} className="w-full h-full object-cover" controls playsInline />
                ) : (
                  <div className="w-full h-full flex items-center justify-center text-gray-300 bg-gray-50">No Media</div>
                )}
@@ -732,7 +732,7 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
           <div className="bg-white h-full flex flex-col">
              <div className="aspect-video bg-black w-full flex items-center justify-center relative">
                 {selectedMedia ? (
-                   selectedMedia.type === 'image' ? <img src={selectedMedia.url} className="w-full h-full object-cover opacity-80" /> : <video src={selectedMedia.url} className="w-full h-full object-cover" />
+                   selectedMedia.type === 'image' ? <img src={selectedMedia.url} className="w-full h-full object-cover opacity-80" /> : <video src={selectedMedia.url} className="w-full h-full object-cover" controls playsInline />
                 ) : (
                    <div className="text-gray-500">Video Player</div>
                 )}
@@ -1203,7 +1203,7 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
                           {selectedMedia.type === 'image' ? (
                              <img src={selectedMedia.url} className="w-full h-full object-cover" alt="Selected" />
                           ) : (
-                             <video src={selectedMedia.url} className="w-full h-full object-cover" />
+                             <video src={selectedMedia.url} className="w-full h-full object-cover" controls playsInline />
                           )}
                        </div>
                        <div className="flex-1 bg-gray-50 p-4 flex flex-col justify-center border-l border-gray-200">

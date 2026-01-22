@@ -4,11 +4,12 @@ import {
   ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon, 
   Eye, Filter, LayoutList, Grid3X3,
   Globe, Zap, CheckCircle2, RotateCcw, AlertTriangle, Archive, FileEdit, Check, Split,
-  User, Bot, Clock, CalendarDays, MoreHorizontal, ArrowRight, Trash2, StopCircle, Layers
+  User, Bot, Clock, CalendarDays, MoreHorizontal, ArrowRight, Trash2, StopCircle, Layers, X, AlertCircle
 } from 'lucide-react';
 import { store } from '../services/mockStore';
 import { Post, Platform, PostStatus, PageProps, BotType } from '../types';
 import { PlatformIcon } from '../components/PlatformIcon';
+import { validatePost } from '../services/validationService';
 
 // --- Constants & Helpers ---
 
@@ -55,6 +56,35 @@ const isBestTime = (day: number) => {
   return day % 3 === 0 || day % 7 === 0; // Mock logic
 };
 
+// --- Validation Helper ---
+const getPostValidationState = (post: Post) => {
+    // Skip validation for published/archived as they are historical
+    if (post.status === PostStatus.Published || post.status === PostStatus.Archived) return null;
+
+    // Check date only if scheduled
+    const checkDate = post.status === PostStatus.Scheduled ? new Date(post.scheduledFor) : undefined;
+
+    const result = validatePost(
+        post.content,
+        post.platforms,
+        post.mediaUrl ? { 
+            id: 'mock', 
+            name: 'media', 
+            type: post.mediaType || 'image', 
+            url: post.mediaUrl, 
+            size: 0, 
+            createdAt: '' 
+        } : null,
+        post.isCarousel,
+        post.title,
+        checkDate
+    );
+
+    if (!result.isValid) return { isError: true, message: result.errors[0] };
+    if (result.warnings.length > 0) return { isError: false, message: result.warnings[0] };
+    return null;
+};
+
 export const Calendar: React.FC<PageProps> = ({ onNavigate, params }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -69,6 +99,7 @@ export const Calendar: React.FC<PageProps> = ({ onNavigate, params }) => {
   // Selection & Bulk Actions
   const [selectedPostIds, setSelectedPostIds] = useState<Set<string>>(new Set());
   const [isBulkActionProcessing, setIsBulkActionProcessing] = useState(false);
+  const [isAssignMenuOpen, setIsAssignMenuOpen] = useState(false);
   const bulkDateInputRef = useRef<HTMLInputElement>(null);
   
   // Timezone - Auto detect system default
@@ -150,6 +181,7 @@ export const Calendar: React.FC<PageProps> = ({ onNavigate, params }) => {
 
   const clearSelection = () => {
     setSelectedPostIds(new Set());
+    setIsAssignMenuOpen(false);
   };
 
   const selectAllBots = () => {
@@ -164,6 +196,7 @@ export const Calendar: React.FC<PageProps> = ({ onNavigate, params }) => {
     if (selectedPostIds.size === 0) return;
     setIsBulkActionProcessing(true);
     
+    // Create updates based on current posts state
     const updates = posts
       .filter(p => selectedPostIds.has(p.id))
       .map(p => action(p));
@@ -211,9 +244,28 @@ export const Calendar: React.FC<PageProps> = ({ onNavigate, params }) => {
     if(!confirm("Revert selected posts to Draft status? This will stop them from publishing.")) return;
     performBulkAction(post => ({ ...post, status: PostStatus.Draft }));
   };
+  
+  const handleBulkApprove = () => {
+    performBulkAction(post => ({ ...post, status: PostStatus.Approved }));
+  };
 
-  const handleBulkPlatform = (platform: Platform) => {
-    performBulkAction(post => ({ ...post, platforms: [platform] }));
+  const handleBulkAssignBot = (botType: BotType | 'User') => {
+    performBulkAction(post => ({ ...post, author: botType }));
+    setIsAssignMenuOpen(false);
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedPostIds.size === 0) return;
+    if (!window.confirm(`Permanently delete ${selectedPostIds.size} posts?`)) return;
+    
+    setIsBulkActionProcessing(true);
+    const ids = Array.from(selectedPostIds);
+    for (const id of ids) {
+        await store.deletePost(id);
+    }
+    await loadPosts();
+    clearSelection();
+    setIsBulkActionProcessing(false);
   };
 
   const handleRevertToDraft = async (e: React.MouseEvent, post: Post) => {
@@ -359,17 +411,107 @@ export const Calendar: React.FC<PageProps> = ({ onNavigate, params }) => {
         {/* Main Content Area */}
         <div className="flex-1 bg-white rounded-[32px] border border-black/5 shadow-sm p-6 flex flex-col overflow-hidden relative">
           
-          {/* Header for View Mode */}
-          {viewMode === 'Month' && (
-            <div className="flex items-center justify-between mb-6">
-               <h2 className="text-xl font-bold text-gray-900">
-                 {currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-               </h2>
-               <div className="flex items-center gap-1 bg-gray-100 rounded-full p-1">
-                 <button onClick={handlePrevMonth} className="p-2 hover:bg-white rounded-full transition-shadow hover:shadow-sm"><ChevronLeft className="w-4 h-4 text-gray-600" /></button>
-                 <button onClick={handleNextMonth} className="p-2 hover:bg-white rounded-full transition-shadow hover:shadow-sm"><ChevronRight className="w-4 h-4 text-gray-600" /></button>
-               </div>
-            </div>
+          {/* Top Bulk Action Bar (Replaces Headers when active) */}
+          {selectedPostIds.size > 0 ? (
+             <div className="w-full bg-[#1d1d1f] text-white p-3 rounded-2xl shadow-xl flex items-center justify-between mb-4 animate-in slide-in-from-top-2 z-30">
+                <div className="flex items-center gap-4 pl-2">
+                   <div className="flex flex-col">
+                      <span className="text-sm font-bold text-white">{selectedPostIds.size} Selected</span>
+                      <span className="text-[10px] text-gray-400 font-medium">Bulk Actions</span>
+                   </div>
+                   <div className="h-8 w-px bg-gray-700"></div>
+                   <button onClick={clearSelection} className="text-xs font-bold text-gray-400 hover:text-white transition-colors">
+                      Deselect All
+                   </button>
+                </div>
+                
+                <div className="flex items-center gap-2">
+                   {/* Approve */}
+                   <button onClick={handleBulkApprove} className="flex flex-col items-center gap-1 p-2 hover:bg-white/10 rounded-lg min-w-[60px] transition-colors" title="Approve Selected">
+                      <CheckCircle2 className="w-5 h-5 text-green-400" />
+                      <span className="text-[9px] font-bold uppercase tracking-wider">Approve</span>
+                   </button>
+                   
+                   {/* Reschedule */}
+                   <div className="relative">
+                       <button className="flex flex-col items-center gap-1 p-2 hover:bg-white/10 rounded-lg min-w-[60px] transition-colors" title="Change Date">
+                          <CalendarDays className="w-5 h-5 text-blue-400" />
+                          <span className="text-[9px] font-bold uppercase tracking-wider">Move</span>
+                       </button>
+                       <input 
+                          type="date" 
+                          ref={bulkDateInputRef}
+                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                          onChange={(e) => handleBulkReschedule(e.target.value)}
+                       />
+                   </div>
+
+                   {/* Assign Bot */}
+                   <div className="relative">
+                       <button 
+                          onClick={() => setIsAssignMenuOpen(!isAssignMenuOpen)}
+                          className={`flex flex-col items-center gap-1 p-2 rounded-lg min-w-[60px] transition-colors ${isAssignMenuOpen ? 'bg-white/20' : 'hover:bg-white/10'}`}
+                        >
+                          <Bot className="w-5 h-5 text-purple-400" />
+                          <span className="text-[9px] font-bold uppercase tracking-wider">Assign</span>
+                       </button>
+                       {isAssignMenuOpen && (
+                         <>
+                           <div className="fixed inset-0 z-10" onClick={() => setIsAssignMenuOpen(false)} />
+                           <div className="absolute top-full right-0 mt-2 bg-white rounded-xl shadow-xl border border-gray-200 p-1 w-48 z-20 animate-in fade-in zoom-in-95 duration-100">
+                               <div className="px-3 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 mb-1 flex justify-between items-center">
+                                  Assign Author
+                                  <X className="w-3 h-3 cursor-pointer" onClick={() => setIsAssignMenuOpen(false)} />
+                               </div>
+                               {Object.values(BotType).map(bot => (
+                                  <button 
+                                    key={bot} 
+                                    onClick={() => handleBulkAssignBot(bot)}
+                                    className="w-full text-left px-3 py-2 text-xs font-bold text-gray-700 hover:bg-purple-50 hover:text-purple-700 rounded-lg flex items-center gap-2"
+                                  >
+                                     <Bot className="w-3 h-3" /> {bot}
+                                  </button>
+                               ))}
+                               <button 
+                                    onClick={() => handleBulkAssignBot('User' as any)}
+                                    className="w-full text-left px-3 py-2 text-xs font-bold text-gray-700 hover:bg-gray-100 rounded-lg flex items-center gap-2"
+                                  >
+                                     <User className="w-3 h-3" /> User (Manual)
+                              </button>
+                           </div>
+                         </>
+                       )}
+                   </div>
+
+                   <div className="h-8 w-px bg-gray-700 mx-2"></div>
+
+                   {/* Delete */}
+                   <button onClick={handleBulkDelete} className="flex flex-col items-center gap-1 p-2 hover:bg-red-500/20 rounded-lg group min-w-[60px] transition-colors" title="Delete Selected">
+                      <Trash2 className="w-5 h-5 text-red-500 group-hover:text-red-400" />
+                      <span className="text-[9px] font-bold uppercase tracking-wider text-red-500 group-hover:text-red-400">Delete</span>
+                   </button>
+                </div>
+             </div>
+          ) : (
+             // Standard Headers
+             <>
+                {viewMode === 'Month' ? (
+                  <div className="flex items-center justify-between mb-6">
+                     <h2 className="text-xl font-bold text-gray-900">
+                       {currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                     </h2>
+                     <div className="flex items-center gap-1 bg-gray-100 rounded-full p-1">
+                       <button onClick={handlePrevMonth} className="p-2 hover:bg-white rounded-full transition-shadow hover:shadow-sm"><ChevronLeft className="w-4 h-4 text-gray-600" /></button>
+                       <button onClick={handleNextMonth} className="p-2 hover:bg-white rounded-full transition-shadow hover:shadow-sm"><ChevronRight className="w-4 h-4 text-gray-600" /></button>
+                     </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between mb-6 pb-2 border-b border-gray-100">
+                      <h3 className="text-lg font-bold text-gray-800">Upcoming Agenda</h3>
+                      <div className="text-xs text-gray-500 font-medium">{agendaPosts.length} posts scheduled</div>
+                  </div>
+                )}
+             </>
           )}
 
           {viewMode === 'Month' ? (
@@ -457,7 +599,9 @@ export const Calendar: React.FC<PageProps> = ({ onNavigate, params }) => {
                           </div>
                         )}
                         <div className="flex flex-wrap gap-1 mt-1 justify-end">
-                           {dayPosts.slice(0, 6).map((p, idx) => (
+                           {dayPosts.slice(0, 6).map((p, idx) => {
+                              const validation = getPostValidationState(p);
+                              return (
                               <div 
                                 key={idx} 
                                 className="relative group/icon cursor-grab active:cursor-grabbing" 
@@ -468,6 +612,14 @@ export const Calendar: React.FC<PageProps> = ({ onNavigate, params }) => {
                                     handleDragStart(e, p);
                                 }}
                               >
+                                {validation && (
+                                    <div 
+                                        className={`absolute -top-1 -left-1 z-20 rounded-full bg-white border border-white ${validation.isError ? 'text-red-500' : 'text-yellow-500'}`} 
+                                        title={validation.message}
+                                    >
+                                        <AlertCircle className="w-3 h-3 fill-white" />
+                                    </div>
+                                )}
                                 <PlatformIcon 
                                   platform={p.platforms[0]} 
                                   size={10} 
@@ -478,7 +630,7 @@ export const Calendar: React.FC<PageProps> = ({ onNavigate, params }) => {
                                   <div className="absolute -top-1 -right-1 w-2 h-2 bg-blue-600 rounded-full border border-white"></div>
                                 )}
                               </div>
-                           ))}
+                           )})}
                         </div>
                       </div>
                     );
@@ -487,12 +639,6 @@ export const Calendar: React.FC<PageProps> = ({ onNavigate, params }) => {
             </>
           ) : (
             <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3 pb-24">
-               {/* Agenda View Content */}
-               <div className="flex items-center justify-between sticky top-0 bg-white py-3 z-10 border-b border-gray-100">
-                  <h3 className="text-lg font-bold text-gray-800">Upcoming Agenda</h3>
-                  <div className="text-xs text-gray-500 font-medium">{agendaPosts.length} posts scheduled</div>
-               </div>
-               
                {agendaPosts.length === 0 ? (
                   <div className="py-20 text-center text-gray-400">
                      <CalendarIcon className="w-12 h-12 mx-auto mb-3 opacity-20" />
@@ -503,6 +649,7 @@ export const Calendar: React.FC<PageProps> = ({ onNavigate, params }) => {
                  const isSelected = selectedPostIds.has(post.id);
                  const statusStyle = getStatusStyle(post.status, post.author);
                  const isBot = post.author !== 'User';
+                 const validation = getPostValidationState(post);
 
                  return (
                  <div 
@@ -515,7 +662,7 @@ export const Calendar: React.FC<PageProps> = ({ onNavigate, params }) => {
                     onDragStart={(e) => handleDragStart(e, post)}
                  >
                     {/* Selection Checkbox */}
-                    <div className="flex items-center justify-center pl-1" onClick={(e) => toggleSelection(e, post.id)}>
+                    <div className="flex items-center justify-center pl-1 cursor-pointer" onClick={(e) => toggleSelection(e, post.id)}>
                        <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${
                           isSelected ? 'bg-blue-600 border-blue-600 text-white' : 'border-gray-300 text-transparent hover:border-blue-400'
                        }`}>
@@ -550,6 +697,17 @@ export const Calendar: React.FC<PageProps> = ({ onNavigate, params }) => {
                           <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${getStatusStyle(post.status, post.author)}`}>
                              {getStatusLabel(post.status, post.author)}
                           </span>
+                          
+                          {/* Validation Badge for Agenda View */}
+                          {validation && (
+                             <span 
+                                className={`flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${validation.isError ? 'bg-red-50 text-red-600 border-red-200' : 'bg-yellow-50 text-yellow-600 border-yellow-200'}`}
+                                title={validation.message}
+                             >
+                                <AlertCircle className="w-3 h-3" />
+                                {validation.isError ? 'Error' : 'Warning'}
+                             </span>
+                          )}
 
                           {/* Bot/User Icon */}
                           {isBot ? (
@@ -572,80 +730,6 @@ export const Calendar: React.FC<PageProps> = ({ onNavigate, params }) => {
                  </div>
                )}))}
             </div>
-          )}
-
-          {/* Floating Bulk Actions Bar */}
-          {selectedPostIds.size > 0 && (
-             <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-[#1d1d1f] text-white p-2 rounded-2xl shadow-2xl flex items-center gap-2 z-50 animate-in slide-in-from-bottom-4 zoom-in-95 border border-gray-700/50">
-                <div className="pl-4 pr-3 py-1 flex flex-col border-r border-gray-700">
-                   <span className="text-xs text-gray-400 font-medium">Selected</span>
-                   <span className="text-sm font-bold">{selectedPostIds.size}</span>
-                </div>
-                
-                <div className="flex items-center gap-1">
-                   {/* Reschedule */}
-                   <div className="relative group">
-                      <button className="p-2 hover:bg-gray-700 rounded-xl transition-colors flex flex-col items-center gap-0.5 w-16">
-                         <CalendarDays className="w-5 h-5" />
-                         <span className="text-[9px] font-medium">Reschedule</span>
-                      </button>
-                      {/* Hidden Date Input Trigger */}
-                      <input 
-                        type="date" 
-                        ref={bulkDateInputRef}
-                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                        onChange={(e) => handleBulkReschedule(e.target.value)}
-                      />
-                   </div>
-
-                   {/* Quick +7 Days */}
-                   <button 
-                      onClick={handleBulkMoveWeek}
-                      className="p-2 hover:bg-gray-700 rounded-xl transition-colors flex flex-col items-center gap-0.5 w-16"
-                      title="Move to Next Week"
-                   >
-                      <ArrowRight className="w-5 h-5" />
-                      <span className="text-[9px] font-medium">+7 Days</span>
-                   </button>
-
-                   {/* Change Platform */}
-                   <div className="relative group">
-                      <button className="p-2 hover:bg-gray-700 rounded-xl transition-colors flex flex-col items-center gap-0.5 w-16">
-                         <Layers className="w-5 h-5" />
-                         <span className="text-[9px] font-medium">Platform</span>
-                      </button>
-                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-white rounded-xl shadow-xl border border-gray-200 hidden group-hover:flex flex-col p-1 w-32">
-                         {Object.values(Platform).map(p => (
-                            <button 
-                               key={p} 
-                               onClick={() => handleBulkPlatform(p)}
-                               className="px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 text-left font-bold rounded-lg flex items-center gap-2"
-                            >
-                               <PlatformIcon platform={p} size={12} /> {p}
-                            </button>
-                         ))}
-                      </div>
-                   </div>
-
-                   {/* Pause/Draft */}
-                   <button 
-                      onClick={handleBulkPause}
-                      className="p-2 hover:bg-gray-700 rounded-xl transition-colors flex flex-col items-center gap-0.5 w-16 text-yellow-400 hover:text-yellow-300"
-                   >
-                      <StopCircle className="w-5 h-5" />
-                      <span className="text-[9px] font-medium">Pause</span>
-                   </button>
-                </div>
-
-                <div className="w-px h-8 bg-gray-700 mx-1"></div>
-
-                <button 
-                   onClick={clearSelection}
-                   className="p-2 hover:bg-gray-700 rounded-full transition-colors text-gray-400 hover:text-white"
-                >
-                   <Trash2 className="w-4 h-4" />
-                </button>
-             </div>
           )}
         </div>
 
@@ -740,6 +824,8 @@ export const Calendar: React.FC<PageProps> = ({ onNavigate, params }) => {
                 <div className="absolute left-9 top-4 bottom-4 w-px bg-gradient-to-b from-transparent via-gray-200 to-transparent z-0 hidden lg:block" />
                 {filteredPosts.map((post, idx) => {
                   const label = getStatusLabel(post.status, post.author);
+                  const validation = getPostValidationState(post);
+
                   return (
                   <div 
                      key={post.id} 
@@ -765,6 +851,14 @@ export const Calendar: React.FC<PageProps> = ({ onNavigate, params }) => {
                                  ))}
                               </div>
                               <div className="flex gap-1 items-center">
+                                {validation && (
+                                   <div 
+                                      className={`flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${validation.isError ? 'bg-red-50 text-red-600 border-red-200' : 'bg-yellow-50 text-yellow-600 border-yellow-200'}`}
+                                      title={validation.message}
+                                   >
+                                      <AlertCircle className="w-3 h-3" /> Fix
+                                   </div>
+                                )}
                                 {post.author === BotType.Creator && (
                                     <div className="bg-purple-100 text-purple-700 p-1 rounded-full" title="Drafted by Creator Bot">
                                         <Zap className="w-3 h-3" />
