@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -10,7 +7,9 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// --- ENUMS ---
+//////////////////////
+// ENUMS
+//////////////////////
 
 enum UserRole {
   Admin
@@ -24,7 +23,31 @@ enum UserStatus {
   Invited
 }
 
-// Status for background job execution
+enum Platform {
+  X
+  Facebook
+  Instagram
+  LinkedIn
+  Threads
+  YouTube
+  GoogleBusiness
+}
+
+enum PostStatus {
+  Draft
+  Scheduled
+  Published
+  Failed
+  Archived
+}
+
+enum BotStatus {
+  Idle
+  Running
+  Paused
+  Error
+}
+
 enum RunStatus {
   QUEUED
   RUNNING
@@ -33,163 +56,166 @@ enum RunStatus {
   CANCELLED
 }
 
-// --- CORE MODELS ---
+enum ActivityStatus {
+  SUCCESS
+  FAILED
+  SKIPPED
+}
+
+//////////////////////
+// CORE MODELS
+//////////////////////
 
 model User {
-  id             String      @id @default(uuid())
-  email          String      @unique
-  name           String
-  role           UserRole    @default(Viewer)
-  status         UserStatus  @default(Active)
-  passwordHash   String?     // Nullable for invited users
-  lastActive     DateTime    @default(now())
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
+  id           String     @id @default(uuid())
+  email        String     @unique
+  name         String
+  role         UserRole   @default(Viewer)
+  status       UserStatus @default(Active)
+  passwordHash String?
+  lastActive   DateTime   @default(now())
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
 
-  // Settings stored as JSON to match UserSettings interface (theme, notifs, etc)
-  settings       Json?       
-  
-  // Relations
-  posts          Post[]
-  accounts       IntegrationAccount[]
-  mediaItems     MediaItem[]
+  settings     Json?
+
+  posts        Post[]
+  accounts     IntegrationAccount[]
+  mediaItems   MediaItem[]
+  bots         BotConfig[]
 }
 
 model IntegrationAccount {
-  id             String   @id @default(uuid())
-  userId         String
-  platform       String   // "Twitter", "LinkedIn", etc.
-  handle         String?
-  accessToken    String?  // Encrypt this in production
-  refreshToken   String?
-  isConnected    Boolean  @default(false)
-  lastSync       DateTime?
-  
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id           String    @id @default(uuid())
+  userId       String
+  platform     Platform
+  handle       String?
+  accessToken  String?
+  refreshToken String?
+  isConnected  Boolean   @default(false)
+  lastSync     DateTime?
+
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, platform])
 }
 
 model Post {
-  id             String   @id @default(uuid())
-  title          String?  // For YouTube/Blog titles
-  content        String
-  description    String?  // Internal notes or meta description
-  
-  // Arrays are supported natively in Postgres
-  platforms      String[] 
-  
-  status         String   // "Draft", "Scheduled", "Needs Review" (String used to support spaces)
-  scheduledFor   DateTime
-  
-  // Media
-  mediaUrl       String?
-  mediaType      String?  // "image" | "video"
-  thumbnailUrl   String?
-  isCarousel     Boolean  @default(false)
+  id              String      @id @default(uuid())
+  title           String?
+  content         String
+  description     String?
+  platforms       Platform[]
+  status          PostStatus
+  scheduledFor    DateTime
 
-  // AI & Context
-  generatedByAi  Boolean  @default(false)
-  author         String?  // "User" or "Creator Bot" (Loose relation to allow bot names)
-  creationContext Json?   // { source: "AI", topic: "..." }
-  
-  // Advanced Config (JSON maps to interface types)
-  variants       Json?    // Array of PostVariant
+  mediaUrl        String?
+  mediaType       String?
+  thumbnailUrl    String?
+  isCarousel      Boolean     @default(false)
+
+  generatedByAi   Boolean     @default(false)
+  author          String?
+  creationContext Json?
+
+  variants        Json?
   activeVariantId String?
-  autoOps        Json?    // { autoEngage: boolean }
-  safetySettings Json?    // { bypassSafety: boolean }
-  timezone       String?
-  
-  // Analytics Data
-  engagement     Json?    // { likes: 0, shares: 0 }
+  autoOps         Json?
+  safetySettings  Json?
+  timezone        String?
 
-  // Relations
-  userId         String?
-  user           User?    @relation(fields: [userId], references: [id])
-  
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  engagement      Json?
+
+  userId          String?
+  user            User?       @relation(fields: [userId], references: [id])
+
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
 }
 
 model MediaItem {
-  id          String   @id @default(uuid())
-  name        String
-  type        String   // "image" | "video"
-  url         String
-  size        Int
-  dimensions  String?
-  createdAt   DateTime @default(now())
-  
-  userId      String?
-  user        User?    @relation(fields: [userId], references: [id])
+  id         String   @id @default(uuid())
+  name       String
+  type       String
+  url        String
+  size       Int
+  dimensions String?
+  createdAt  DateTime @default(now())
+
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id])
 }
 
-// --- AUTOMATION / BOTS ---
+//////////////////////
+// BOTS & AUTOMATION
+//////////////////////
 
 model BotConfig {
-  id                String   @id @default(uuid())
-  type              String   @unique // "Creator Bot", "Engagement Bot", etc.
-  enabled           Boolean  @default(false)
-  status            String   // "Idle", "Running", "Error"
-  intervalMinutes   Int      @default(60)
-  lastRun           DateTime?
-  consecutiveFailures Int    @default(0)
-  isPaused          Boolean  @default(false)
+  id                   String     @id @default(uuid())
+  userId               String?
+  type                 String     @unique
+  enabled              Boolean    @default(false)
+  status               BotStatus  @default(Idle)
+  intervalMinutes      Int        @default(60)
+  lastRun              DateTime?
+  consecutiveFailures  Int        @default(0)
+  isPaused             Boolean    @default(false)
 
-  // Configuration BLOBS
-  config            Json     // BotSpecificConfig (rules, tags, safety)
-  stats             Json     // { currentDailyActions: 0, maxDailyActions: 50 }
-  
-  // Logs (Legacy array support if needed, but we prefer relations)
-  logs              Json?    // Storing simple log array for quick access if needed
+  config               Json
+  stats                Json
 
-  // Relations
-  activities        BotActivity[]
-  runs              BotRun[]
+  user                 User?      @relation(fields: [userId], references: [id])
+
+  activities           BotActivity[]
+  runs                 BotRun[]
 }
 
-// Granular Activity Log (Used by BotEngine.ts service)
-model BotActivity {
-  id          String   @id @default(uuid())
-  botType     String
-  runId       String?  // Grouping ID for a specific execution cycle
-  actionType  String   // "POST", "LIKE", "ANALYZE"
-  platform    String
-  status      String   // "SUCCESS", "FAILED", "SKIPPED"
-  message     String
-  error       String?
-  metadata    Json?
-  
-  createdAt   DateTime @default(now())
-  finishedAt  DateTime?
-
-  bot         BotConfig @relation(fields: [botType], references: [type])
-}
-
-// High-Level Execution Session (Used by Worker executors)
 model BotRun {
-  id          String    @id @default(uuid())
-  botType     String
-  botId       String    // Could be "system" or specific instance
-  status      RunStatus @default(RUNNING)
-  createdAt   DateTime  @default(now())
-  finishedAt  DateTime?
-  error       String?
+  id         String     @id @default(uuid())
+  botId      String
+  status     RunStatus  @default(RUNNING)
+  createdAt  DateTime   @default(now())
+  finishedAt DateTime?
+  error      String?
 
-  bot         BotConfig @relation(fields: [botType], references: [type])
+  bot        BotConfig  @relation(fields: [botId], references: [id], onDelete: Cascade)
 }
 
-// --- INFRASTRUCTURE ---
+model BotActivity {
+  id         String         @id @default(uuid())
+  botId      String
+  runId      String?
+  actionType String
+  platform   Platform
+  status     ActivityStatus
+  message    String
+  error      String?
+  metadata   Json?
 
-// Custom Queue Table for Simulation Mode (See backend/src/lib/queue.ts)
+  createdAt  DateTime       @default(now())
+  finishedAt DateTime?
+
+  bot        BotConfig      @relation(fields: [botId], references: [id], onDelete: Cascade)
+
+  @@index([botId])
+  @@index([createdAt])
+}
+
+//////////////////////
+// SIMULATION QUEUE
+//////////////////////
+
 model JobQueue {
-  id            String   @id @default(uuid())
-  queueName     String
-  status        String   // "DELAYED", "PROCESSING", "COMPLETED"
-  scheduledFor  DateTime
-  payload       Json
-  postId        String?  // Optional reference for traceability
-  
-  createdAt     DateTime @default(now())
-  processedAt   DateTime?
+  id           String   @id @default(uuid())
+  queueName    String
+  status       String
+  scheduledFor DateTime
+  payload      Json
+  postId       String?
+
+  createdAt    DateTime @default(now())
+  processedAt  DateTime?
+
+  @@index([queueName])
+  @@index([status])
 }
