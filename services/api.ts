@@ -1,5 +1,5 @@
 
-import { Post, BotConfig, User, UserSettings, MediaItem, DashboardStats, BotType, Platform } from '../types';
+import { Post, BotConfig, User, UserSettings, MediaItem, DashboardStats, BotType, Platform, BotActivity } from '../types';
 
 const API_URL = import.meta.env?.VITE_API_URL || 'http://localhost:8000';
 
@@ -33,8 +33,9 @@ export const api = {
 
   // Bots
   getBots: () => request<BotConfig[]>('/bots'),
-  toggleBot: (type: BotType) => request<BotConfig[]>(`/bots/${type}/toggle`, { method: 'POST' }),
-  updateBot: (bot: BotConfig) => request<BotConfig[]>(`/bots/${bot.type}`, { method: 'PUT', body: JSON.stringify(bot) }),
+  getBotActivity: (type: BotType) => request<BotActivity[]>(`/bots/${encodeURIComponent(type)}/activity`),
+  toggleBot: (type: BotType) => request<BotConfig[]>(`/bots/${encodeURIComponent(type)}/toggle`, { method: 'POST' }),
+  updateBot: (bot: BotConfig) => request<BotConfig[]>(`/bots/${encodeURIComponent(bot.type)}`, { method: 'PUT', body: JSON.stringify(bot) }),
 
   // Settings
   getSettings: () => request<UserSettings>('/settings'),

@@ -16,12 +16,42 @@ export enum BotType {
   Growth = 'Growth Bot',
 }
 
+export enum ActivityStatus {
+  STARTED = 'STARTED',
+  SUCCESS = 'SUCCESS',
+  FAILED = 'FAILED',
+  SKIPPED = 'SKIPPED'
+}
+
+export enum ActionType {
+  POST = 'POST',
+  LIKE = 'LIKE',
+  REPLY = 'REPLY',
+  FOLLOW = 'FOLLOW',
+  UNFOLLOW = 'UNFOLLOW',
+  ANALYZE = 'ANALYZE'
+}
+
+export interface BotActivity {
+  id: string;
+  botType: BotType;
+  actionType: ActionType;
+  platform: Platform;
+  status: ActivityStatus;
+  message: string;
+  error?: string;
+  metadata?: any;
+  createdAt: string;
+  finishedAt?: string;
+}
+
+// ... (Rest of existing types below)
 export enum PostStatus {
   Draft = 'Draft',
   NeedsReview = 'Needs Review',
   Approved = 'Approved',
   Scheduled = 'Scheduled',
-  Processing = 'Processing', // Added for Worker state
+  Processing = 'Processing',
   Published = 'Published',
   Failed = 'Failed',
   Archived = 'Archived',
@@ -29,7 +59,7 @@ export enum PostStatus {
 
 export interface PostVariant {
   id: string;
-  name: string; // e.g., "Variant A", "Viral Copy", "Short Form"
+  name: string;
   content: string;
   mediaUrl?: string;
   mediaType?: 'image' | 'video';
@@ -37,41 +67,34 @@ export interface PostVariant {
 
 export interface Post {
   id: string;
-  title?: string; // Added for YouTube/Long-form
-  description?: string; // Explicit description field for YouTube/Long-form
-  thumbnailUrl?: string; // Added for YouTube thumbnail
-  isCarousel?: boolean; // Added for Instagram Carousel
-  content: string; // Always represents the content of the activeVariant
+  title?: string;
+  description?: string;
+  thumbnailUrl?: string;
+  isCarousel?: boolean;
+  content: string;
   platforms: Platform[];
-  scheduledFor: string; // ISO date string
+  scheduledFor: string;
   status: PostStatus;
   mediaUrl?: string;
-  mediaType?: 'image' | 'video'; // Explicit type
+  mediaType?: 'image' | 'video';
   generatedByAi: boolean;
-  author?: 'User' | BotType; // Track authorship
-  
-  // A/B Testing Variants
+  author?: 'User' | BotType;
   variants?: PostVariant[];
-  activeVariantId?: string; // ID of the currently selected/published variant
-
-  // New: Track Intent & Deep Sync Data
+  activeVariantId?: string;
   creationContext?: {
     source: 'Manual' | 'AI_Assistant' | BotType;
     topic?: string;
     originalPrompt?: string;
     strategyUsed?: string;
   };
-
-  // Deep Sync Settings Parity
-  timezone?: string; // Persist scheduling timezone
+  timezone?: string;
   autoOps?: {
-    autoEngage?: boolean; // Bot auto-reply enabled for this post
+    autoEngage?: boolean;
   };
   safetySettings?: {
-    bypassSafety?: boolean; // If user overrode safety checks
+    bypassSafety?: boolean;
     lastChecked?: string;
   };
-
   engagement?: {
     likes: number;
     shares: number;
@@ -80,8 +103,8 @@ export interface Post {
 }
 
 export interface AIStrategyConfig {
-  creativityLevel: 'Low' | 'Medium' | 'High'; // Maps to Temperature 0.2, 0.7, 1.0
-  brandVoice: string; // e.g., 'Professional', 'Witty', 'Empathetic'
+  creativityLevel: 'Low' | 'Medium' | 'High';
+  brandVoice: string;
   keywordsToInclude: string[];
   topicsToAvoid: string[];
 }
@@ -89,46 +112,33 @@ export interface AIStrategyConfig {
 export interface CalendarConfig {
   enabled: boolean;
   maxPostsPerDay: number;
-  blackoutDates: string[]; // YYYY-MM-DD strings
+  blackoutDates: string[];
 }
 
 export interface BotSpecificConfig {
-  // Creator Bot
   contentTopics?: string[];
   targetPlatforms?: Platform[];
   generationMode?: 'AI' | 'Drafts';
   workHoursStart?: string;
   workHoursEnd?: string;
-
-  // Engagement Bot
   replyToMentions?: boolean;
   replyToComments?: boolean;
   watchHashtags?: string[];
   enableAutoLike?: boolean;
   maxDailyInteractions?: number;
   mutedKeywords?: string[];
-
-  // Finder Bot
   trackKeywords?: string[];
   trackAccounts?: string[];
   autoSaveToDrafts?: boolean;
-
-  // Growth Bot
   growthTags?: string[];
   interactWithCompetitors?: boolean;
   unfollowAfterDays?: number;
   hourlyActionLimit?: number;
-
-  // Shared Safety Config
   safetyLevel?: 'Conservative' | 'Moderate' | 'Aggressive';
   minDelaySeconds?: number;
   maxDelaySeconds?: number;
   stopOnConsecutiveErrors?: number;
-
-  // New AI Strategy
   aiStrategy?: AIStrategyConfig;
-
-  // Calendar Awareness
   calendarConfig?: CalendarConfig;
 }
 
@@ -148,16 +158,14 @@ export interface BotConfig {
   intervalMinutes: number;
   lastRun?: string;
   status: BotStatus;
-  logs: BotLogEntry[]; // Structured logs
+  logs: BotLogEntry[];
   config: BotSpecificConfig;
-  
-  // Safety & Usage Stats
   stats: {
     currentDailyActions: number;
     maxDailyActions: number;
     consecutiveErrors: number;
-    cooldownEndsAt?: string; // ISO String if in cooldown
-    itemsCreated?: number; // Track artifacts produced (Drafts, Leads, etc.)
+    cooldownEndsAt?: string;
+    itemsCreated?: number;
   };
 }
 
@@ -171,8 +179,6 @@ export interface DashboardStats {
 export interface UserSettings {
   demoMode: boolean;
   geminiApiKey: string;
-  
-  // Enhanced Settings Structure
   general: {
     language: string;
     dateFormat: 'MM/DD/YYYY' | 'DD/MM/YYYY' | 'YYYY-MM-DD';
@@ -215,7 +221,7 @@ export interface PlatformAnalytics {
   platform: Platform | 'All';
   summary: {
     followers: number;
-    followersGrowth: number; // percentage
+    followersGrowth: number;
     impressions: number;
     impressionsGrowth: number;
     engagementRate: number;
@@ -260,12 +266,11 @@ export interface MediaItem {
   name: string;
   type: 'image' | 'video';
   url: string;
-  size: number; // in bytes
+  size: number;
   createdAt: string;
-  dimensions?: string; // e.g. "1920x1080"
+  dimensions?: string;
 }
 
-// Navigation & Validation Types
 export interface PageProps {
   onNavigate: (page: string, params?: any) => void;
   params?: any;

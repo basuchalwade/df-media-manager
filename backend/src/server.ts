@@ -44,24 +44,69 @@ app.post('/api/posts', async (req, res) => {
   res.json(post);
 });
 
-// 2. Bots (Trigger)
-app.post('/api/bots/:type/run', async (req, res) => {
-  const { type } = req.params;
-  let queue;
-  
-  if (type === 'Engagement Bot') queue = engagementQueue;
-  if (type === 'Growth Bot') queue = growthQueue;
-  // ... other mappings
+// 2. Bots Config
+app.get('/api/bots', async (req, res) => {
+  const bots = await prisma.botConfig.findMany({
+    include: {
+      // Get recent 5 activities as "logs" for the card view
+      activities: {
+        take: 5,
+        orderBy: { createdAt: 'desc' }
+      }
+    }
+  });
 
-  if (queue) {
-    await queue.add('run-bot', { botType: type, botId: 'system' });
-    res.json({ success: true, message: `Triggered ${type}` });
-  } else {
-    res.status(400).json({ error: 'Unknown bot type' });
-  }
+  // Map activities to the "logs" structure expected by frontend
+  const mappedBots = bots.map(b => ({
+    ...b,
+    logs: b.activities.map(a => ({
+      id: a.id,
+      timestamp: a.createdAt,
+      level: a.status === 'FAILED' ? 'Error' : a.status === 'SKIPPED' ? 'Warning' : 'Info',
+      message: a.message
+    }))
+  }));
+
+  res.json(mappedBots);
 });
 
-// ... (Other CRUD endpoints for Bots, Users, Media would go here matching existing API surface)
+// 3. Bot Activity (Specific)
+app.get('/api/bots/:type/activity', async (req, res) => {
+  const { type } = req.params;
+  const { limit = 100 } = req.query;
+  
+  const activities = await prisma.botActivity.findMany({
+    where: { botType: type },
+    orderBy: { createdAt: 'desc' },
+    take: Number(limit)
+  });
+  
+  res.json(activities);
+});
+
+// 4. Global Activity
+app.get('/api/activity/recent', async (req, res) => {
+  const activities = await prisma.botActivity.findMany({
+    orderBy: { createdAt: 'desc' },
+    take: 50
+  });
+  res.json(activities);
+});
+
+app.post('/api/bots/:type/toggle', async (req, res) => {
+  const { type } = req.params;
+  const bot = await prisma.botConfig.findUnique({ where: { type } });
+  if (!bot) return res.status(404).json({ error: 'Bot not found' });
+
+  const updated = await prisma.botConfig.update({
+    where: { type },
+    data: { 
+      enabled: !bot.enabled,
+      status: !bot.enabled ? 'Running' : 'Idle' 
+    }
+  });
+  res.json([updated]);
+});
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

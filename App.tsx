@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { Overview } from './pages/Overview';
@@ -9,6 +10,8 @@ import { Analytics } from './pages/Analytics';
 import { UserManagement } from './pages/UserManagement';
 import { Integrations } from './pages/Integrations';
 import { MediaLibrary } from './pages/MediaLibrary';
+import { BotActivityLog } from './pages/BotActivityLog';
+import { BotType } from './types';
 
 const App: React.FC = () => {
   const [currentPage, setCurrentPage] = useState('overview');
@@ -25,7 +28,9 @@ const App: React.FC = () => {
       case 'creator': return <CreatorStudio onNavigate={handleNavigate} params={navParams} />;
       case 'calendar': return <Calendar onNavigate={handleNavigate} />;
       case 'analytics': return <Analytics />;
-      case 'bots': return <BotManager />;
+      case 'bots': return <BotManager onNavigate={handleNavigate} />;
+      case 'bot-activity': 
+          return <BotActivityLog botType={navParams?.botType || BotType.Creator} onBack={() => setCurrentPage('bots')} />;
       case 'users': return <UserManagement />;
       case 'integrations': return <Integrations />;
       case 'media': return <MediaLibrary />;
