@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Sparkles, Send, Calendar as CalendarIcon, RotateCcw, Image as ImageIcon, ChevronDown, CheckCircle, Briefcase, Smile, Rocket, GraduationCap, X, FileVideo, Clock, Save, AlertCircle, Check, Zap, Eye, Copy, Hash, MoreHorizontal, ThumbsUp, MessageSquare, Share2, Repeat, Bookmark, Globe, Heart, Layers, UploadCloud, RefreshCw, ShieldCheck, AlertTriangle, Bot, Info, Cloud, CheckSquare, Plus, Split } from 'lucide-react';
+import { Sparkles, Send, Calendar as CalendarIcon, RotateCcw, Image as ImageIcon, ChevronDown, CheckCircle, Briefcase, Smile, Rocket, GraduationCap, X, FileVideo, Clock, Save, AlertCircle, Check, Zap, Eye, Copy, Hash, MoreHorizontal, ThumbsUp, MessageSquare, Share2, Repeat, Bookmark, Globe, Heart, Layers, UploadCloud, RefreshCw, ShieldCheck, AlertTriangle, Bot, Info, Cloud, CheckSquare, Plus, Split, ExternalLink } from 'lucide-react';
 import { generatePostContent, generatePostVariants, generateHashtags, validateContentSafety } from '../services/geminiService';
 import { validatePost, PLATFORM_LIMITS } from '../services/validationService';
 import { store } from '../services/mockStore';
@@ -396,6 +396,18 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
       setYoutubeThumbnail(item);
     }
     setSyncStatus('modified');
+  };
+
+  const handleViewInCalendar = () => {
+    // Construct date with time to ensure accurate passing, though Calendar mostly uses date part
+    let target = new Date(scheduledDate);
+    // Adjust time if needed based on timeState, but scheduledDate state should already track it roughly if set via date picker
+    // Actually scheduledDate state tracks the date part primarily in the UI logic shown:
+    // setScheduledDate(newDate) updates year/month/day.
+    // The time is in timeState.
+    
+    // However, for Calendar navigation, just the date is sufficient.
+    onNavigate('calendar', { date: target.toISOString() });
   };
 
   // DEEP SYNC: Merges original post data with new form changes to prevent data loss
@@ -819,16 +831,37 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
          </div>
       </div>
       
-      {/* Creation Context / Intent Display */}
-      {originalPost?.creationContext && (
-         <div className="flex items-center gap-2 text-xs font-semibold text-gray-500 bg-gray-100 px-3 py-1.5 rounded-lg w-fit">
-            <Info className="w-3.5 h-3.5" />
-            <span>
-                Original Intent: {originalPost.creationContext.source.replace('_', ' ')} 
-                {originalPost.creationContext.topic ? ` — Topic: "${originalPost.creationContext.topic}"` : ''}
-            </span>
-         </div>
-      )}
+      {/* Context Bar: Creation Intent & Calendar Link */}
+      <div className="flex flex-wrap items-center gap-3 animate-in slide-in-from-top-1">
+        {originalPost?.creationContext && (
+            <div className="flex items-center gap-2 text-xs font-semibold text-gray-500 bg-gray-100 px-3 py-1.5 rounded-lg w-fit">
+                <Info className="w-3.5 h-3.5" />
+                <span>
+                    Original Intent: {originalPost.creationContext.source.replace('_', ' ')} 
+                    {originalPost.creationContext.topic ? ` — Topic: "${originalPost.creationContext.topic}"` : ''}
+                </span>
+            </div>
+        )}
+
+        {scheduleMode === 'later' && (
+             <button 
+                onClick={handleViewInCalendar}
+                className="flex items-center gap-2 text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-lg hover:bg-blue-100 transition-all group"
+             >
+                <CalendarIcon className="w-3.5 h-3.5" />
+                <span>
+                    Scheduled: {scheduledDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} 
+                    {' · '}
+                    {timeState.hour}:{timeState.minute} {timeState.period}
+                    {postTimezone ? ` (${postTimezone.split('/').pop()?.replace('_', ' ')})` : ''}
+                </span>
+                <span className="w-px h-3 bg-blue-300 mx-1"></span>
+                <span className="flex items-center gap-1 group-hover:underline">
+                   View in Calendar <ExternalLink className="w-3 h-3" />
+                </span>
+             </button>
+        )}
+      </div>
 
       {/* Bot Review Mode Banner */}
       {postStatus === PostStatus.NeedsReview && (

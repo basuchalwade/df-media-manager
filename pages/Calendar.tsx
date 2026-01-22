@@ -75,14 +75,35 @@ export const Calendar: React.FC<PageProps> = ({ onNavigate, params }) => {
   const systemTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const [selectedTimezone, setSelectedTimezone] = useState(systemTz);
 
+  // Capacity Limits
+  const [dailyLimit, setDailyLimit] = useState(3); // Default limit
+
   // Drag & Drop State
   const [draggedPost, setDraggedPost] = useState<Post | null>(null);
 
   useEffect(() => {
     loadPosts();
-    // Handle Navigation Params (e.g. Filter by Bot)
-    if (params && params.filterAuthor) {
-      setFilterAuthor(params.filterAuthor);
+    
+    // Fetch Bot Config to get Calendar Capacity
+    store.getBots().then(bots => {
+       const creatorBot = bots.find(b => b.type === BotType.Creator);
+       if (creatorBot?.config?.calendarConfig?.maxPostsPerDay) {
+          setDailyLimit(creatorBot.config.calendarConfig.maxPostsPerDay);
+       }
+    });
+
+    // Handle Navigation Params (e.g. Filter by Bot or Date)
+    if (params) {
+      if (params.filterAuthor) {
+        setFilterAuthor(params.filterAuthor);
+      }
+      if (params.date) {
+        const d = new Date(params.date);
+        if (!isNaN(d.getTime())) {
+            setSelectedDate(d);
+            setCurrentDate(new Date(d.getFullYear(), d.getMonth(), 1)); // Switch month view to target
+        }
+      }
     }
   }, [params]);
 
@@ -369,6 +390,11 @@ export const Calendar: React.FC<PageProps> = ({ onNavigate, params }) => {
                     const isToday = new Date().toDateString() === date.toDateString();
                     const isPast = isPastDate(date);
                     const isSuggested = isBestTime(day) && !isPast; 
+                    
+                    // Capacity Calculation (Active Scheduled/Published/Drafts, ignore Archived/Failed)
+                    const activeCount = dayPosts.filter(p => p.status !== PostStatus.Archived && p.status !== PostStatus.Failed).length;
+                    const isFull = activeCount >= dailyLimit;
+                    const isOverLimit = activeCount > dailyLimit;
 
                     return (
                       <div 
@@ -381,14 +407,21 @@ export const Calendar: React.FC<PageProps> = ({ onNavigate, params }) => {
                           ${isPast ? 'bg-gray-50/50 hover:bg-gray-50' : 'cursor-pointer hover:bg-gray-50'}
                           ${isSelected
                             ? 'bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/30 scale-105 z-10 border-transparent ring-0' 
-                            : 'bg-white text-gray-700 border-transparent hover:border-gray-100'}
+                            : 'bg-white text-gray-700 hover:border-gray-100'}
                           ${isToday && !isSelected ? 'ring-2 ring-blue-500 ring-offset-1 z-0' : ''}
                           ${isSuggested && !isSelected && !isPast ? 'shadow-[0_0_15px_-3px_rgba(59,130,246,0.3)] border-blue-100' : ''}
+                          ${!isSelected && isFull && !isOverLimit ? 'border-orange-200 bg-orange-50/30' : ''}
+                          ${!isSelected && isOverLimit ? 'border-red-200 bg-red-50/30' : ''}
+                          ${!isSelected && !isFull && !isOverLimit && !isSuggested ? 'border-transparent' : ''}
                         `}
                       >
                         <div className="flex justify-between items-start">
                            <span className={`text-sm font-bold ${isSelected ? 'text-white' : isPast ? 'text-gray-400' : 'text-gray-900'}`}>{day}</span>
                            <div className="flex gap-0.5">
+                              {/* Warning Dot for Over Limit */}
+                              {isOverLimit && !isSelected && (
+                                <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" title="Over Limit"></div>
+                              )}
                               {dayPosts.length > 0 && dayPosts.some(p => p.status === PostStatus.NeedsReview) && (
                                 <div className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-yellow-300' : 'bg-amber-500'}`} title="Needs Review"></div>
                               )}
@@ -396,7 +429,24 @@ export const Calendar: React.FC<PageProps> = ({ onNavigate, params }) => {
                                 <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse" title="AI Suggested Day"></div>
                               )}
                            </div>
+                           
+                           {/* Post Capacity Counter */}
+                           {!isPast && (
+                               <div className={`
+                                  absolute top-2 right-2 text-[9px] font-bold px-1.5 py-0.5 rounded-full border
+                                  ${isSelected 
+                                    ? 'bg-white/20 text-white border-white/20' 
+                                    : isOverLimit 
+                                        ? 'bg-red-100 text-red-600 border-red-200'
+                                        : isFull 
+                                            ? 'bg-orange-100 text-orange-600 border-orange-200'
+                                            : 'bg-gray-100 text-gray-400 border-gray-200'}
+                               `}>
+                                  {activeCount}/{dailyLimit}
+                               </div>
+                           )}
                         </div>
+                        
                         {!isPast && !isSelected && (
                           <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
                              <div className="bg-blue-50 text-blue-600 p-1.5 rounded-full shadow-sm">
