@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Sparkles, Send, Calendar as CalendarIcon, RotateCcw, Image as ImageIcon, ChevronDown, CheckCircle, Briefcase, Smile, Rocket, GraduationCap, X, FileVideo, Clock, Save, AlertCircle, Check, Zap, Eye, Copy, Hash, MoreHorizontal, ThumbsUp, MessageSquare, Share2, Repeat, Bookmark, Globe, Heart, Layers, UploadCloud, RefreshCw, ShieldCheck, AlertTriangle, Bot, Info } from 'lucide-react';
+import { Sparkles, Send, Calendar as CalendarIcon, RotateCcw, Image as ImageIcon, ChevronDown, CheckCircle, Briefcase, Smile, Rocket, GraduationCap, X, FileVideo, Clock, Save, AlertCircle, Check, Zap, Eye, Copy, Hash, MoreHorizontal, ThumbsUp, MessageSquare, Share2, Repeat, Bookmark, Globe, Heart, Layers, UploadCloud, RefreshCw, ShieldCheck, AlertTriangle, Bot, Info, Cloud } from 'lucide-react';
 import { generatePostContent, generateHashtags, validateContentSafety } from '../services/geminiService';
 import { validatePost, PLATFORM_LIMITS } from '../services/validationService';
 import { store } from '../services/mockStore';
@@ -21,6 +21,7 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
   // --- Deep Sync State ---
   const [originalPost, setOriginalPost] = useState<Post | null>(null);
   const [postTimezone, setPostTimezone] = useState<string | undefined>(undefined);
+  const [syncStatus, setSyncStatus] = useState<'synced' | 'modified'>('synced');
 
   // --- AI State ---
   const [topic, setTopic] = useState('');
@@ -129,6 +130,8 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
                   setTimeState({ hour: h.toString().padStart(2, '0'), minute: date.getMinutes().toString().padStart(2, '0'), period: p });
                }
             }
+            
+            setSyncStatus('synced'); // Initially synced
           }
         });
       } else if (params.date) {
@@ -143,9 +146,11 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
             setSelectedPlatforms([params.platform]);
             setPreviewPlatform(params.platform);
         }
+        setSyncStatus('synced');
       }
     } else {
       resetForm(true);
+      setSyncStatus('synced');
     }
   }, [params]);
 
@@ -161,6 +166,24 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
     const errors = validatePost(content, selectedPlatforms, selectedMedia, isCarousel, youtubeTitle);
     setValidationErrors(errors);
   }, [content, selectedPlatforms, youtubeTitle, selectedMedia, isCarousel]);
+
+  // Change Detection for Sync Status
+  useEffect(() => {
+    // Simple check: if we have content and it's different from original (or original is null), it's modified.
+    // In a real app, you'd do deep comparison. For now, any change to these triggers 'modified'.
+    if (!originalPost && !content) return; // Fresh state
+
+    const isModified = 
+        content !== (originalPost?.content || '') ||
+        selectedPlatforms.length !== (originalPost?.platforms?.length || 1) ||
+        youtubeTitle !== (originalPost?.title || '') ||
+        // Check schedule change crudely
+        (scheduleMode === 'later' && originalPost?.scheduledFor && Math.abs(new Date(originalPost.scheduledFor).getTime() - scheduledDate.getTime()) > 60000);
+
+    if (isModified) {
+        setSyncStatus('modified');
+    }
+  }, [content, selectedPlatforms, youtubeTitle, scheduledDate, timeState, originalPost]);
 
   // Initial Hashtags
   useEffect(() => {
@@ -178,6 +201,7 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
     if(contextPlatform === Platform.YouTube) setYoutubeTitle(`${topic} - Official Video`);
     setIsAiGenerated(true);
     setIsGenerating(false);
+    setSyncStatus('modified');
   };
 
   const handleFetchHashtags = async () => {
@@ -206,6 +230,7 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
       }
       setYoutubeThumbnail(item);
     }
+    setSyncStatus('modified');
   };
 
   // DEEP SYNC: Merges original post data with new form changes to prevent data loss
@@ -299,6 +324,9 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
     setIsSaving(false);
     setShowSafetyModal(false);
     
+    setOriginalPost(newPost); // Update local reference
+    setSyncStatus('synced'); // Update Status
+    
     // Optional: Navigate back to calendar if that's where we came from?
     // For now, reset or stay.
     if (!currentPostId) resetForm(true);
@@ -328,6 +356,7 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
        alert('Draft saved. You can continue editing.');
     }
     
+    setSyncStatus('synced'); // Update Status
     setIsSaving(false);
   };
 
@@ -342,6 +371,7 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
     setPostAuthor('User'); // Cloned post is owned by user
     setOriginalPost(saved); // Update context to new copy
     setBypassSafety(false); // Reset safety for new copy
+    setSyncStatus('synced');
     
     alert("Version duplicated! You are now editing the copy.");
     setIsSaving(false);
@@ -366,6 +396,7 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
     setBypassSafety(false);
     setAutoEngage(false);
     setPostTimezone(undefined);
+    setSyncStatus('synced');
   };
 
   const formatBytes = (bytes: number) => {
@@ -566,7 +597,17 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
          <div>
            <h1 className="text-[34px] font-bold text-[#1d1d1f] tracking-tight">Creator Studio</h1>
-           <p className="text-gray-500 font-medium">Draft, optimize, and schedule your content across channels.</p>
+           <div className="flex items-center gap-3 mt-1">
+              <p className="text-gray-500 font-medium">Draft, optimize, and schedule your content across channels.</p>
+              {/* Sync Status Indicator */}
+              <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${
+                syncStatus === 'synced' ? 'bg-green-50 text-green-700 border-green-200' :
+                'bg-yellow-50 text-yellow-700 border-yellow-200 shadow-sm'
+              }`}>
+                {syncStatus === 'synced' ? <CheckCircle className="w-3.5 h-3.5" /> : <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse" />}
+                <span>{syncStatus === 'synced' ? 'In Sync' : 'Unsaved Changes'}</span>
+              </div>
+           </div>
          </div>
          <div className="flex gap-2">
             <button 
@@ -617,7 +658,7 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
              </div>
              <div className="flex gap-2">
                 <button 
-                   onClick={() => setPostAuthor('User')} // Acknowledge review
+                   onClick={() => { setPostAuthor('User'); setSyncStatus('modified'); }} // Acknowledge review
                    className="px-4 py-2 bg-orange-200 text-orange-800 text-xs font-bold rounded-lg hover:bg-orange-300 transition-colors"
                 >
                    Mark Reviewed
@@ -683,10 +724,13 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
                        return (
                           <button
                              key={p}
-                             onClick={() => isSelected 
-                                ? setSelectedPlatforms(prev => prev.filter(i => i !== p)) 
-                                : setSelectedPlatforms(prev => [...prev, p])
-                             }
+                             onClick={() => {
+                                const newSelection = isSelected 
+                                   ? selectedPlatforms.filter(i => i !== p) 
+                                   : [...selectedPlatforms, p];
+                                setSelectedPlatforms(newSelection);
+                                // Trigger modified state logic handled by useEffect
+                             }}
                              className={`
                                 flex items-center gap-2 px-3 py-2 rounded-full border transition-all duration-200 text-xs font-bold
                                 ${isSelected 
@@ -867,7 +911,7 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
               {selectedMedia && (
                  <div className="relative rounded-2xl overflow-hidden bg-gray-900 shadow-md group">
                     <button 
-                       onClick={() => setSelectedMedia(null)}
+                       onClick={() => { setSelectedMedia(null); setSyncStatus('modified'); }}
                        className="absolute top-3 right-3 p-1.5 bg-black/50 text-white rounded-full backdrop-blur-md opacity-0 group-hover:opacity-100 transition-opacity z-10"
                     >
                        <X className="w-4 h-4" />
@@ -911,7 +955,7 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
                  <div className="flex items-center gap-3">
                     <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Bot Actions</span>
                     <button 
-                       onClick={() => setAutoEngage(!autoEngage)}
+                       onClick={() => { setAutoEngage(!autoEngage); setSyncStatus('modified'); }}
                        className={`relative w-10 h-6 rounded-full transition-colors ${autoEngage ? 'bg-green-500' : 'bg-gray-200'}`}
                        title="Auto-Reply Engagement Bot"
                     >

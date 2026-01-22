@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon, 
   Eye, Filter, LayoutList, Grid3X3,
-  Globe, Zap
+  Globe, Zap, CheckCircle2, RotateCcw
 } from 'lucide-react';
 import { store } from '../services/mockStore';
 import { Post, Platform, PostStatus, PageProps, BotType } from '../types';
@@ -95,6 +95,15 @@ export const Calendar: React.FC<PageProps> = ({ onNavigate, params }) => {
   const handleEditPost = (post: Post) => {
     // Deep Sync: Also pass current view context if needed
     onNavigate('creator', { postId: post.id });
+  };
+
+  const handleRevertToDraft = async (e: React.MouseEvent, post: Post) => {
+    e.stopPropagation();
+    if(window.confirm('Cancel scheduling and move to Drafts?')) {
+        const updated = { ...post, status: PostStatus.Draft };
+        await store.updatePost(updated);
+        await loadPosts();
+    }
   };
 
   // --- Drag & Drop Handlers ---
@@ -418,7 +427,12 @@ export const Calendar: React.FC<PageProps> = ({ onNavigate, params }) => {
               ) : (
                 <>
                 <div className="absolute left-9 top-4 bottom-4 w-px bg-gradient-to-b from-transparent via-gray-200 to-transparent z-0 hidden lg:block" />
-                {filteredPosts.map((post, idx) => (
+                {filteredPosts.map((post, idx) => {
+                  const isReviewed = post.creationContext?.source && 
+                                     post.creationContext.source !== 'Manual' && 
+                                     post.author === 'User';
+
+                  return (
                   <div 
                      key={post.id} 
                      className="relative z-10 animate-in slide-in-from-right-4 duration-500" 
@@ -442,20 +456,38 @@ export const Calendar: React.FC<PageProps> = ({ onNavigate, params }) => {
                                     </div>
                                  ))}
                               </div>
-                              <div className="flex gap-1">
+                              <div className="flex gap-1 items-center">
                                 {post.author === BotType.Creator && (
                                     <div className="bg-orange-100 text-orange-700 p-1 rounded-full" title="Drafted by Creator Bot">
                                         <Zap className="w-3 h-3" />
+                                    </div>
+                                )}
+                                {isReviewed && (
+                                    <div className="flex items-center gap-1 bg-green-50 text-green-700 px-1.5 py-0.5 rounded-md border border-green-100" title="Bot content reviewed by human">
+                                        <CheckCircle2 className="w-3 h-3" />
+                                        <span className="text-[9px] font-bold uppercase">Reviewed</span>
                                     </div>
                                 )}
                                 <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${getStatusStyle(post.status)}`}>{post.status}</span>
                               </div>
                            </div>
                            <p className="text-sm font-medium text-gray-700 line-clamp-2">{post.content}</p>
+                           
+                           {/* Quick Actions on Hover */}
+                           <div className="mt-2 pt-2 border-t border-gray-100 flex justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+                              {post.status === PostStatus.Scheduled && (
+                                  <button 
+                                    onClick={(e) => handleRevertToDraft(e, post)}
+                                    className="text-xs font-bold text-gray-400 hover:text-red-500 flex items-center gap-1"
+                                  >
+                                    <RotateCcw className="w-3 h-3" /> Move to Drafts
+                                  </button>
+                              )}
+                           </div>
                         </div>
                      </div>
                   </div>
-                ))}
+                )})}
                 </>
               )}
            </div>
