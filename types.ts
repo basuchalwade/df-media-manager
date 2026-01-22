@@ -85,6 +85,12 @@ export interface AIStrategyConfig {
   topicsToAvoid: string[];
 }
 
+export interface CalendarConfig {
+  enabled: boolean;
+  maxPostsPerDay: number;
+  blackoutDates: string[]; // YYYY-MM-DD strings
+}
+
 export interface BotSpecificConfig {
   // Creator Bot
   contentTopics?: string[];
@@ -120,6 +126,9 @@ export interface BotSpecificConfig {
 
   // New AI Strategy
   aiStrategy?: AIStrategyConfig;
+
+  // Calendar Awareness
+  calendarConfig?: CalendarConfig;
 }
 
 export type BotStatus = 'Idle' | 'Running' | 'Cooldown' | 'LimitReached' | 'Error';

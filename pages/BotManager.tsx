@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { Bot, Power, Clock, Zap, Target, TrendingUp, Search, Activity, Pause, Play, ChevronRight, Settings, X, Save, Check, Shield, AlertTriangle, AlertOctagon, Hourglass, FileText, Download, Filter, Calendar, ExternalLink, BrainCircuit, Wand2, Plus, Minus } from 'lucide-react';
 import { store } from '../services/mockStore';
-import { BotConfig, BotType, Platform, BotSpecificConfig, BotLogEntry, LogLevel, AIStrategyConfig } from '../types';
+import { BotConfig, BotType, Platform, BotSpecificConfig, BotLogEntry, LogLevel, AIStrategyConfig, CalendarConfig } from '../types';
 import { PlatformIcon } from '../components/PlatformIcon';
 
 const BOT_DESCRIPTIONS: Record<BotType, string> = {
@@ -479,7 +479,7 @@ const BotConfigModal: React.FC<BotConfigModalProps> = ({ bot, onClose, onSave })
     topicsToAvoid: [],
     ...bot.config.aiStrategy // Merge existing strategy
   });
-  const [activeTab, setActiveTab] = useState<'General' | 'Strategy' | 'Safety'>('General');
+  const [activeTab, setActiveTab] = useState<'General' | 'Strategy' | 'Safety' | 'Calendar'>('General');
   const [interval, setInterval] = useState(bot.intervalMinutes);
   
   // Helper to update specific config fields
@@ -489,6 +489,18 @@ const BotConfigModal: React.FC<BotConfigModalProps> = ({ bot, onClose, onSave })
 
   const updateStrategy = (key: keyof AIStrategyConfig, value: any) => {
     setAiStrategy(prev => ({ ...prev, [key]: value }));
+  };
+
+  const updateCalendarConfig = (key: keyof CalendarConfig, value: any) => {
+    setConfig(prev => ({
+        ...prev,
+        calendarConfig: {
+            enabled: prev.calendarConfig?.enabled ?? true,
+            maxPostsPerDay: prev.calendarConfig?.maxPostsPerDay ?? 3,
+            blackoutDates: prev.calendarConfig?.blackoutDates ?? [],
+            [key]: value
+        }
+    }));
   };
 
   const handleSave = () => {
@@ -857,6 +869,80 @@ const BotConfigModal: React.FC<BotConfigModalProps> = ({ bot, onClose, onSave })
     </div>
   );
 
+  const renderCalendarFields = () => (
+    <div className="space-y-6">
+        <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 flex gap-3">
+            <Calendar className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
+            <div>
+                <h4 className="text-sm font-bold text-blue-800">Smart Scheduling</h4>
+                <p className="text-xs text-blue-700 mt-1 leading-relaxed">
+                    Prevent bots from over-scheduling. The bot will check existing posts on the calendar before creating new drafts.
+                </p>
+            </div>
+        </div>
+
+        <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-100">
+            <span className="font-bold text-sm text-gray-700">Enable Calendar Awareness</span>
+            <button 
+                onClick={() => updateCalendarConfig('enabled', !config.calendarConfig?.enabled)}
+                className={`relative w-11 h-6 rounded-full transition-colors ${config.calendarConfig?.enabled ? 'bg-blue-600' : 'bg-gray-300'}`}
+            >
+                <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${config.calendarConfig?.enabled ? 'translate-x-5' : 'translate-x-0'}`} />
+            </button>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4">
+             <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Daily Bot Post Limit</label>
+                <input 
+                    type="number" 
+                    value={config.calendarConfig?.maxPostsPerDay ?? 3}
+                    onChange={(e) => updateCalendarConfig('maxPostsPerDay', parseInt(e.target.value))}
+                    className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm font-bold" 
+                />
+                <p className="text-[10px] text-gray-400 mt-1">Bot will stop drafting if this many posts exist on a given day.</p>
+             </div>
+        </div>
+
+        <div>
+            <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Blackout Dates (Holidays/Launches)</label>
+            <div className="flex gap-2 mb-2">
+                <input 
+                    type="date" 
+                    id="blackout-date-picker"
+                    className="flex-1 px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm"
+                />
+                <button 
+                    onClick={() => {
+                        const input = document.getElementById('blackout-date-picker') as HTMLInputElement;
+                        if (input.value) {
+                            const current = config.calendarConfig?.blackoutDates || [];
+                            if (!current.includes(input.value)) {
+                                updateCalendarConfig('blackoutDates', [...current, input.value]);
+                            }
+                            input.value = '';
+                        }
+                    }}
+                    className="px-4 py-2 bg-gray-900 text-white rounded-lg text-xs font-bold"
+                >
+                    Add
+                </button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+                {config.calendarConfig?.blackoutDates?.map(date => (
+                    <span key={date} className="flex items-center gap-1 px-2 py-1 bg-red-50 text-red-700 rounded-md text-xs font-bold border border-red-100">
+                        {date}
+                        <button onClick={() => updateCalendarConfig('blackoutDates', config.calendarConfig?.blackoutDates?.filter(d => d !== date))} className="hover:bg-red-100 rounded-full p-0.5"><X className="w-3 h-3" /></button>
+                    </span>
+                ))}
+                {(!config.calendarConfig?.blackoutDates || config.calendarConfig.blackoutDates.length === 0) && (
+                    <span className="text-xs text-gray-400 italic">No blackout dates set.</span>
+                )}
+            </div>
+        </div>
+    </div>
+  );
+
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in">
        <div className="bg-white rounded-[32px] w-full max-w-lg shadow-2xl flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
@@ -891,6 +977,14 @@ const BotConfigModal: React.FC<BotConfigModalProps> = ({ bot, onClose, onSave })
              >
                 <Shield className="w-4 h-4" /> Safety
              </button>
+             {bot.type === BotType.Creator && (
+                <button 
+                    onClick={() => setActiveTab('Calendar')}
+                    className={`py-3 px-4 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 whitespace-nowrap ${activeTab === 'Calendar' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
+                >
+                    <Calendar className="w-4 h-4" /> Calendar
+                </button>
+             )}
           </div>
 
           <div className="p-6 overflow-y-auto custom-scrollbar flex-1">
@@ -926,6 +1020,8 @@ const BotConfigModal: React.FC<BotConfigModalProps> = ({ bot, onClose, onSave })
              {activeTab === 'Strategy' && renderStrategyFields()}
 
              {activeTab === 'Safety' && renderSafetyFields()}
+
+             {activeTab === 'Calendar' && renderCalendarFields()}
           </div>
 
           <div className="p-6 border-t border-gray-100 bg-gray-50 rounded-b-[32px] flex justify-end gap-3">

@@ -1,123 +1,108 @@
-# ContentCaster - AI-Powered Social Media Automation Platform
 
-**ContentCaster** (by Dossiefoyer Private Limited) is an enterprise-grade social media management dashboard designed to automate content creation, scheduling, and analytics using advanced AI agents (Gemini) and smart growth bots. It serves as a unified command center for all your social channels.
+# ContentCaster - Enterprise AI Social Automation Platform
 
-![Version](https://img.shields.io/badge/version-1.3.0-blue.svg)
+**ContentCaster** (by Dossiefoyer Private Limited) is the industry's most advanced social media command center. Unlike standard scheduling tools, ContentCaster employs **Autonomous AI Agents**, **Deep State Synchronization**, and **Context-Aware Scheduling** to manage high-volume social strategies with military precision.
+
+![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
-![Status](https://img.shields.io/badge/status-stable-success.svg)
+![Status](https://img.shields.io/badge/status-production--ready-success.svg)
 ![AI](https://img.shields.io/badge/AI-Gemini%20Pro-purple)
+
+---
+
+## 🌟 Why ContentCaster? (Key Differentiators)
+
+### 1. 🧠 Deep Sync™ Architecture
+Most tools lose context when you switch between views. ContentCaster maintains a **Deep Sync** state.
+- **Context Preservation**: Start editing in the Calendar, jump to the Creator Studio, and switch platforms without losing your draft, unsaved changes, or safety override settings.
+- **Real-time State**: "Unsaved Changes" indicators track modifications across the entire session until committed to the database.
+
+### 2. 📅 Intelligent Command Center (Calendar)
+A calendar designed for power users and enterprise teams.
+- **Dynamic Bulk Operations**: Select multiple posts to trigger a "Dynamic Island" floating toolbar.
+  - **Mass Reschedule**: Shift entire campaigns to specific dates.
+  - **Quick +7 Days**: Instantly push content to the next week (perfect for delaying campaigns).
+  - **Bulk Pause**: Revert scheduled posts to drafts in one click.
+  - **Platform Migration**: Bulk convert Twitter posts to LinkedIn posts instantly.
+- **Visual Agenda**: High-density list view with status indicators, platform icons, and author tracking (Human vs. Bot).
+- **Timezone Intelligence**: Auto-detects local system time vs. target audience timezone.
+
+### 3. 🤖 Context-Aware Bot Swarm
+Our bots don't just post; they *think* before they act.
+- **Calendar Awareness**: Bots scan your existing calendar load before creating drafts. If a day is full (e.g., >3 posts), the bot holds back to prevent spamming.
+- **Blackout Dates**: Define holidays, launch days, or crisis periods where bots automatically silence themselves.
+- **Granular Strategy**:
+  - **Creator Bot**: autonomous drafting based on brand voice (Professional, Viral, Empathetic).
+  - **Engagement Bot**: Handles replies and likes with daily safety caps.
+  - **Growth Bot**: Executes safe follow/unfollow strategies with cool-down periods.
+- **Safety Throttling**: "Circuit breakers" stop bots immediately upon consecutive API errors or rate limits.
+
+### 4. 🎨 Creator Studio Pro
+- **A/B Testing (Variants)**: Generate and manage multiple text variants (Variant A, B, C) for a single post to test hooks.
+- **Platform-Perfect Previews**: High-fidelity rendering for X (Twitter), Instagram (Grid & Carousel), LinkedIn, and YouTube.
+- **AI Copilot**:
+  - **Tone Shifting**: Rewrite content instantly (e.g., "Make it wittier", "Make it professional").
+  - **Viral Hashtags**: Context-aware tag generation.
+- **YouTube Workflow**: First-class support for Video Titles, Thumbnails, and Description formatting.
+
+### 5. 🛡️ Trust & Safety Engine
+An integrated AI layer that audits every keystroke before publication.
+- **Compliance Checks**: Scans for hate speech, violence, NSFW content, and aggressive language.
+- **Platform Policy**: Warns about character limits and aspect ratios (e.g., "Instagram images should be 1:1 or 4:5").
+- **Safety Override**: Admins can explicitly bypass safety checks with audit logging.
 
 ---
 
 ## 🚀 Tech Stack
 
 ### Frontend
-- **Framework**: React 18
+- **Framework**: React 19
 - **Build Tool**: Vite
 - **Language**: TypeScript
-- **Styling**: Tailwind CSS
+- **Styling**: Tailwind CSS (Glassmorphism & Apple-style aesthetics)
 - **Icons**: Lucide React
-- **Charts**: Recharts
+- **Visualization**: Recharts
 - **AI Integration**: Google GenAI SDK (`@google/genai`)
 
 ### Backend & Infrastructure
-- **API**: FastAPI (Python)
-- **Database**: SQLite / PostgreSQL (via SQLAlchemy)
+- **API**: FastAPI (Python) / Node.js
+- **Database**: PostgreSQL / SQLite (Development)
 - **Containerization**: Docker & Docker Compose
-- **State Management**: Mock Store (LocalStorage) / REST API
+- **State Management**: Reactive Mock Store (simulating low-latency edge caching)
 
 ---
 
 ## 🏗️ Architecture
 
-ContentCaster follows a modern client-server architecture designed for scalability.
-
 ```mermaid
 graph TD
-    User["User Browser"] -->|HTTP/HTTPS| Nginx["Nginx Reverse Proxy"]
-    Nginx -->|Static Files| Frontend["React App (Port 3000)"]
-    Nginx -->|API Requests| Backend["FastAPI Backend (Port 8000)"]
-    Backend -->|Query/Write| DB[("SQLite/Postgres")]
-    Backend -->|Generate Content| Gemini["Google Gemini API"]
-    Backend -->|Post Content| Socials["Social Media APIs"]
+    User["User Browser"] -->|React 19| App["Frontend App"]
+    App -->|Deep Sync| State["Global Store"]
+    App -->|Validation| Safety["Safety Engine"]
+    App -->|Generative Tasks| Gemini["Google Gemini Pro"]
+    
+    subgraph "Automation Core"
+      Bot1["Creator Bot"]
+      Bot2["Engagement Bot"]
+      Bot3["Growth Bot"]
+      Calendar["Calendar Awareness"]
+    end
+    
+    Bot1 --> Calendar
+    State <--> Calendar
 ```
 
 ---
 
 ## 📱 Supported Platforms
 
-ContentCaster is engineered to support multi-channel publishing with platform-specific validation.
-
-| Platform | Type | Key Capabilities |
+| Platform | Type | Deep Features |
 | :--- | :--- | :--- |
-| **X (Twitter)** | Microblogging | • Thread creation & scheduling<br>• Reply automation via Engagement Bot<br>• **Visual Preview**: Accurate tweet rendering |
-| **LinkedIn** | Professional | • Company Page & Personal Profile support<br>• **Formatting**: Professional formatting preservation |
-| **Instagram** | Visual | • Direct publishing to Feed<br>• **Validation**: Aspect ratio warnings (1:1, 4:5)<br>• Feed Grid preview |
-| **YouTube** | Video | • **Video Support**: Title & Description fields<br>• Custom Thumbnail upload<br>• SEO tag generation |
-| **Threads** | Microblogging | • 500 character limit enforcement<br>• Cross-posting from Instagram |
-| **Facebook** | Social Network | • Page management<br>• Group posting |
-
----
-
-## ✨ Key Features
-
-### 1. 🛡️ AI Trust & Safety Engine (Content Protection)
-ContentCaster includes a built-in safety layer powered by Google Gemini to protect your brand reputation before any post goes live.
-- **Violence & Physical Harm**: Detects and blocks content promoting violence, self-harm, or dangerous acts.
-- **Hate Speech & Harassment**: Automatically flags discriminatory language or targeted harassment.
-- **Content Protection**: Checks for potential policy violations (e.g., scams, clickbait, NSFW content).
-- **Brand Safety**: Ensures tone consistency and prevents "PR disasters" by analyzing sentiment.
-
-### 2. 📊 Dashboard Overview
-- **Bento Grid Layout**: Real-time performance metrics (Reach, Engagement, Active Bots).
-- **Live Activity Feed**: Streaming logs from backend automation agents.
-- **Trend Detection**: AI analysis of viral topics to prompt immediate action.
-
-### 3. 🎨 Creator Studio (Enhanced)
-- **High-Fidelity Previews**: Pixel-perfect previews for Mobile/Desktop across all platforms.
-- **AI Copilot**: 
-  - Generates content based on Tone (Professional, Funny, Viral).
-  - Auto-suggests viral hashtags based on content context.
-  - "Auto-Fix" grammar and style.
-- **Smart Validation**: Real-time checks for character limits, media types (e.g., Video required for YouTube), and aspect ratios.
-- **YouTube Workflow**: Dedicated fields for Video Title and Thumbnail selection.
-
-### 4. 🤖 Bot Manager (Autonomous Agents)
-A full suite of configurable agents with granular control rules:
-
-*   **Creator Bot**: Autonomous content engine.
-    *   *Config*: Define Topics, Work Hours (9-5), Target Platforms, AI vs. Draft mode.
-*   **Engagement Bot**: Community manager.
-    *   *Config*: Reply to Mentions/Comments, Auto-Like hashtags, Daily interaction limits, Muted keywords.
-*   **Finder Bot**: Trend scout.
-    *   *Config*: Track Competitors, Monitor Keywords, Auto-save viral inspiration to drafts.
-*   **Growth Bot**: Audience builder.
-    *   *Config*: Follow strategies based on hashtags, Unfollow logic (e.g., after 7 days), Hourly safety throttles.
-
-### 5. 📅 Content Calendar
-- **Drag-and-Drop Scheduling**: Easily move posts to reschedule.
-- **Views**: Toggle between Month Grid and Agenda List views.
-- **Smart Filters**: Filter by Platform (e.g., show only LinkedIn posts) or Status (Draft/Scheduled/Published).
-- **Timezone Awareness**: Multi-timezone scheduling support.
-
-### 6. 📈 Advanced Analytics
-- **Cross-Platform Metrics**: Compare growth across Twitter, LinkedIn, etc.
-- **AI Insights**: Text-based analysis of performance (e.g., "Video content is performing 40% better on Tuesdays").
-- **Engagement Heatmaps**: Visualize peak interaction times.
-
-### 7. 🖼️ Media Library
-- **Central Asset Repo**: Manage Images (JPG, PNG, WEBP) and Videos (MP4).
-- **Details Inspector**: View metadata (Size, Dimensions, Date).
-- **Video Preview**: Hover-to-play functionality for quick video scanning.
-- **Optimization Tools**: Mock capability to crop/resize assets for specific platforms (Square/Story).
-
-### 8. 👥 User Management (RBAC)
-- **Role-Based Access**:
-  - **Admin**: Full system control.
-  - **Monitor**: Manage bots and view analytics (Read/Write limited).
-  - **Viewer**: Read-only access.
-- **Invite System**: Email invitation flow for onboarding team members.
-- **Audit**: Track user status (Active/Suspended) and last active timestamps.
+| **X (Twitter)** | Microblogging | • Thread visualization<br>• Reply automation<br>• Character count strict enforcement |
+| **LinkedIn** | Professional | • Rich text formatting<br>• Document/PDF support readiness<br>• Corporate tone analysis |
+| **Instagram** | Visual | • Carousel indicator support<br>• 1:1 / 4:5 Aspect Ratio validation<br>• Hashtag density optimization |
+| **YouTube** | Video | • **Video Title & Thumbnail Management**<br>• Description SEO optimization<br>• Subscriber growth tracking |
+| **Threads** | Microblogging | • Cross-posting capability<br>• 500-char limit checks |
 
 ---
 
@@ -126,9 +111,9 @@ A full suite of configurable agents with granular control rules:
 ### Prerequisites
 - Node.js (v18+)
 - Docker & Docker Compose
-- Google Gemini API Key (get one at [aistudio.google.com](https://aistudio.google.com))
+- Google Gemini API Key
 
-### Option A: Quick Start (Docker)
+### Quick Start
 
 1. **Clone the repository**
    ```bash
@@ -137,43 +122,36 @@ A full suite of configurable agents with granular control rules:
    ```
 
 2. **Configure Environment**
-   Create a `.env` file in the root directory:
+   Create a `.env` file:
    ```env
    API_KEY=your_gemini_api_key_here
    VITE_API_URL=http://localhost:8000
    ```
 
-3. **Run with Docker Compose**
-   ```bash
-   docker-compose up -d --build
-   ```
-
-4. **Access the App**
-   - Frontend: `http://localhost:3000`
-   - Backend API: `http://localhost:8000`
-
-### Option B: Local Development
-
-1. **Install Dependencies**
+3. **Run Development Server**
    ```bash
    npm install
-   ```
-
-2. **Start Development Server**
-   ```bash
    npm run dev
    ```
 
 ---
 
-## ⚙️ Configuration
+## ⚙️ Configuration Guide
 
-The application defaults to a **Simulation Mode** (Mock Store) for immediate testing without a backend database. Data persists to `localStorage`.
+### Setting up Bots
+1. Navigate to **Bot Manager**.
+2. Select **Creator Bot** -> **Configure**.
+3. **Calendar Tab**: Enable "Smart Scheduling" and set "Max Posts Per Day" to 3.
+4. **Blackout Dates**: Add upcoming holidays to prevent auto-posting.
+5. **Strategy Tab**: Set Creativity to "High" and Brand Voice to "Professional".
 
-To switch to **Live Mode**:
-1. Go to **Settings**.
-2. Toggle "System Mode" to **Live Mode**.
-3. Ensure your backend is running and `VITE_API_URL` is set correctly.
+### Using Bulk Actions
+1. Go to **Calendar** -> **Agenda View**.
+2. Click checkboxes on multiple posts.
+3. Use the **Floating Action Bar** to:
+   - **Reschedule**: Move all to a specific date.
+   - **+7 Days**: Delay the campaign by a week.
+   - **Pause**: Revert all to drafts.
 
 ---
 
@@ -181,34 +159,32 @@ To switch to **Live Mode**:
 
 ```
 contentcaster/
-├── components/       # UI Components (Sidebar, MediaPicker, PlatformIcon, etc.)
-├── pages/            # Page Views
-│   ├── BotManager.tsx    # Agent Configuration & Logs
-│   ├── CreatorStudio.tsx # Post Composer & AI Tools
-│   ├── Analytics.tsx     # Charts & Graphs
-│   ├── Calendar.tsx      # Drag-drop Schedule
+├── components/       # Reusable UI (PlatformIcon, MediaPicker)
+├── pages/            # Core Modules
+│   ├── BotManager.tsx    # Agent Configuration, Audit Logs, Calendar Awareness
+│   ├── CreatorStudio.tsx # Editor, Deep Sync Logic, AI Generation
+│   ├── Calendar.tsx      # Agenda/Month View, Bulk Actions
+│   ├── Analytics.tsx     # Performance Metrics
 │   └── ...
-├── services/         # Logic Layer
-│   ├── geminiService.ts  # AI Integration
-│   ├── mockStore.ts      # Local State/Persistence
-│   └── validationService.ts # Platform Rules
-├── types.ts          # TypeScript Interfaces
-├── App.tsx           # Router & Layout
-└── docker-compose.yml
+├── services/         # Business Logic
+│   ├── geminiService.ts  # AI Prompts & Handling
+│   ├── mockStore.ts      # State Persistence & Bot Simulation
+│   └── validationService.ts # Platform Rules Engine
+└── types.ts          # TypeScript Definitions (Strict Typing)
 ```
 
 ---
 
 ## 🤝 Contributing
 
+We welcome enterprise partners and open-source contributors.
 1. Fork the repository.
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`).
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`).
-4. Push to the branch (`git push origin feature/AmazingFeature`).
-5. Open a Pull Request.
+2. Create your feature branch (`git checkout -b feature/DeepSync`).
+3. Commit your changes.
+4. Open a Pull Request.
 
 ---
 
 ## 📝 License
 
-Distributed under the MIT License. See `LICENSE` for more information.
+**Dossiefoyer Private Limited**. Distributed under the MIT License.

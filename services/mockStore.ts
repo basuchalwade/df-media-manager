@@ -136,6 +136,11 @@ const INITIAL_BOTS: BotConfig[] = [
         brandVoice: 'Professional',
         keywordsToInclude: ['Innovation', 'Growth'],
         topicsToAvoid: ['Politics', 'Competitors']
+      },
+      calendarConfig: {
+        enabled: true,
+        maxPostsPerDay: 3,
+        blackoutDates: []
       }
     }
   },
