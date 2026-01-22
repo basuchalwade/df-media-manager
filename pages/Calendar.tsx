@@ -1,11 +1,12 @@
+
 import React, { useState, useEffect } from 'react';
 import { 
   ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon, 
   Eye, Filter, LayoutList, Grid3X3,
-  Globe
+  Globe, Zap
 } from 'lucide-react';
 import { store } from '../services/mockStore';
-import { Post, Platform, PostStatus, PageProps } from '../types';
+import { Post, Platform, PostStatus, PageProps, BotType } from '../types';
 import { PlatformIcon } from '../components/PlatformIcon';
 
 // --- Constants & Helpers ---
@@ -40,7 +41,7 @@ const isBestTime = (day: number) => {
   return day % 3 === 0 || day % 7 === 0; // Mock logic
 };
 
-export const Calendar: React.FC<PageProps> = ({ onNavigate }) => {
+export const Calendar: React.FC<PageProps> = ({ onNavigate, params }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [posts, setPosts] = useState<Post[]>([]);
@@ -48,6 +49,7 @@ export const Calendar: React.FC<PageProps> = ({ onNavigate }) => {
   // Filter & View State
   const [filterPlatform, setFilterPlatform] = useState<Platform | 'All'>('All');
   const [filterStatus, setFilterStatus] = useState<PostStatus | 'All'>('All');
+  const [filterAuthor, setFilterAuthor] = useState<string | 'All'>('All');
   const [viewMode, setViewMode] = useState<'Month' | 'Agenda'>('Month');
   
   // Timezone - Auto detect system default
@@ -59,7 +61,11 @@ export const Calendar: React.FC<PageProps> = ({ onNavigate }) => {
 
   useEffect(() => {
     loadPosts();
-  }, []);
+    // Handle Navigation Params (e.g. Filter by Bot)
+    if (params && params.filterAuthor) {
+      setFilterAuthor(params.filterAuthor);
+    }
+  }, [params]);
 
   const loadPosts = async () => {
     const fetchedPosts = await store.getPosts();
@@ -137,9 +143,12 @@ export const Calendar: React.FC<PageProps> = ({ onNavigate }) => {
   };
 
   const rawPostsForDate = getPostsForDate(selectedDate);
+  
+  // Apply all filters
   const filteredPosts = rawPostsForDate.filter(p => {
     if (filterPlatform !== 'All' && !p.platforms.includes(filterPlatform)) return false;
     if (filterStatus !== 'All' && p.status !== filterStatus) return false;
+    if (filterAuthor !== 'All' && p.author !== filterAuthor) return false;
     return true;
   }).sort((a, b) => new Date(a.scheduledFor).getTime() - new Date(b.scheduledFor).getTime());
 
@@ -148,6 +157,7 @@ export const Calendar: React.FC<PageProps> = ({ onNavigate }) => {
       .filter(p => new Date(p.scheduledFor) >= new Date())
       .filter(p => filterPlatform === 'All' || p.platforms.includes(filterPlatform))
       .filter(p => filterStatus === 'All' || p.status === filterStatus)
+      .filter(p => filterAuthor === 'All' || p.author === filterAuthor)
       .sort((a, b) => new Date(a.scheduledFor).getTime() - new Date(b.scheduledFor).getTime())
       .slice(0, 20);
   };
@@ -251,9 +261,15 @@ export const Calendar: React.FC<PageProps> = ({ onNavigate }) => {
                       >
                         <div className="flex justify-between items-start">
                            <span className={`text-sm font-bold ${isSelected ? 'text-white' : isPast ? 'text-gray-400' : 'text-gray-900'}`}>{day}</span>
-                           {isSuggested && !isSelected && !isPast && (
-                             <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse" title="AI Suggested Day"></div>
-                           )}
+                           {/* Dot indicator if there are posts */}
+                           <div className="flex gap-0.5">
+                              {dayPosts.some(p => p.author === BotType.Creator) && (
+                                <div className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-yellow-300' : 'bg-orange-500'}`} title="Bot Created Content"></div>
+                              )}
+                              {isSuggested && !isSelected && !isPast && (
+                                <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse" title="AI Suggested Day"></div>
+                              )}
+                           </div>
                         </div>
                         {!isPast && !isSelected && (
                           <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
@@ -301,6 +317,11 @@ export const Calendar: React.FC<PageProps> = ({ onNavigate }) => {
                                </div>
                              ))}
                           </div>
+                          {post.author === BotType.Creator && (
+                              <span className="text-[10px] font-bold bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded flex items-center gap-1">
+                                <Zap className="w-3 h-3" /> Bot
+                              </span>
+                          )}
                        </div>
                        <p className="text-sm text-gray-700 font-medium truncate">{post.content}</p>
                     </div>
@@ -346,8 +367,21 @@ export const Calendar: React.FC<PageProps> = ({ onNavigate }) => {
                    ))}
                  </div>
                  
-                 {/* Status Filter Row */}
+                 {/* Status & Author Filter Row */}
                  <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar items-center pl-6">
+                    {/* Bot Filter Toggle */}
+                    <button 
+                        onClick={() => setFilterAuthor(filterAuthor === 'All' ? BotType.Creator : 'All')}
+                        className={`
+                            px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider border transition-all whitespace-nowrap flex items-center gap-1
+                            ${filterAuthor !== 'All' 
+                                ? 'bg-orange-500 text-white border-orange-500 shadow-md' 
+                                : 'bg-white text-slate-500 border-gray-100 hover:bg-gray-50'}
+                        `}
+                    >
+                        <Zap className="w-3 h-3" /> Bot Created
+                    </button>
+                    <div className="w-px h-4 bg-gray-300 mx-1"></div>
                     {['All', ...Object.values(PostStatus)].map(status => (
                         <button
                             key={status}
@@ -393,7 +427,7 @@ export const Calendar: React.FC<PageProps> = ({ onNavigate }) => {
                            </span>
                            <div className={`w-2.5 h-2.5 rounded-full border-2 z-10 bg-white border-gray-300 group-hover:border-blue-500`}></div>
                         </div>
-                        <div className="flex-1 bg-white rounded-2xl shadow-sm border border-gray-100 hover:border-blue-100 p-3 transition-colors">
+                        <div className={`flex-1 bg-white rounded-2xl shadow-sm border p-3 transition-colors ${post.author === BotType.Creator ? 'border-orange-100 bg-orange-50/30' : 'border-gray-100 hover:border-blue-100'}`}>
                            <div className="flex justify-between items-center mb-2">
                               <div className="flex -space-x-2 pl-1">
                                  {post.platforms.map((p, i) => (
@@ -402,7 +436,14 @@ export const Calendar: React.FC<PageProps> = ({ onNavigate }) => {
                                     </div>
                                  ))}
                               </div>
-                              <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${getStatusStyle(post.status)}`}>{post.status}</span>
+                              <div className="flex gap-1">
+                                {post.author === BotType.Creator && (
+                                    <div className="bg-orange-100 text-orange-700 p-1 rounded-full" title="Drafted by Creator Bot">
+                                        <Zap className="w-3 h-3" />
+                                    </div>
+                                )}
+                                <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${getStatusStyle(post.status)}`}>{post.status}</span>
+                              </div>
                            </div>
                            <p className="text-sm font-medium text-gray-700 line-clamp-2">{post.content}</p>
                         </div>

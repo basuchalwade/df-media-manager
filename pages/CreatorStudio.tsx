@@ -1,9 +1,10 @@
+
 import React, { useState, useEffect, useRef } from 'react';
-import { Sparkles, Send, Calendar as CalendarIcon, RotateCcw, Image as ImageIcon, ChevronDown, CheckCircle, Briefcase, Smile, Rocket, GraduationCap, X, FileVideo, Clock, Save, AlertCircle, Check, Zap, Eye, Copy, Hash, MoreHorizontal, ThumbsUp, MessageSquare, Share2, Repeat, Bookmark, Globe, Heart, Layers, UploadCloud, RefreshCw, ShieldCheck, AlertTriangle } from 'lucide-react';
+import { Sparkles, Send, Calendar as CalendarIcon, RotateCcw, Image as ImageIcon, ChevronDown, CheckCircle, Briefcase, Smile, Rocket, GraduationCap, X, FileVideo, Clock, Save, AlertCircle, Check, Zap, Eye, Copy, Hash, MoreHorizontal, ThumbsUp, MessageSquare, Share2, Repeat, Bookmark, Globe, Heart, Layers, UploadCloud, RefreshCw, ShieldCheck, AlertTriangle, Bot } from 'lucide-react';
 import { generatePostContent, generateHashtags, validateContentSafety } from '../services/geminiService';
 import { validatePost, PLATFORM_LIMITS } from '../services/validationService';
 import { store } from '../services/mockStore';
-import { Platform, PostStatus, MediaItem, Post, PageProps } from '../types';
+import { Platform, PostStatus, MediaItem, Post, PageProps, BotType } from '../types';
 import { PlatformIcon } from '../components/PlatformIcon';
 import { MediaPicker } from '../components/MediaPicker';
 
@@ -31,6 +32,7 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
   const [isCarousel, setIsCarousel] = useState(false);
   const [selectedPlatforms, setSelectedPlatforms] = useState<Platform[]>([Platform.Twitter]);
   const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(null);
+  const [postAuthor, setPostAuthor] = useState<'User' | BotType>('User'); // Track if this is bot content
   
   // --- Tools State ---
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -76,6 +78,7 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
             setYoutubeTitle(post.title || '');
             setIsCarousel(post.isCarousel || false);
             setIsAiGenerated(post.generatedByAi);
+            setPostAuthor(post.author || 'User');
             
             // Media
             if (post.mediaUrl) {
@@ -206,6 +209,7 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
       generatedByAi: isAiGenerated,
       mediaUrl: selectedMedia?.url,
       mediaType: selectedMedia?.type,
+      author: forceNewId ? 'User' : postAuthor, // Keep original author unless duplicating
       engagement: { likes: 0, shares: 0, comments: 0 }
     };
   };
@@ -281,6 +285,7 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
     
     const saved = await store.addPost(newPost);
     setCurrentPostId(saved.id);
+    setPostAuthor('User'); // Cloned post is owned by user
     
     alert("Version duplicated! You are now editing the copy.");
     setIsSaving(false);
@@ -300,6 +305,7 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
     if (clearDate) setScheduledDate(new Date());
     setCurrentPostId(null);
     setSafetyIssues([]);
+    setPostAuthor('User');
   };
 
   const formatBytes = (bytes: number) => {
@@ -519,6 +525,30 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
             </button>
          </div>
       </div>
+      
+      {/* Bot Review Mode Banner */}
+      {postAuthor !== 'User' && (
+         <div className="bg-orange-50 border border-orange-100 rounded-2xl p-4 flex items-start gap-4 animate-in slide-in-from-top-2">
+             <div className="bg-orange-100 p-2 rounded-xl text-orange-600">
+                <Bot className="w-6 h-6" />
+             </div>
+             <div className="flex-1">
+                <h3 className="text-sm font-bold text-orange-800 uppercase tracking-wide">Bot Generated Content</h3>
+                <p className="text-sm text-orange-700 mt-1">
+                   This draft was automatically created by the <strong>{postAuthor}</strong>. 
+                   Please review facts, hashtags, and tone before publishing.
+                </p>
+             </div>
+             <div className="flex gap-2">
+                <button 
+                   onClick={() => setPostAuthor('User')} // Acknowledge review
+                   className="px-4 py-2 bg-orange-200 text-orange-800 text-xs font-bold rounded-lg hover:bg-orange-300 transition-colors"
+                >
+                   Mark Reviewed
+                </button>
+             </div>
+         </div>
+      )}
 
       <div className="flex flex-col xl:flex-row gap-8 h-full">
         {/* Same Layout as before, just state wired up */}

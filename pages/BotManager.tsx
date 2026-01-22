@@ -1,8 +1,8 @@
 
 import React, { useEffect, useState } from 'react';
-import { Bot, Power, Clock, Zap, Target, TrendingUp, Search, Activity, Pause, Play, ChevronRight, Settings, X, Save, Check, Shield, AlertTriangle, AlertOctagon, Hourglass, FileText, Download, Filter, Calendar } from 'lucide-react';
+import { Bot, Power, Clock, Zap, Target, TrendingUp, Search, Activity, Pause, Play, ChevronRight, Settings, X, Save, Check, Shield, AlertTriangle, AlertOctagon, Hourglass, FileText, Download, Filter, Calendar, ExternalLink, BrainCircuit, Wand2, Plus, Minus } from 'lucide-react';
 import { store } from '../services/mockStore';
-import { BotConfig, BotType, Platform, BotSpecificConfig, BotLogEntry, LogLevel } from '../types';
+import { BotConfig, BotType, Platform, BotSpecificConfig, BotLogEntry, LogLevel, AIStrategyConfig } from '../types';
 import { PlatformIcon } from '../components/PlatformIcon';
 
 const BOT_DESCRIPTIONS: Record<BotType, string> = {
@@ -12,7 +12,11 @@ const BOT_DESCRIPTIONS: Record<BotType, string> = {
   [BotType.Growth]: "Audience builder that executes safe follow/unfollow strategies."
 };
 
-export const BotManager: React.FC = () => {
+interface BotManagerProps {
+  onNavigate?: (page: string, params?: any) => void;
+}
+
+export const BotManager: React.FC<BotManagerProps> = ({ onNavigate }) => {
   const [bots, setBots] = useState<BotConfig[]>([]);
   const [selectedBot, setSelectedBot] = useState<BotConfig | null>(null);
   const [viewLogsBot, setViewLogsBot] = useState<BotConfig | null>(null);
@@ -30,6 +34,12 @@ export const BotManager: React.FC = () => {
     const updated = await store.updateBot(updatedConfig);
     setBots(updated);
     setSelectedBot(null);
+  };
+
+  const handleViewWork = (bot: BotConfig) => {
+     if (onNavigate) {
+       onNavigate('calendar', { filterAuthor: bot.type });
+     }
   };
 
   return (
@@ -59,6 +69,7 @@ export const BotManager: React.FC = () => {
             onToggle={() => handleToggle(bot.type)} 
             onConfigure={() => setSelectedBot(bot)}
             onViewLogs={() => setViewLogsBot(bot)}
+            onViewWork={() => handleViewWork(bot)}
           />
         ))}
       </div>
@@ -84,7 +95,15 @@ export const BotManager: React.FC = () => {
 };
 
 // Sub-component for Apple-style Tile
-const BotCard = ({ bot, onToggle, onConfigure, onViewLogs }: { bot: BotConfig; onToggle: () => void; onConfigure: () => void; onViewLogs: () => void }) => {
+interface BotCardProps {
+    bot: BotConfig;
+    onToggle: () => void;
+    onConfigure: () => void;
+    onViewLogs: () => void;
+    onViewWork: () => void;
+}
+
+const BotCard: React.FC<BotCardProps> = ({ bot, onToggle, onConfigure, onViewLogs, onViewWork }) => {
   const isRunning = bot.enabled && bot.status === 'Running';
   const isCooldown = bot.status === 'Cooldown';
   const isLimitReached = bot.status === 'LimitReached';
@@ -212,6 +231,26 @@ const BotCard = ({ bot, onToggle, onConfigure, onViewLogs }: { bot: BotConfig; o
              <span>{bot.stats.currentDailyActions} / {bot.stats.maxDailyActions} Actions</span>
           </div>
         </div>
+        
+        {/* Integration Stats Section */}
+        {bot.stats.itemsCreated && bot.stats.itemsCreated > 0 && (
+           <div className="mb-4 bg-gray-50 rounded-xl p-3 border border-gray-100 flex items-center justify-between">
+              <div>
+                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                    {bot.type === BotType.Creator ? 'Generated Assets' : 'Total Interactions'}
+                 </p>
+                 <p className="text-lg font-bold text-gray-800">
+                    {bot.stats.itemsCreated.toLocaleString()}
+                 </p>
+              </div>
+              <button 
+                 onClick={onViewWork}
+                 className="px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-bold text-blue-600 hover:bg-blue-50 transition-colors flex items-center gap-1"
+              >
+                 View All <ChevronRight className="w-3 h-3" />
+              </button>
+           </div>
+        )}
 
         {/* Live Feed (Replaces Terminal) */}
         <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-1 flex-1 min-h-[140px] border border-black/5 shadow-inner flex flex-col">
@@ -433,12 +472,23 @@ interface BotConfigModalProps {
 const BotConfigModal: React.FC<BotConfigModalProps> = ({ bot, onClose, onSave }) => {
   // Local state for editing form
   const [config, setConfig] = useState<BotSpecificConfig>({ ...bot.config });
-  const [activeTab, setActiveTab] = useState<'General' | 'Safety'>('General');
+  const [aiStrategy, setAiStrategy] = useState<AIStrategyConfig>({
+    creativityLevel: 'Medium',
+    brandVoice: 'Professional',
+    keywordsToInclude: [],
+    topicsToAvoid: [],
+    ...bot.config.aiStrategy // Merge existing strategy
+  });
+  const [activeTab, setActiveTab] = useState<'General' | 'Strategy' | 'Safety'>('General');
   const [interval, setInterval] = useState(bot.intervalMinutes);
   
   // Helper to update specific config fields
   const updateConfig = (key: keyof BotSpecificConfig, value: any) => {
     setConfig(prev => ({ ...prev, [key]: value }));
+  };
+
+  const updateStrategy = (key: keyof AIStrategyConfig, value: any) => {
+    setAiStrategy(prev => ({ ...prev, [key]: value }));
   };
 
   const handleSave = () => {
@@ -448,7 +498,10 @@ const BotConfigModal: React.FC<BotConfigModalProps> = ({ bot, onClose, onSave })
     onSave({
       ...bot,
       intervalMinutes: interval,
-      config: config,
+      config: {
+        ...config,
+        aiStrategy: aiStrategy
+      },
       stats: {
          ...bot.stats,
          maxDailyActions: maxDaily
@@ -592,6 +645,117 @@ const BotConfigModal: React.FC<BotConfigModalProps> = ({ bot, onClose, onSave })
     </div>
   );
 
+  const renderStrategyFields = () => (
+    <div className="space-y-6">
+       <div className="bg-purple-50 p-4 rounded-xl border border-purple-100 flex gap-3">
+          <BrainCircuit className="w-5 h-5 text-purple-600 shrink-0 mt-0.5" />
+          <div>
+             <h4 className="text-sm font-bold text-purple-800">AI Strategy</h4>
+             <p className="text-xs text-purple-700 mt-1 leading-relaxed">
+                Configure how Gemini generates content. These settings help maintain a consistent brand voice.
+             </p>
+          </div>
+       </div>
+
+       {/* Creativity Level */}
+       <div>
+          <label className="flex items-center justify-between text-xs font-bold text-gray-500 uppercase mb-2">
+             <span>Creativity (Temperature)</span>
+             <span className="text-purple-600">{aiStrategy.creativityLevel}</span>
+          </label>
+          <div className="flex items-center gap-4 bg-gray-50 p-3 rounded-xl border border-gray-100">
+             <span className="text-xs font-bold text-gray-400">Factual</span>
+             <input 
+               type="range" min="0" max="2" step="1"
+               value={aiStrategy.creativityLevel === 'Low' ? 0 : aiStrategy.creativityLevel === 'Medium' ? 1 : 2}
+               onChange={(e) => {
+                  const val = parseInt(e.target.value);
+                  updateStrategy('creativityLevel', val === 0 ? 'Low' : val === 1 ? 'Medium' : 'High');
+               }}
+               className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-purple-600"
+             />
+             <span className="text-xs font-bold text-gray-400">Creative</span>
+          </div>
+       </div>
+
+       {/* Brand Voice */}
+       <div>
+          <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Brand Voice</label>
+          <div className="flex flex-wrap gap-2">
+             {['Professional', 'Friendly', 'Witty', 'Empathetic', 'Urgent', 'Technical'].map(voice => (
+                <button
+                   key={voice}
+                   onClick={() => updateStrategy('brandVoice', voice)}
+                   className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
+                      aiStrategy.brandVoice === voice 
+                      ? 'bg-purple-600 text-white border-purple-600 shadow-md' 
+                      : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                   }`}
+                >
+                   {voice}
+                </button>
+             ))}
+          </div>
+       </div>
+
+       {/* Keywords to Include */}
+       <div>
+          <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Push Keywords</label>
+          <div className="flex flex-wrap gap-2 p-3 bg-white border border-gray-200 rounded-xl focus-within:ring-2 focus-within:ring-purple-500/20 transition-shadow">
+             {aiStrategy.keywordsToInclude.map((kw, i) => (
+                <span key={i} className="flex items-center gap-1 px-2 py-1 bg-green-50 text-green-700 rounded-md text-xs font-bold border border-green-100">
+                   {kw}
+                   <button onClick={() => updateStrategy('keywordsToInclude', aiStrategy.keywordsToInclude.filter((_, idx) => idx !== i))} className="hover:bg-green-100 rounded-full p-0.5"><X className="w-3 h-3" /></button>
+                </span>
+             ))}
+             <input 
+               type="text" 
+               placeholder="Add keyword..." 
+               className="flex-1 min-w-[100px] text-sm outline-none bg-transparent"
+               onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                     const val = e.currentTarget.value.trim();
+                     if (val && !aiStrategy.keywordsToInclude.includes(val)) {
+                        updateStrategy('keywordsToInclude', [...aiStrategy.keywordsToInclude, val]);
+                        e.currentTarget.value = '';
+                     }
+                  }
+               }}
+             />
+          </div>
+          <p className="text-[10px] text-gray-400 mt-1">AI will prioritize these terms in generated content.</p>
+       </div>
+
+       {/* Topics to Avoid */}
+       <div>
+          <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Negative Constraints (Avoid)</label>
+          <div className="flex flex-wrap gap-2 p-3 bg-white border border-gray-200 rounded-xl focus-within:ring-2 focus-within:ring-red-500/20 transition-shadow">
+             {aiStrategy.topicsToAvoid.map((topic, i) => (
+                <span key={i} className="flex items-center gap-1 px-2 py-1 bg-red-50 text-red-700 rounded-md text-xs font-bold border border-red-100">
+                   {topic}
+                   <button onClick={() => updateStrategy('topicsToAvoid', aiStrategy.topicsToAvoid.filter((_, idx) => idx !== i))} className="hover:bg-red-100 rounded-full p-0.5"><X className="w-3 h-3" /></button>
+                </span>
+             ))}
+             <input 
+               type="text" 
+               placeholder="Add topic..." 
+               className="flex-1 min-w-[100px] text-sm outline-none bg-transparent"
+               onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                     const val = e.currentTarget.value.trim();
+                     if (val && !aiStrategy.topicsToAvoid.includes(val)) {
+                        updateStrategy('topicsToAvoid', [...aiStrategy.topicsToAvoid, val]);
+                        e.currentTarget.value = '';
+                     }
+                  }
+               }}
+             />
+          </div>
+          <p className="text-[10px] text-gray-400 mt-1">AI will strictly avoid these subjects.</p>
+       </div>
+    </div>
+  );
+
   const renderSafetyFields = () => (
     <div className="space-y-6">
        {/* Global Warning */}
@@ -708,24 +872,30 @@ const BotConfigModal: React.FC<BotConfigModalProps> = ({ bot, onClose, onSave })
           </div>
 
           {/* Tabs */}
-          <div className="flex border-b border-gray-100 px-6">
+          <div className="flex border-b border-gray-100 px-6 overflow-x-auto no-scrollbar">
              <button 
                 onClick={() => setActiveTab('General')}
-                className={`py-3 px-4 text-sm font-bold border-b-2 transition-colors ${activeTab === 'General' ? 'border-black text-black' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
+                className={`py-3 px-4 text-sm font-bold border-b-2 transition-colors whitespace-nowrap ${activeTab === 'General' ? 'border-black text-black' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
              >
                 General Settings
              </button>
              <button 
-                onClick={() => setActiveTab('Safety')}
-                className={`py-3 px-4 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'Safety' ? 'border-red-500 text-red-600' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
+                onClick={() => setActiveTab('Strategy')}
+                className={`py-3 px-4 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 whitespace-nowrap ${activeTab === 'Strategy' ? 'border-purple-600 text-purple-600' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
              >
-                <Shield className="w-4 h-4" /> Safety & Throttling
+                <BrainCircuit className="w-4 h-4" /> AI Strategy
+             </button>
+             <button 
+                onClick={() => setActiveTab('Safety')}
+                className={`py-3 px-4 text-sm font-bold border-b-2 transition-colors flex items-center gap-2 whitespace-nowrap ${activeTab === 'Safety' ? 'border-red-500 text-red-600' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
+             >
+                <Shield className="w-4 h-4" /> Safety
              </button>
           </div>
 
           <div className="p-6 overflow-y-auto custom-scrollbar flex-1">
              
-             {activeTab === 'General' ? (
+             {activeTab === 'General' && (
                 <>
                    {/* Common Settings */}
                    <div className="mb-6">
@@ -751,9 +921,11 @@ const BotConfigModal: React.FC<BotConfigModalProps> = ({ bot, onClose, onSave })
                    {bot.type === BotType.Finder && renderFinderFields()}
                    {bot.type === BotType.Growth && renderGrowthFields()}
                 </>
-             ) : (
-                renderSafetyFields()
              )}
+
+             {activeTab === 'Strategy' && renderStrategyFields()}
+
+             {activeTab === 'Safety' && renderSafetyFields()}
           </div>
 
           <div className="p-6 border-t border-gray-100 bg-gray-50 rounded-b-[32px] flex justify-end gap-3">

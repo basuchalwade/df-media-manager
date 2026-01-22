@@ -36,11 +36,19 @@ export interface Post {
   mediaUrl?: string;
   mediaType?: 'image' | 'video'; // Explicit type
   generatedByAi: boolean;
+  author?: 'User' | BotType; // Track authorship
   engagement?: {
     likes: number;
     shares: number;
     comments: number;
   };
+}
+
+export interface AIStrategyConfig {
+  creativityLevel: 'Low' | 'Medium' | 'High'; // Maps to Temperature 0.2, 0.7, 1.0
+  brandVoice: string; // e.g., 'Professional', 'Witty', 'Empathetic'
+  keywordsToInclude: string[];
+  topicsToAvoid: string[];
 }
 
 export interface BotSpecificConfig {
@@ -75,6 +83,9 @@ export interface BotSpecificConfig {
   minDelaySeconds?: number;
   maxDelaySeconds?: number;
   stopOnConsecutiveErrors?: number;
+
+  // New AI Strategy
+  aiStrategy?: AIStrategyConfig;
 }
 
 export type BotStatus = 'Idle' | 'Running' | 'Cooldown' | 'LimitReached' | 'Error';
@@ -102,6 +113,7 @@ export interface BotConfig {
     maxDailyActions: number;
     consecutiveErrors: number;
     cooldownEndsAt?: string; // ISO String if in cooldown
+    itemsCreated?: number; // Track artifacts produced (Drafts, Leads, etc.)
   };
 }
 

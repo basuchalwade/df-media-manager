@@ -10,6 +10,7 @@ const INITIAL_POSTS: Post[] = [
     scheduledFor: new Date().toISOString(),
     status: PostStatus.Published,
     generatedByAi: false,
+    author: 'User',
     mediaUrl: 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80',
     mediaType: 'image',
     engagement: { likes: 120, shares: 34, comments: 12 }
@@ -21,6 +22,7 @@ const INITIAL_POSTS: Post[] = [
     scheduledFor: new Date(Date.now() + 86400000).toISOString(),
     status: PostStatus.Scheduled,
     generatedByAi: true,
+    author: BotType.Creator,
   },
   {
     id: '3',
@@ -29,8 +31,27 @@ const INITIAL_POSTS: Post[] = [
     scheduledFor: new Date(Date.now() + 172800000).toISOString(),
     status: PostStatus.Draft,
     generatedByAi: false,
+    author: 'User',
     mediaUrl: 'https://www.w3schools.com/html/mov_bbb.mp4',
     mediaType: 'video'
+  },
+  {
+    id: '4',
+    content: '5 Tips for Better Productivity using AI Tools. 🧵👇 #Productivity',
+    platforms: [Platform.Twitter, Platform.LinkedIn],
+    scheduledFor: new Date(Date.now() + 250000000).toISOString(),
+    status: PostStatus.Draft,
+    generatedByAi: true,
+    author: BotType.Creator,
+  },
+  {
+    id: '5',
+    content: 'Why Design Systems Matter in 2025. A deep dive.',
+    platforms: [Platform.LinkedIn],
+    scheduledFor: new Date(Date.now() + 300000000).toISOString(),
+    status: PostStatus.Draft,
+    generatedByAi: true,
+    author: BotType.Creator,
   }
 ];
 
@@ -40,7 +61,7 @@ const generateLogs = (count: number, type: BotType): BotLogEntry[] => {
   const now = new Date();
   
   const messages = {
-    [BotType.Creator]: ['Drafted post for LinkedIn', 'Checked content calendar', 'Analyzing trending topics', 'Content generation successful'],
+    [BotType.Creator]: ['Drafted post for LinkedIn', 'Checked content calendar', 'Analyzing trending topics', 'Content generation successful', 'Added 3 new drafts to Studio'],
     [BotType.Engagement]: ['Replied to @user123', 'Liked post #882', 'Checked for new mentions', 'Daily limit warning'],
     [BotType.Finder]: ['Scanned 50 tweets', 'Found new competitor activity', 'Saved draft to library', 'Keyword alert: "AI"'],
     [BotType.Growth]: ['Followed @dev_jane', 'Unfollowed inactive user', 'API Rate Limit (429) detected', 'Cooling down']
@@ -56,7 +77,7 @@ const generateLogs = (count: number, type: BotType): BotLogEntry[] => {
     let level: LogLevel = 'Info';
     if (msg.includes('warning') || msg.includes('Limit')) level = 'Warning';
     if (msg.includes('Error') || msg.includes('Failed')) level = 'Error';
-    if (msg.includes('Successful') || msg.includes('Saved') || msg.includes('Drafted')) level = 'Success';
+    if (msg.includes('Successful') || msg.includes('Saved') || msg.includes('Drafted') || msg.includes('Added')) level = 'Success';
 
     logs.push({
       id: `log-${i}-${type}`,
@@ -78,7 +99,8 @@ const INITIAL_BOTS: BotConfig[] = [
     stats: {
       currentDailyActions: 12,
       maxDailyActions: 50,
-      consecutiveErrors: 0
+      consecutiveErrors: 0,
+      itemsCreated: 3 // 3 Drafts
     },
     config: {
       contentTopics: ['SaaS', 'AI', 'Marketing'],
@@ -86,7 +108,13 @@ const INITIAL_BOTS: BotConfig[] = [
       generationMode: 'AI',
       workHoursStart: '09:00',
       workHoursEnd: '17:00',
-      safetyLevel: 'Moderate'
+      safetyLevel: 'Moderate',
+      aiStrategy: {
+        creativityLevel: 'High',
+        brandVoice: 'Professional',
+        keywordsToInclude: ['Innovation', 'Growth'],
+        topicsToAvoid: ['Politics', 'Competitors']
+      }
     }
   },
   { 
@@ -98,7 +126,8 @@ const INITIAL_BOTS: BotConfig[] = [
     stats: {
       currentDailyActions: 150,
       maxDailyActions: 150,
-      consecutiveErrors: 0
+      consecutiveErrors: 0,
+      itemsCreated: 150 // Interactions
     },
     config: {
       replyToMentions: true,
@@ -107,7 +136,13 @@ const INITIAL_BOTS: BotConfig[] = [
       enableAutoLike: true,
       maxDailyInteractions: 150,
       mutedKeywords: ['NSFW', 'Spam', 'Crypto'],
-      safetyLevel: 'Aggressive'
+      safetyLevel: 'Aggressive',
+      aiStrategy: {
+        creativityLevel: 'Medium',
+        brandVoice: 'Helpful',
+        keywordsToInclude: [],
+        topicsToAvoid: ['Controversial']
+      }
     }
   },
   { 
@@ -119,7 +154,8 @@ const INITIAL_BOTS: BotConfig[] = [
     stats: {
       currentDailyActions: 0,
       maxDailyActions: 100,
-      consecutiveErrors: 0
+      consecutiveErrors: 0,
+      itemsCreated: 0
     },
     config: {
       trackKeywords: ['Artificial Intelligence', 'Machine Learning'],
@@ -138,7 +174,8 @@ const INITIAL_BOTS: BotConfig[] = [
       currentDailyActions: 45,
       maxDailyActions: 200,
       consecutiveErrors: 2,
-      cooldownEndsAt: new Date(Date.now() + 45 * 60000).toISOString()
+      cooldownEndsAt: new Date(Date.now() + 45 * 60000).toISOString(),
+      itemsCreated: 45 // Follows
     },
     config: {
       growthTags: ['#FollowFriday', '#TechCommunity'],

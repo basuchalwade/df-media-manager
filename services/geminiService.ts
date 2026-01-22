@@ -1,5 +1,6 @@
+
 import { GoogleGenAI } from "@google/genai";
-import { Platform } from '../types';
+import { Platform, AIStrategyConfig } from '../types';
 
 const API_KEY = process.env.API_KEY || '';
 
@@ -9,25 +10,39 @@ const ai = new GoogleGenAI({ apiKey: API_KEY });
 export const generatePostContent = async (
   topic: string,
   platform: string,
-  tone: string = 'Professional'
+  tone: string = 'Professional',
+  strategy?: AIStrategyConfig
 ): Promise<string> => {
   if (!API_KEY) {
     console.warn("Gemini API Key missing. Returning mock data.");
     return `[MOCK] This is a simulated AI post about ${topic} for ${platform} with a ${tone} tone. Please configure API_KEY in .env to use real Gemini AI.`;
   }
 
+  // Map Creativity to Temperature
+  let temperature = 0.7;
+  if (strategy?.creativityLevel === 'Low') temperature = 0.2;
+  if (strategy?.creativityLevel === 'High') temperature = 1.0;
+
   try {
-    const prompt = `
+    let prompt = `
       You are an expert social media manager using the ContentCaster platform by Dossiefoyer.
-      Task: Write a ${tone.toLowerCase()} social media post about "${topic}".
+      Task: Write a social media post about "${topic}".
       Platform: ${platform}.
-      
+      Tone: ${strategy?.brandVoice || tone}.
+    `;
+
+    if (strategy?.keywordsToInclude?.length) {
+      prompt += `\nInclude these keywords: ${strategy.keywordsToInclude.join(', ')}.`;
+    }
+
+    if (strategy?.topicsToAvoid?.length) {
+      prompt += `\nStrictly AVOID mentioning: ${strategy.topicsToAvoid.join(', ')}.`;
+    }
+
+    prompt += `
       Constraints:
       - Language: English only
-      - Tone: Positive, Motivational, Friendly
-      - Topics allowed: Technology, Space, Sports, Movies
       - Length: Optimized for ${platform}
-      - Include 2-3 relevant hashtags.
       - Do not include introductory text, just the post content.
     `;
 
@@ -35,6 +50,7 @@ export const generatePostContent = async (
       model: 'gemini-3-flash-preview',
       contents: prompt,
       config: {
+        temperature: temperature,
         thinkingConfig: { thinkingBudget: 0 }, // Disable thinking for faster content generation
       }
     });
