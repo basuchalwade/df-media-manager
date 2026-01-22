@@ -145,15 +145,14 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
             // Schedule
             if (post.scheduledFor) {
                const date = new Date(post.scheduledFor);
-               if (date > new Date()) {
-                  setScheduleMode('later');
-                  setScheduledDate(date);
-                  let h = date.getHours();
-                  const p = h >= 12 ? 'PM' : 'AM';
-                  h = h % 12;
-                  h = h ? h : 12;
-                  setTimeState({ hour: h.toString().padStart(2, '0'), minute: date.getMinutes().toString().padStart(2, '0'), period: p });
-               }
+               // FIX: Always load the schedule, even if past, to show correct edit state
+               setScheduleMode('later');
+               setScheduledDate(date);
+               let h = date.getHours();
+               const p = h >= 12 ? 'PM' : 'AM';
+               h = h % 12;
+               h = h ? h : 12;
+               setTimeState({ hour: h.toString().padStart(2, '0'), minute: date.getMinutes().toString().padStart(2, '0'), period: p });
             }
             
             setSyncStatus('synced'); // Initially synced
@@ -639,6 +638,16 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
     const m = (date.getMonth() + 1).toString().padStart(2, '0');
     const d = date.getDate().toString().padStart(2, '0');
     return `${y}-${m}-${d}`;
+  };
+
+  // Helper for min date
+  const getMinDate = () => {
+    const today = new Date();
+    // If current scheduled date is before today (editing past post), allow it as min to avoid UI errors
+    if (scheduledDate < today) {
+        return getFormattedDateValue(scheduledDate);
+    }
+    return getFormattedDateValue(today);
   };
 
   // Preview Truncation
@@ -1322,16 +1331,16 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
                        </span>
                        <input 
                           type="date"
-                          min={getFormattedDateValue(new Date())}
+                          min={getMinDate()} // Use helper
                           value={getFormattedDateValue(scheduledDate)}
                           onChange={(e) => {
                              if(e.target.value) {
-                                const parts = e.target.value.split('-').map(Number);
+                                const [year, month, day] = e.target.value.split('-').map(Number);
                                 const newDate = new Date(scheduledDate);
-                                newDate.setFullYear(parts[0]);
-                                newDate.setMonth(parts[1] - 1);
-                                newDate.setDate(parts[2]);
+                                // Atomic update of date components to prevent rollover issues (e.g. Jan 31 -> Feb)
+                                newDate.setFullYear(year, month - 1, day);
                                 setScheduledDate(newDate);
+                                setSyncStatus('modified');
                              }
                           }}
                           onClick={(e) => {

@@ -16,20 +16,45 @@ services:
     networks:
       - app_network
 
-  # Backend Service (Node.js + Prisma)
+  # Backend Service (API Gateway)
   backend:
     image: node:18-alpine
     working_dir: /app
-    command: sh -c "npm install && npx prisma generate && npx ts-node server.ts"
+    command: sh -c "npm install && npx prisma generate && npx ts-node src/server.ts"
     volumes:
       - ./backend:/app
     ports:
       - "8000:8000"
     environment:
       - DATABASE_URL=postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-password}@postgres:5432/${DB_NAME:-contentcaster}?schema=public
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - SIMULATION_MODE=${SIMULATION_MODE:-false}
       - PORT=8000
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - app_network
+
+  # Worker Service (Background Jobs)
+  worker:
+    image: node:18-alpine
+    working_dir: /app
+    command: sh -c "npm install && npx prisma generate && npx ts-node src/worker.ts"
+    volumes:
+      - ./backend:/app
+    environment:
+      - DATABASE_URL=postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-password}@postgres:5432/${DB_NAME:-contentcaster}?schema=public
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - SIMULATION_MODE=${SIMULATION_MODE:-false}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     networks:
       - app_network
@@ -53,8 +78,24 @@ services:
     networks:
       - app_network
 
+  # Cache Service (Redis)
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app_network
+
 volumes:
   postgres_data:
+  redis_data:
 
 networks:
   app_network:

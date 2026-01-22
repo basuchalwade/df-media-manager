@@ -5,7 +5,7 @@ import {
   Eye, LayoutList, Grid3X3,
   Globe, Zap, CheckCircle2, RotateCcw, AlertTriangle, Archive, FileEdit, Check, 
   User, Bot, Clock, CalendarDays, Trash2, X, Search, Filter, 
-  ArrowRight, Sparkles, AlertOctagon, MoreHorizontal, CalendarRange, Copy
+  ArrowRight, Sparkles, AlertOctagon, MoreHorizontal, CalendarRange, Copy, Loader2
 } from 'lucide-react';
 import { store } from '../services/mockStore';
 import { Post, Platform, PostStatus, PageProps, BotType } from '../types';
@@ -18,6 +18,7 @@ const STATUS_CONFIG: Record<PostStatus, { icon: any, color: string, bg: string, 
   [PostStatus.NeedsReview]: { icon: Eye, color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-200', label: 'Review' },
   [PostStatus.Approved]: { icon: CheckCircle2, color: 'text-indigo-600', bg: 'bg-indigo-50', border: 'border-indigo-200', label: 'Approved' },
   [PostStatus.Scheduled]: { icon: Clock, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-200', label: 'Scheduled' },
+  [PostStatus.Processing]: { icon: Loader2, color: 'text-purple-600', bg: 'bg-purple-50', border: 'border-purple-200', label: 'Processing' },
   [PostStatus.Published]: { icon: Zap, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-200', label: 'Published' },
   [PostStatus.Failed]: { icon: AlertTriangle, color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-200', label: 'Failed' },
   [PostStatus.Archived]: { icon: Archive, color: 'text-slate-400', bg: 'bg-slate-50', border: 'border-slate-200', label: 'Archived' },

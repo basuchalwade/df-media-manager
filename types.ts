@@ -21,6 +21,7 @@ export enum PostStatus {
   NeedsReview = 'Needs Review',
   Approved = 'Approved',
   Scheduled = 'Scheduled',
+  Processing = 'Processing', // Added for Worker state
   Published = 'Published',
   Failed = 'Failed',
   Archived = 'Archived',
