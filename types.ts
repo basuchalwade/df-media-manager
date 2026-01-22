@@ -6,7 +6,7 @@ export enum Platform {
   Threads = 'Threads',
   LinkedIn = 'LinkedIn',
   YouTube = 'YouTube',
-  Discord = 'Discord',
+  GoogleBusiness = 'Google Business',
 }
 
 export enum BotType {

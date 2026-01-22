@@ -8,7 +8,7 @@ export const PLATFORM_LIMITS: Record<Platform, number> = {
   [Platform.Facebook]: 63206,
   [Platform.Threads]: 500,
   [Platform.YouTube]: 5000,
-  [Platform.Discord]: 2000,
+  [Platform.GoogleBusiness]: 1500,
 };
 
 export const validatePost = (

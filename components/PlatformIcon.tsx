@@ -1,5 +1,6 @@
+
 import React from 'react';
-import { Twitter, Facebook, Instagram, Linkedin, Youtube, Disc, AtSign, Share2, Layers } from 'lucide-react';
+import { Twitter, Facebook, Instagram, Linkedin, Youtube, MapPin, AtSign, Share2, Layers } from 'lucide-react';
 import { Platform } from '../types';
 
 interface PlatformIconProps {
@@ -18,7 +19,7 @@ export const PlatformIcon: React.FC<PlatformIconProps> = ({ platform, size = 18,
       case Platform.Instagram: return 'text-pink-600';
       case Platform.LinkedIn: return 'text-blue-700';
       case Platform.YouTube: return 'text-red-600';
-      case Platform.Discord: return 'text-indigo-500';
+      case Platform.GoogleBusiness: return 'text-blue-600';
       case Platform.Threads: return 'text-slate-900';
       case 'All': return 'text-slate-600';
       default: return 'text-slate-400';
@@ -39,8 +40,8 @@ export const PlatformIcon: React.FC<PlatformIconProps> = ({ platform, size = 18,
       return <Linkedin size={size} className={finalClass} />;
     case Platform.YouTube:
       return <Youtube size={size} className={finalClass} />;
-    case Platform.Discord:
-      return <Disc size={size} className={finalClass} />;
+    case Platform.GoogleBusiness:
+      return <MapPin size={size} className={finalClass} />;
     case Platform.Threads:
       return <AtSign size={size} className={finalClass} />;
     case 'All':

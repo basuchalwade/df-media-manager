@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { BarChart3, TrendingUp, Users, Eye, ArrowUp, ArrowDown, Activity } from 'lucide-react';
 import { store } from '../services/mockStore';
@@ -163,6 +164,7 @@ export const Analytics: React.FC = () => {
                {selectedPlatform === 'Twitter' && " Short-form content posted between 9AM-11AM is performing best."}
                {selectedPlatform === 'LinkedIn' && " Professional case studies are generating 2x more shares."}
                {selectedPlatform === 'Instagram' && " Reels are outperforming static images by 40%."}
+               {selectedPlatform === 'Google Business' && " Updates with 'Offer' CTAs are driving 20% more clicks to your site."}
                {selectedPlatform === 'All' && " We recommend increasing video content frequency across all channels to sustain this growth."}
              </p>
           </div>

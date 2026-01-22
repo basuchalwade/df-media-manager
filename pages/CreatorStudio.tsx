@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Sparkles, Send, Calendar as CalendarIcon, RotateCcw, Image as ImageIcon, ChevronDown, CheckCircle, Briefcase, Smile, Rocket, GraduationCap, X, FileVideo, Clock, Save, AlertCircle, Check, Zap, Eye, Copy, Hash, MoreHorizontal, ThumbsUp, MessageSquare, Share2, Repeat, Bookmark, Globe, Heart, Layers, UploadCloud, RefreshCw, ShieldCheck, AlertTriangle, Bot, Info, Cloud, CheckSquare, Plus, Split, ExternalLink } from 'lucide-react';
+import { Sparkles, Send, Calendar as CalendarIcon, RotateCcw, Image as ImageIcon, ChevronDown, CheckCircle, Briefcase, Smile, Rocket, GraduationCap, X, FileVideo, Clock, Save, AlertCircle, Check, Zap, Eye, Copy, Hash, MoreHorizontal, ThumbsUp, MessageSquare, Share2, Repeat, Bookmark, Globe, Heart, Layers, UploadCloud, RefreshCw, ShieldCheck, AlertTriangle, Bot, Info, Cloud, CheckSquare, Plus, Split, ExternalLink, MapPin } from 'lucide-react';
 import { generatePostContent, generatePostVariants, generateHashtags, validateContentSafety } from '../services/geminiService';
 import { validatePost, PLATFORM_LIMITS } from '../services/validationService';
 import { store } from '../services/mockStore';
@@ -256,6 +256,7 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
     if (contextPlatform === Platform.Twitter) constraints += " Use thread-style brevity if needed, focus on impact. No intro fluff.";
     if (contextPlatform === Platform.Instagram) constraints += " Write an engaging caption. Assume visuals are attached.";
     if (contextPlatform === Platform.YouTube) constraints += " Write a compelling video description with a clear CTA.";
+    if (contextPlatform === Platform.GoogleBusiness) constraints += " Keep it local and actionable. Focus on updates, offers, or events.";
 
     return {
         contextPlatform,
@@ -761,6 +762,28 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
                    <br />
                    {displayContent}
                 </div>
+             </div>
+          </div>
+        );
+
+      case Platform.GoogleBusiness:
+        return (
+          <div className="bg-white p-4">
+             <div className="bg-white border rounded-lg shadow-sm p-4 max-w-sm mx-auto mt-4">
+                <div className="flex items-center gap-3 mb-3">
+                   <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold text-lg">B</div>
+                   <div>
+                      <div className="font-bold text-sm">Your Business Name</div>
+                      <div className="text-xs text-gray-500">Just now</div>
+                   </div>
+                </div>
+                <div className="text-sm text-gray-800 mb-3 whitespace-pre-wrap">{displayContent || "Your update text goes here..."}</div>
+                {selectedMedia && (
+                   <div className="rounded-lg overflow-hidden border border-gray-200 mb-3">
+                      {commonMedia}
+                   </div>
+                )}
+                <button className="w-full py-2 bg-blue-50 text-blue-700 font-bold text-sm rounded-lg border border-blue-100">Learn more</button>
              </div>
           </div>
         );
