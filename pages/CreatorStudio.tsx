@@ -4,7 +4,7 @@ import { Sparkles, Send, Calendar as CalendarIcon, RotateCcw, Image as ImageIcon
 import { generatePostContent, generatePostVariants, generateHashtags, validateContentSafety } from '../services/geminiService';
 import { validatePost, PLATFORM_LIMITS } from '../services/validationService';
 import { store } from '../services/mockStore';
-import { Platform, PostStatus, MediaItem, Post, PageProps, BotType, PostVariant } from '../types';
+import { Platform, PostStatus, MediaItem, Post, PageProps, BotType, PostVariant, BotConfig } from '../types';
 import { PlatformIcon } from '../components/PlatformIcon';
 import { MediaPicker } from '../components/MediaPicker';
 
@@ -62,12 +62,14 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
   const [autoEngage, setAutoEngage] = useState(false);
   const [isAiGenerated, setIsAiGenerated] = useState(false);
   const [bypassSafety, setBypassSafety] = useState(false); // Deep Sync: Safety Override
+  const [bots, setBots] = useState<BotConfig[]>([]);
 
   // --- UI State ---
   const [previewPlatform, setPreviewPlatform] = useState<Platform>(Platform.Twitter);
   const [isMediaPickerOpen, setIsMediaPickerOpen] = useState(false);
   const [mediaPickerMode, setMediaPickerMode] = useState<'main' | 'thumbnail'>('main');
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [validationWarnings, setValidationWarnings] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   
   // --- Safety Check State ---
@@ -77,6 +79,8 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
 
   // Initialize from Navigation Params
   useEffect(() => {
+    store.getBots().then(setBots); // Load bots for validation
+
     if (params) {
       if (params.postId) {
         // Edit Mode
@@ -185,9 +189,34 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
 
   // Validation Logic (Shared)
   useEffect(() => {
-    const errors = validatePost(content, selectedPlatforms, selectedMedia, isCarousel, youtubeTitle);
+    let checkDate: Date | undefined = undefined;
+    if (scheduleMode === 'later') {
+      checkDate = new Date(scheduledDate);
+      let hours = parseInt(timeState.hour);
+      if (timeState.period === 'PM' && hours !== 12) hours += 12;
+      else if (timeState.period === 'AM' && hours === 12) hours = 0;
+      checkDate.setHours(hours, parseInt(timeState.minute), 0, 0);
+    }
+
+    const { errors, warnings } = validatePost(content, selectedPlatforms, selectedMedia, isCarousel, youtubeTitle, checkDate);
+    
+    // Additional Bot Warnings
+    const botWarnings: string[] = [];
+    if (autoEngage) {
+        const engagementBot = bots.find(b => b.type === BotType.Engagement);
+        if (engagementBot) {
+            const usage = engagementBot.stats.currentDailyActions / engagementBot.stats.maxDailyActions;
+            if (usage >= 0.9) {
+                botWarnings.push("Engagement Bot daily limit nearly reached (>90%). Auto-replies may be skipped.");
+            } else if (usage >= 0.8) {
+                botWarnings.push("Engagement Bot usage is high (>80%).");
+            }
+        }
+    }
+
     setValidationErrors(errors);
-  }, [content, selectedPlatforms, youtubeTitle, selectedMedia, isCarousel]);
+    setValidationWarnings([...warnings, ...botWarnings]);
+  }, [content, selectedPlatforms, youtubeTitle, selectedMedia, isCarousel, scheduledDate, timeState, scheduleMode, autoEngage, bots]);
 
   // Change Detection for Sync Status
   useEffect(() => {
@@ -830,6 +859,28 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
          </div>
       )}
 
+      {/* Conflict Warnings Section */}
+      {validationWarnings.length > 0 && (
+         <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4 animate-in slide-in-from-top-2 shadow-sm">
+             <div className="flex items-start gap-3">
+                <div className="bg-yellow-100 p-2 rounded-lg text-yellow-700 shrink-0">
+                   <AlertTriangle className="w-5 h-5" />
+                </div>
+                <div className="flex-1">
+                   <h3 className="text-sm font-bold text-yellow-900 uppercase tracking-wide mb-1">Optimization Warnings</h3>
+                   <ul className="space-y-1">
+                      {validationWarnings.map((warning, idx) => (
+                         <li key={idx} className="text-sm text-yellow-800 font-medium flex items-start gap-2">
+                            <span className="mt-1.5 w-1.5 bg-yellow-500 rounded-full shrink-0" />
+                            {warning}
+                         </li>
+                      ))}
+                   </ul>
+                </div>
+             </div>
+         </div>
+      )}
+
       <div className="flex flex-col xl:flex-row gap-8 h-full">
         {/* Same Layout as before, just state wired up */}
         
@@ -1304,14 +1355,17 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
                  </div>
                  
                  {/* Live Warning Overlay */}
-                 {validationErrors.length > 0 && (
-                    <div className="absolute bottom-4 left-4 right-4 bg-red-500/90 backdrop-blur-md text-white p-3 rounded-xl shadow-lg animate-in slide-in-from-bottom-2 z-50">
+                 {(validationErrors.length > 0 || validationWarnings.length > 0) && (
+                    <div className={`absolute bottom-4 left-4 right-4 backdrop-blur-md p-3 rounded-xl shadow-lg animate-in slide-in-from-bottom-2 z-50 ${validationErrors.length > 0 ? 'bg-red-500/90 text-white' : 'bg-yellow-500/90 text-black'}`}>
                        <div className="flex items-start gap-2">
                           <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
                           <div className="text-xs font-medium">
-                             <p className="font-bold mb-1">Issues Detected:</p>
+                             <p className="font-bold mb-1">{validationErrors.length > 0 ? 'Errors Detected:' : 'Optimization Tips:'}</p>
                              <ul className="list-disc list-inside opacity-90">
-                                {validationErrors.map((e, i) => <li key={i}>{e}</li>)}
+                                {validationErrors.map((e, i) => <li key={`err-${i}`}>{e}</li>)}
+                                {validationWarnings.length > 0 && validationErrors.length === 0 && (
+                                    validationWarnings.map((w, i) => <li key={`warn-${i}`}>{w}</li>)
+                                )}
                              </ul>
                           </div>
                        </div>
