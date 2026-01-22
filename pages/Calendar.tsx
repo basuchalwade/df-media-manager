@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon, 
@@ -158,20 +157,32 @@ export const Calendar: React.FC<PageProps> = ({ onNavigate, params }) => {
   };
 
   const handleBulkReschedule = (dateStr: string) => {
-    const newDate = new Date(dateStr);
+    if (!dateStr) return;
+    
+    // Explicitly parse parts to avoid UTC/Local timezone shifts
+    const [year, month, day] = dateStr.split('-').map(Number);
+
     performBulkAction(post => {
       const original = new Date(post.scheduledFor);
-      // Keep original time, change date
+      
+      // Construct local date from input
+      const newDate = new Date(year, month - 1, day);
+      
+      // Preserve original time
       newDate.setHours(original.getHours(), original.getMinutes());
+      
       return { ...post, scheduledFor: newDate.toISOString(), status: PostStatus.Scheduled };
     });
+
+    // Reset input value to allow re-selection of same date if needed
+    if (bulkDateInputRef.current) bulkDateInputRef.current.value = '';
   };
 
   const handleBulkMoveWeek = () => {
     performBulkAction(post => {
       const d = new Date(post.scheduledFor);
       d.setDate(d.getDate() + 7);
-      return { ...post, scheduledFor: d.toISOString() };
+      return { ...post, scheduledFor: d.toISOString(), status: PostStatus.Scheduled };
     });
   };
 
@@ -230,7 +241,8 @@ export const Calendar: React.FC<PageProps> = ({ onNavigate, params }) => {
 
     const updatedPost = {
       ...draggedPost,
-      scheduledFor: newDate.toISOString()
+      scheduledFor: newDate.toISOString(),
+      status: PostStatus.Scheduled
     };
 
     // Optimistic Update
@@ -435,7 +447,7 @@ export const Calendar: React.FC<PageProps> = ({ onNavigate, params }) => {
                  <div 
                     key={post.id} 
                     className={`flex gap-4 p-3 rounded-xl border transition-all group cursor-pointer ${
-                        isSelected ? 'bg-blue-50/50 border-blue-200' : 'bg-white border-gray-100 hover:border-blue-200 hover:shadow-sm'
+                        isSelected ? 'bg-blue-50/50 border-blue-200 shadow-sm' : 'bg-white border-gray-100 hover:border-blue-200 hover:shadow-sm'
                     }`}
                     onClick={() => handleEditPost(post)}
                  >
@@ -478,11 +490,11 @@ export const Calendar: React.FC<PageProps> = ({ onNavigate, params }) => {
 
                           {/* Bot/User Icon */}
                           {isBot ? (
-                             <span title="Bot Generated">
+                             <span title="Bot Generated" className="flex items-center">
                                <Bot className="w-3.5 h-3.5 text-purple-500 ml-1" />
                              </span>
                           ) : (
-                             <span title="Manually Created">
+                             <span title="Manually Created" className="flex items-center">
                                <User className="w-3.5 h-3.5 text-gray-400 ml-1" />
                              </span>
                           )}
@@ -518,7 +530,7 @@ export const Calendar: React.FC<PageProps> = ({ onNavigate, params }) => {
                       <input 
                         type="date" 
                         ref={bulkDateInputRef}
-                        className="absolute inset-0 opacity-0 cursor-pointer"
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                         onChange={(e) => handleBulkReschedule(e.target.value)}
                       />
                    </div>
