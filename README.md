@@ -1,172 +1,158 @@
 
 # ContentCaster - Enterprise AI Social Automation Platform
 
-**ContentCaster** (by Dossiefoyer Private Limited) is the industry's most advanced social media command center. Unlike standard scheduling tools, ContentCaster employs **Autonomous AI Agents**, **Deep State Synchronization**, and **Context-Aware Scheduling** to manage high-volume social strategies with military precision.
+**ContentCaster** (by Dossiefoyer Private Limited) is a production-ready, frontend-first social media command center. It leverages **Autonomous AI Agents**, **Deep State Synchronization**, and **Context-Aware Scheduling** to manage high-volume social strategies with military precision.
 
 ![Version](https://img.shields.io/badge/version-2.2.0-blue.svg)
+![React](https://img.shields.io/badge/react-19.0-61DAFB.svg?logo=react&logoColor=white)
+![TypeScript](https://img.shields.io/badge/typescript-5.0-3178C6.svg?logo=typescript&logoColor=white)
+![AI](https://img.shields.io/badge/AI-Gemini%20Flash%202.5-purple)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
-![Status](https://img.shields.io/badge/status-production--ready-success.svg)
-![AI](https://img.shields.io/badge/AI-Gemini%20Pro-purple)
-![Docker](https://img.shields.io/badge/container-ready-blue)
 
 ---
 
-## 🌟 Why ContentCaster? (Key Differentiators)
+## 🏗️ Tech Stack
 
-### 1. 🧠 Deep Sync™ Architecture
-Most tools lose context when you switch between views. ContentCaster maintains a **Deep Sync** state.
-- **Context Preservation**: Start editing in the Calendar, jump to the Creator Studio, and switch platforms without losing your draft, unsaved changes, or safety override settings.
-- **Real-time State**: "Unsaved Changes" indicators track modifications across the entire session until committed to the database.
+This application is built with a modern, performant, and type-safe stack designed for scalability.
 
-### 2. 📅 Intelligent Command Center (Calendar)
-A calendar designed for power users and enterprise teams.
-- **Drag-and-Drop Rescheduling**: Instantly drag posts from one day to another to reschedule. The system automatically preserves the original time slot while updating the date.
-- **Visual Capacity Planning**: Smart indicators (e.g., "2/3") allow you to visualize daily load instantly.
-  - **Orange Outline**: Day is full (at capacity).
-  - **Red Pulse**: Day is over-booked. This acts as a signal for the **Bot Swarm** to halt auto-scheduling for that specific date.
-- **Dynamic Bulk Operations**: Select multiple posts to trigger a "Dynamic Island" floating toolbar.
-  - **Mass Reschedule**: Shift entire campaigns to specific dates.
-  - **Quick +7 Days**: Instantly push content to the next week (perfect for delaying campaigns).
-  - **Bulk Pause**: Revert scheduled posts to drafts in one click.
-  - **Platform Migration**: Bulk convert Twitter posts to LinkedIn posts instantly.
+### Core Framework
+*   **React 19**: Utilizing the latest concurrent features and hooks.
+*   **Vite**: Next-generation frontend tooling for instant HMR and optimized builds.
+*   **TypeScript**: Strict type checking for robustness and maintainability.
 
-### 3. 🤖 Context-Aware Bot Swarm
-Our bots don't just post; they *think* before they act.
-- **Calendar Awareness**: Bots scan your existing calendar load before creating drafts. If a day is marked as full (via the Capacity Indicator), the bot holds back to prevent spamming.
-- **Blackout Dates**: Define holidays, launch days, or crisis periods where bots automatically silence themselves.
-- **Granular Strategy**:
-  - **Creator Bot**: Autonomous drafting based on brand voice (Professional, Viral, Empathetic)..
-  - **Engagement Bot**: Handles replies and likes with daily safety caps.
-  - **Growth Bot**: Executes safe follow/unfollow strategies with cool-down periods.
-- **Safety Throttling**: "Circuit breakers" stop bots immediately upon consecutive API errors or rate limits.
+### UI & Styling
+*   **Tailwind CSS**: Utility-first CSS framework for rapid UI development.
+*   **Lucide React**: consistent, lightweight icon library.
+*   **Recharts**: Composable charting library for analytics visualization.
+*   **Apple-System Fonts**: Native font stack integration for a premium OS-like feel.
 
-### 4. 🎨 Creator Studio Pro
-- **A/B Testing (Variants)**: Generate and manage multiple text variants (Variant A, B, C) for a single post to test hooks.
-- **Platform-Perfect Previews**: High-fidelity rendering for X (Twitter), Instagram (Grid & Carousel), LinkedIn, and YouTube.
-- **AI Copilot**:
-  - **Tone Shifting**: Rewrite content instantly (e.g., "Make it wittier", "Make it professional").
-  - **Viral Hashtags**: Context-aware tag generation.
-- **YouTube Workflow**: First-class support for Video Titles, Thumbnails, and Description formatting.
-
-### 5. 🛡️ Trust & Safety Engine
-An integrated AI layer that audits every keystroke before publication.
-- **Compliance Checks**: Scans for hate speech, violence, NSFW content, and aggressive language.
-- **Platform Policy**: Warns about character limits and aspect ratios (e.g., "Instagram images should be 1:1 or 4:5").
-- **Safety Override**: Admins can explicitly bypass safety checks with audit logging..
+### AI & Logic
+*   **@google/genai**: Official SDK for Google's Gemini models (Flash 2.5 & Pro).
+*   **Service Layer Pattern**: Decoupled business logic via `services/` directory.
+*   **Deep Sync™ State**: Custom state management ensuring draft persistence across views.
 
 ---
 
-## 🛠️ Installation & Local Development
+## 📐 System Architecture
+
+ContentCaster follows a **Service-Oriented Frontend Architecture (SOFA)**.
+
+### 1. The Service Layer (`/services`)
+Instead of embedding logic in components, all business logic lives in singleton services:
+*   **`mockStore.ts`**: Acts as the "Backend-in-a-Box". It simulates database CRUD operations, API latency, and relational data integrity (Users <-> Posts <-> Bots). It is designed to be easily swapped with a real GraphQL/REST client.
+*   **`geminiService.ts`**: Encapsulates all AI interaction. It handles prompt engineering, context injection (date, tone, platform constraints), and JSON schema enforcement.
+*   **`validationService.ts`**: Centralized validation logic for platform-specific rules (e.g., Twitter 280 char limit, Instagram aspect ratios).
+
+### 2. The Bot Swarm Engine
+The application simulates autonomous agents using a State Machine pattern within `mockStore`:
+*   **States**: `Idle` -> `Running` -> `Cooldown` -> `LimitReached` -> `Error`.
+*   **Logic**: Bots respect global constraints (Calendar blackouts, Daily Action Limits) before executing.
+*   **Simulation**: The `generateLogs` utility creates realistic audit trails for Creator, Engagement, Finder, and Growth bots.
+
+### 3. Deep Sync™
+A state preservation strategy where navigation parameters (passed via `onNavigate`) carry the full context of the user's intent.
+*   *Example*: Clicking a date on the Calendar passes `{ date: '2024-10-10', timezone: 'EST' }` to the Creator Studio, ensuring the draft is pre-configured correctly.
+
+---
+
+## 📂 Project Structure
+
+```bash
+/
+├── components/         # Reusable UI atoms (Buttons, Icons, Modals)
+│   ├── MediaPicker.tsx # Unified asset selection & upload
+│   ├── PlatformIcon.tsx# SVGs for X, LinkedIn, etc.
+│   └── Sidebar.tsx     # Main navigation controller
+├── pages/              # View Controllers (Screens)
+│   ├── Analytics.tsx   # Data visualization dashboard
+│   ├── BotManager.tsx  # Agent configuration & logs
+│   ├── Calendar.tsx    # Drag-and-drop scheduling grid
+│   ├── CreatorStudio.tsx # Main AI editor & previewer
+│   └── ...
+├── services/           # Business Logic & Data Access
+│   ├── geminiService.ts # AI Prompt Engineering
+│   ├── mockStore.ts    # Data persistence simulation
+│   └── validationService.ts # Compliance rules
+├── types.ts            # Shared TypeScript Interfaces (Domain Models)
+├── App.tsx             # Main Router & Layout
+└── index.tsx           # Entry Point
+```
+
+---
+
+## 🚀 Key Features & Analysis
+
+### 1. Creator Studio Pro (AI-Powered)
+*   **Platform-Specific Optimization**: Uses `refinePostContent` with specific prompt instructions (e.g., "Make it punchy for X") to rewrite content in real-time.
+*   **A/B Variant Generation**: Generates 3 distinct tonal variations (Viral, Professional, Question) using structured JSON output from Gemini.
+*   **Live Mobile Previews**: Renders pixel-perfect mockups for X, Instagram, LinkedIn, and Google Business.
+
+### 2. Intelligent Calendar
+*   **Capacity Indicators**: Visual cues (Color-coded borders) indicate if a day is at optimal posting capacity or over-booked.
+*   **Bulk Operations**: A "Dynamic Island" toolbar appears on selection, allowing mass rescheduling, approval, or deletion.
+*   **Drag-and-Drop**: Implements HTML5 Drag and Drop API for intuitive rescheduling.
+
+### 3. Bot Swarm Manager
+*   **Granular Configuration**: Users can define specific "Work Hours", "Safety Levels", and "Topics" for each bot.
+*   **Audit Logging**: Detailed logs (Info, Warning, Error) provide transparency into bot actions.
+*   **Safety Throttling**: Simulated circuit breakers stop bots upon consecutive API errors.
+
+---
+
+## 🛠️ Installation & Setup
 
 ### Prerequisites
-- Node.js (v18+)
-- Google Gemini API Key (Paid Tier recommended for high volume)
+*   Node.js v18+
+*   NPM or Yarn
+*   Google Gemini API Key (Get one from AI Studio)
 
-### Quick Start
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/dossiefoyer/contentcaster.git
-   cd contentcaster
-   ```
+### Local Development
 
-2. **Configure Environment**
-   Create a `.env` file:
-   ```env
-   API_KEY=your_gemini_api_key_here
-   VITE_API_URL=http://localhost:8000
-   ```
+1.  **Clone the repository**
+    ```bash
+    git clone https://github.com/dossiefoyer/contentcaster.git
+    cd contentcaster
+    ```
 
-3. **Run Development Server**
-   ```bash
-   npm install
-   npm run dev
-   ```
+2.  **Install Dependencies**
+    ```bash
+    npm install
+    ```
 
----
+3.  **Environment Setup**
+    *   The app uses `process.env.API_KEY` for Gemini.
+    *   Ensure your build tool injects this variable.
 
-## ☁️ Deployment & Self-Hosting
+4.  **Run Development Server**
+    ```bash
+    npm run dev
+    ```
 
-ContentCaster is designed to be deployed on your own infrastructure (AWS EC2, DigitalOcean Droplet, or on-premise servers) using Docker and Nginx.
+### Docker Deployment
 
-### 1. Build & Run with Docker
-We provide a production-ready `docker-compose.yml`.
+A production-ready `docker-compose.yml` is included.
 
 ```bash
-# 1. Update your .env file with production keys
-nano .env
-
-# 2. Build and run the container in detached mode
-docker compose up -d --build
-```
-
-### 2. Nginx Reverse Proxy Configuration
-To serve the application securely on your own domain (e.g., `app.yourdomain.com`), configure Nginx as a reverse proxy.
-
-**Create Nginx Config:**
-```bash
-sudo nano /etc/nginx/sites-available/contentcaster
-```
-
-**Paste the following configuration:**
-
-```nginx
-server {
-    listen 80;
-    server_name app.yourdomain.com;
-
-    # Frontend (React App)
-    location / {
-        proxy_pass http://localhost:3000; # Forward to Docker Container
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_cache_bypass $http_upgrade;
-    }
-
-    # Backend API (FastAPI/Node)
-    location /api {
-        proxy_pass http://localhost:8000;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
-}
-```
-
-**Enable the site and restart Nginx:**
-```bash
-sudo ln -s /etc/nginx/sites-available/contentcaster /etc/nginx/sites-enabled/
-sudo nginx -t
-sudo systemctl restart nginx
+# Build and run container
+docker-compose up -d --build
 ```
 
 ---
 
-## ⚙️ Configuration & Troubleshooting
+## ⚙️ Configuration
 
-### Setting up Bots
-1. Navigate to **Bot Manager**.
-2. Select **Creator Bot** -> **Configure**.
-3. **Calendar Tab**: Enable "Smart Scheduling" and set "Max Posts Per Day" to 3.
-4. **Blackout Dates**: Add upcoming holidays to prevent auto-posting.
-5. **Strategy Tab**: Set Creativity to "High" and Brand Voice to "Professional".
+### API Keys
+The application requires a valid API key for content generation.
+1.  Go to `Settings` -> `Intelligence`.
+2.  Enter your Gemini API Key.
+3.  (Optional) Toggle "Simulation Mode" in `Settings` -> `Environment` to bypass live AI calls for testing.
 
-### Handling API Quotas (Error 429)
-If you see a `Safety Check Error` or `429 Resource Exhausted`:
-1. **Check Plan**: You are likely on the Gemini Free Tier which has rate limits. Upgrade to a Pay-as-you-go plan in Google AI Studio.
-2. **Simulation Mode**: Go to **Settings** -> **Environment** and enable **Simulation Mode**. This uses internal mock engines instead of live API calls for testing purposes.
-
----
-
-## 📱 Supported Platforms
-
-| Platform | Type | Deep Features |
-| :--- | :--- | :--- |
-| **X (Twitter)** | Microblogging | • Thread visualization<br>• Reply automation<br>• Character count strict enforcement |
-| **LinkedIn** | Professional | • Rich text formatting<br>• Corporate tone analysis |
-| **Instagram** | Visual | • Carousel indicator support<br>• 1:1 / 4:5 Aspect Ratio validation |
-| **YouTube** | Video | • **Video Title & Thumbnail Management**<br>• Description SEO optimization |
+### Adding New Platforms
+To extend the app for a new platform (e.g., TikTok):
+1.  Add entry to `Platform` enum in `types.ts`.
+2.  Add icon to `PlatformIcon.tsx`.
+3.  Add validation rules to `PLATFORM_LIMITS` in `validationService.ts`.
+4.  Add preview rendering logic in `CreatorStudio.tsx`.
 
 ---
 

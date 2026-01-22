@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Save, Server, Cpu, CheckCircle, AlertTriangle, Key, ChevronRight, Globe, Shield, Bell } from 'lucide-react';
+import { Save, Server, CheckCircle, AlertTriangle, ChevronRight, Globe, Shield, Bell } from 'lucide-react';
 import { store } from '../services/mockStore';
 import { UserSettings } from '../types';
 
@@ -88,34 +88,6 @@ export const Settings: React.FC = () => {
                  </div>
                </div>
                <ChevronRight className="w-5 h-5 text-slate-300" />
-            </div>
-          </div>
-        </div>
-
-        {/* Group 2: AI */}
-        <div className="space-y-2">
-          <h2 className="px-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Intelligence</h2>
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden divide-y divide-slate-100">
-            <div className="p-4 flex flex-col gap-4">
-               <div className="flex items-center gap-4">
-                 <div className="w-8 h-8 rounded-lg bg-purple-100 text-purple-600 flex items-center justify-center">
-                   <Cpu className="w-5 h-5" />
-                 </div>
-                 <div className="flex-1">
-                   <h3 className="font-semibold text-slate-900">Gemini API Key</h3>
-                   <p className="text-xs text-slate-500">Required for content generation</p>
-                 </div>
-               </div>
-               <div className="relative">
-                 <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                 <input 
-                    type="password" 
-                    value={settings.geminiApiKey}
-                    onChange={(e) => setSettings({...settings, geminiApiKey: e.target.value})}
-                    className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-                    placeholder="Enter your AI Studio Key..."
-                 />
-               </div>
             </div>
           </div>
         </div>
