@@ -81,6 +81,54 @@ export const generatePostContent = async (
   }
 };
 
+export const generatePostVariants = async (
+  topic: string,
+  platform: string,
+  baseTone: string,
+  context?: GenerationContext
+): Promise<Array<{ name: string; content: string }>> => {
+  if (!API_KEY) {
+    return [
+      { name: "Variant A (Base)", content: `[MOCK] ${baseTone} post about ${topic}` },
+      { name: "Variant B (Viral)", content: `[MOCK] Viral take: ${topic} is changing everything! 🚀` },
+      { name: "Variant C (Question)", content: `[MOCK] Question: What do you think about ${topic}? 🤔` }
+    ];
+  }
+
+  try {
+    let prompt = `
+      You are a social media optimization expert.
+      Task: Generate 3 distinct variants of a social media post about "${topic}" for ${platform}.
+      
+      Context:
+      - Brand Voice: ${context?.brandVoice || baseTone}
+      - Constraints: ${context?.platformConstraints || 'Standard'}
+      
+      Return a JSON array with 3 objects. Each object must have:
+      - "name": A short label (e.g., "Professional", "Viral Hook", "Question")
+      - "content": The full post text including hashtags.
+      
+      Do not include markdown code blocks. Just the raw JSON.
+    `;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: prompt,
+      config: {
+        responseMimeType: 'application/json',
+        temperature: 0.8
+      }
+    });
+
+    const text = response.text || "[]";
+    const cleaned = text.replace(/```json|```/g, '').trim();
+    return JSON.parse(cleaned);
+  } catch (error) {
+    console.error("Gemini Variants Error:", error);
+    return [];
+  }
+};
+
 export const refinePostContent = async (
   currentContent: string,
   instruction: string

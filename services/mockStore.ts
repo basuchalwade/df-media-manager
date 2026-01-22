@@ -23,6 +23,11 @@ const INITIAL_POSTS: Post[] = [
     status: PostStatus.Scheduled,
     generatedByAi: true,
     author: BotType.Creator,
+    variants: [
+        { id: 'v1', name: 'Original', content: 'The future of space travel is looking bright! 🚀 #SpaceX #Mars' },
+        { id: 'v2', name: 'Question Hook', content: 'Do you think we will live on Mars by 2030? 🌌 The future of space travel is accelerating! #SpaceX' }
+    ],
+    activeVariantId: 'v1'
   },
   {
     id: '3',

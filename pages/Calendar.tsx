@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon, 
   Eye, Filter, LayoutList, Grid3X3,
-  Globe, Zap, CheckCircle2, RotateCcw, AlertTriangle, Archive, FileEdit, Check
+  Globe, Zap, CheckCircle2, RotateCcw, AlertTriangle, Archive, FileEdit, Check, Split
 } from 'lucide-react';
 import { store } from '../services/mockStore';
 import { Post, Platform, PostStatus, PageProps, BotType } from '../types';
@@ -362,6 +362,11 @@ export const Calendar: React.FC<PageProps> = ({ onNavigate, params }) => {
                                 <AlertTriangle className="w-3 h-3" /> Review
                               </span>
                           )}
+                          {post.variants && post.variants.length > 1 && (
+                              <span className="text-[10px] font-bold bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded flex items-center gap-1" title="A/B Testing Variants">
+                                <Split className="w-3 h-3" /> A/B
+                              </span>
+                          )}
                        </div>
                        <p className="text-sm text-gray-700 font-medium truncate">{post.content}</p>
                     </div>
@@ -482,6 +487,11 @@ export const Calendar: React.FC<PageProps> = ({ onNavigate, params }) => {
                                 {post.author === BotType.Creator && (
                                     <div className="bg-purple-100 text-purple-700 p-1 rounded-full" title="Drafted by Creator Bot">
                                         <Zap className="w-3 h-3" />
+                                    </div>
+                                )}
+                                {post.variants && post.variants.length > 1 && (
+                                    <div className="bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded flex items-center gap-1 border border-purple-100" title="Has A/B Variants">
+                                        <Split className="w-3 h-3" />
                                     </div>
                                 )}
                                 <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${getStatusStyle(post.status, post.author)}`}>{label}</span>

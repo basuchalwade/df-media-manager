@@ -1,10 +1,10 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Sparkles, Send, Calendar as CalendarIcon, RotateCcw, Image as ImageIcon, ChevronDown, CheckCircle, Briefcase, Smile, Rocket, GraduationCap, X, FileVideo, Clock, Save, AlertCircle, Check, Zap, Eye, Copy, Hash, MoreHorizontal, ThumbsUp, MessageSquare, Share2, Repeat, Bookmark, Globe, Heart, Layers, UploadCloud, RefreshCw, ShieldCheck, AlertTriangle, Bot, Info, Cloud, CheckSquare } from 'lucide-react';
-import { generatePostContent, generateHashtags, validateContentSafety } from '../services/geminiService';
+import { Sparkles, Send, Calendar as CalendarIcon, RotateCcw, Image as ImageIcon, ChevronDown, CheckCircle, Briefcase, Smile, Rocket, GraduationCap, X, FileVideo, Clock, Save, AlertCircle, Check, Zap, Eye, Copy, Hash, MoreHorizontal, ThumbsUp, MessageSquare, Share2, Repeat, Bookmark, Globe, Heart, Layers, UploadCloud, RefreshCw, ShieldCheck, AlertTriangle, Bot, Info, Cloud, CheckSquare, Plus, Split } from 'lucide-react';
+import { generatePostContent, generatePostVariants, generateHashtags, validateContentSafety } from '../services/geminiService';
 import { validatePost, PLATFORM_LIMITS } from '../services/validationService';
 import { store } from '../services/mockStore';
-import { Platform, PostStatus, MediaItem, Post, PageProps, BotType } from '../types';
+import { Platform, PostStatus, MediaItem, Post, PageProps, BotType, PostVariant } from '../types';
 import { PlatformIcon } from '../components/PlatformIcon';
 import { MediaPicker } from '../components/MediaPicker';
 
@@ -28,6 +28,10 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
   const [tone, setTone] = useState('Professional');
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationPlatform, setGenerationPlatform] = useState<Platform>(Platform.Twitter);
+
+  // --- Variant State (A/B Testing) ---
+  const [variants, setVariants] = useState<PostVariant[]>([{ id: 'v1', name: 'Variant A', content: '' }]);
+  const [activeVariantId, setActiveVariantId] = useState<string>('v1');
 
   // --- Composer State ---
   const [currentPostId, setCurrentPostId] = useState<string | null>(null);
@@ -82,13 +86,29 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
             setOriginalPost(post); // DEEP SYNC: Store original to preserve metadata
             
             setCurrentPostId(post.id);
-            setContent(post.content);
             setSelectedPlatforms(post.platforms);
             setYoutubeTitle(post.title || '');
             setIsCarousel(post.isCarousel || false);
             setIsAiGenerated(post.generatedByAi);
             setPostAuthor(post.author || 'User');
             setPostStatus(post.status); // Hydrate Status
+            
+            // Variants Logic
+            if (post.variants && post.variants.length > 0) {
+                setVariants(post.variants);
+                // If active variant specified, load it. Else default to first.
+                const activeId = post.activeVariantId || post.variants[0].id;
+                const activeVariant = post.variants.find(v => v.id === activeId) || post.variants[0];
+                setActiveVariantId(activeId);
+                setContent(activeVariant.content);
+                // Note: Currently media isn't strictly per-variant in UI state, but model supports it.
+                // We'll load the top-level media which represents active variant.
+            } else {
+                // Fallback for legacy posts
+                setContent(post.content);
+                setVariants([{ id: 'v1', name: 'Original', content: post.content }]);
+                setActiveVariantId('v1');
+            }
             
             // Deep Sync: Auto-Ops & Safety
             setAutoEngage(!!post.autoOps?.autoEngage);
@@ -191,12 +211,7 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
 
   // --- Handlers ---
 
-  const handleGenerate = async () => {
-    if (!topic) return;
-    setIsGenerating(true);
-    const contextPlatform = selectedPlatforms.length > 0 ? selectedPlatforms[0] : generationPlatform;
-    
-    // 1. Gather Context: Date & Time
+  const getCommonContext = () => {
     let timeContext = "Immediate Publication (Right Now)";
     if (scheduleMode === 'later') {
         const day = scheduledDate.toLocaleDateString('en-US', { weekday: 'long' });
@@ -205,13 +220,26 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
         if (postTimezone) timeContext += ` (${postTimezone})`;
     }
 
-    // 2. Gather Context: Constraints
+    const contextPlatform = selectedPlatforms.length > 0 ? selectedPlatforms[0] : generationPlatform;
     const charLimit = PLATFORM_LIMITS[contextPlatform];
     let constraints = `Strictly keep under ${charLimit} characters.`;
     if (contextPlatform === Platform.LinkedIn) constraints += " Use professional spacing, bullet points, and a 'hook' in the first line.";
     if (contextPlatform === Platform.Twitter) constraints += " Use thread-style brevity if needed, focus on impact. No intro fluff.";
     if (contextPlatform === Platform.Instagram) constraints += " Write an engaging caption. Assume visuals are attached.";
     if (contextPlatform === Platform.YouTube) constraints += " Write a compelling video description with a clear CTA.";
+
+    return {
+        contextPlatform,
+        timeContext,
+        constraints
+    };
+  };
+
+  const handleGenerate = async () => {
+    if (!topic) return;
+    setIsGenerating(true);
+    
+    const { contextPlatform, timeContext, constraints } = getCommonContext();
 
     // 3. Generate
     const generated = await generatePostContent(topic, contextPlatform, tone, {
@@ -222,12 +250,94 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
     });
 
     setContent(generated);
+    // Update current variant content
+    setVariants(prev => prev.map(v => v.id === activeVariantId ? { ...v, content: generated } : v));
+
     if(contextPlatform === Platform.YouTube) setYoutubeTitle(`${topic} - Official Video`);
     setIsAiGenerated(true);
     setIsGenerating(false);
     setSyncStatus('modified');
     setPostAuthor(BotType.Creator); // Explicitly mark as bot content
     setPostStatus(PostStatus.NeedsReview); // Bot content needs review
+  };
+
+  const handleGenerateVariants = async () => {
+    if (!topic) return;
+    setIsGenerating(true);
+    
+    const { contextPlatform, timeContext, constraints } = getCommonContext();
+
+    // Generate 3 variations
+    const newVariants = await generatePostVariants(topic, contextPlatform, tone, {
+        scheduledTime: timeContext,
+        platformConstraints: constraints,
+        brandVoice: tone, 
+        safetyLevel: bypassSafety ? "Relaxed" : "Strict",
+    });
+
+    // Map to PostVariant structure
+    const formattedVariants: PostVariant[] = newVariants.map((v, i) => ({
+        id: `gen-${Date.now()}-${i}`,
+        name: v.name,
+        content: v.content,
+        mediaUrl: selectedMedia?.url, // Carry over current media
+        mediaType: selectedMedia?.type
+    }));
+
+    if (formattedVariants.length > 0) {
+        setVariants(formattedVariants);
+        setActiveVariantId(formattedVariants[0].id);
+        setContent(formattedVariants[0].content);
+        setPostAuthor(BotType.Creator);
+        setPostStatus(PostStatus.NeedsReview);
+        setSyncStatus('modified');
+    }
+
+    setIsGenerating(false);
+  };
+
+  // Switch Variant Logic
+  const handleSwitchVariant = (id: string) => {
+    // 1. Save current state to the active variant before switching
+    setVariants(prev => prev.map(v => 
+        v.id === activeVariantId 
+        ? { ...v, content: content } // Update content of outgoing variant
+        : v
+    ));
+
+    // 2. Load new variant
+    const nextVariant = variants.find(v => v.id === id);
+    if (nextVariant) {
+        setActiveVariantId(id);
+        setContent(nextVariant.content || '');
+        // Media switching per variant can be added here if supported in UI
+    }
+  };
+
+  const handleAddVariant = () => {
+      const newId = `v-${Date.now()}`;
+      const newVariant: PostVariant = {
+          id: newId,
+          name: `Variant ${String.fromCharCode(65 + variants.length)}`, // Variant A, B, C...
+          content: content // Clone current content as start
+      };
+      setVariants([...variants, newVariant]);
+      handleSwitchVariant(newId);
+  };
+
+  const handleDeleteVariant = (e: React.MouseEvent, id: string) => {
+      e.stopPropagation();
+      if (variants.length === 1) return; // Prevent deleting last
+      
+      const newVariants = variants.filter(v => v.id !== id);
+      setVariants(newVariants);
+      
+      if (activeVariantId === id) {
+          // Switch to first available
+          setActiveVariantId(newVariants[0].id);
+          setContent(newVariants[0].content);
+      }
+      setSyncStatus('modified');
   };
 
   const handleFetchHashtags = async () => {
@@ -275,6 +385,11 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
     // If duplicating, we don't merge original stats. If updating, we merge.
     const basePost = (!forceNewId && originalPost) ? originalPost : {};
 
+    // Ensure variants are up to date with current editor state
+    const updatedVariants = variants.map(v => 
+        v.id === activeVariantId ? { ...v, content: content } : v
+    );
+
     const newPost: Post = {
       ...basePost, // DEEP SYNC: Spread original first
       id: id,
@@ -290,6 +405,9 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
       mediaUrl: selectedMedia?.url,
       mediaType: selectedMedia?.type,
       author: forceNewId ? 'User' : postAuthor,
+      // Variants Sync
+      variants: updatedVariants,
+      activeVariantId: activeVariantId,
       // Deep Sync: Settings
       timezone: postTimezone,
       autoOps: { autoEngage },
@@ -433,6 +551,8 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
     setAutoEngage(false);
     setPostTimezone(undefined);
     setSyncStatus('synced');
+    setVariants([{ id: 'v1', name: 'Variant A', content: '' }]);
+    setActiveVariantId('v1');
   };
 
   const formatBytes = (bytes: number) => {
@@ -744,14 +864,24 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
                        </select>
                     </div>
                  </div>
-                 <button 
-                   onClick={handleGenerate}
-                   disabled={isGenerating || !topic}
-                   className="w-full py-3 bg-black text-white rounded-xl font-bold text-sm shadow-lg shadow-black/10 hover:bg-gray-800 active:scale-[0.99] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-                 >
-                    {isGenerating ? <RotateCcw className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4 text-yellow-300" />}
-                    {isGenerating ? 'Generating Magic...' : 'Generate Content'}
-                 </button>
+                 <div className="flex gap-2">
+                    <button 
+                      onClick={handleGenerate}
+                      disabled={isGenerating || !topic}
+                      className="flex-1 py-3 bg-black text-white rounded-xl font-bold text-sm shadow-lg shadow-black/10 hover:bg-gray-800 active:scale-[0.99] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                    >
+                        {isGenerating ? <RotateCcw className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4 text-yellow-300" />}
+                        {isGenerating ? 'Drafting...' : 'Generate Draft'}
+                    </button>
+                    <button 
+                      onClick={handleGenerateVariants}
+                      disabled={isGenerating || !topic}
+                      className="px-6 py-3 bg-purple-100 text-purple-700 rounded-xl font-bold text-sm hover:bg-purple-200 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                      title="Create 3 unique variations"
+                    >
+                        <Split className="w-4 h-4" /> Variants
+                    </button>
+                 </div>
               </div>
            </div>
 
@@ -839,10 +969,35 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
                  </div>
               )}
 
-              {/* Editor */}
+              {/* Editor with Variant Tabs */}
               <div className="flex-1 min-h-[200px] flex flex-col relative">
                  <div className="flex justify-between items-end mb-2">
-                    <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Post Content</label>
+                    {/* Variant Tabs */}
+                    <div className="flex items-center gap-1 p-1 bg-gray-100 rounded-lg overflow-x-auto no-scrollbar max-w-[70%]">
+                        {variants.map(v => (
+                            <button
+                                key={v.id}
+                                onClick={() => handleSwitchVariant(v.id)}
+                                className={`
+                                    px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-md transition-all whitespace-nowrap group flex items-center gap-2
+                                    ${activeVariantId === v.id ? 'bg-white shadow-sm text-black' : 'text-gray-500 hover:text-gray-700'}
+                                `}
+                            >
+                                {v.name}
+                                {variants.length > 1 && (
+                                    <span 
+                                        onClick={(e) => handleDeleteVariant(e, v.id)}
+                                        className="opacity-0 group-hover:opacity-100 hover:text-red-500 transition-opacity"
+                                    >
+                                        <X className="w-3 h-3" />
+                                    </span>
+                                )}
+                            </button>
+                        ))}
+                        <button onClick={handleAddVariant} className="px-2 py-1.5 text-gray-400 hover:text-black transition-colors rounded-md hover:bg-gray-200" title="Add Variant">
+                            <Plus className="w-4 h-4" />
+                        </button>
+                    </div>
                     
                     {/* Character Counters */}
                     <div className="flex flex-wrap justify-end gap-1.5">

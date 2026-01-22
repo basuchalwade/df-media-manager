@@ -26,13 +26,21 @@ export enum PostStatus {
   Archived = 'Archived',
 }
 
+export interface PostVariant {
+  id: string;
+  name: string; // e.g., "Variant A", "Viral Copy", "Short Form"
+  content: string;
+  mediaUrl?: string;
+  mediaType?: 'image' | 'video';
+}
+
 export interface Post {
   id: string;
   title?: string; // Added for YouTube/Long-form
   description?: string; // Explicit description field for YouTube/Long-form
   thumbnailUrl?: string; // Added for YouTube thumbnail
   isCarousel?: boolean; // Added for Instagram Carousel
-  content: string;
+  content: string; // Always represents the content of the activeVariant
   platforms: Platform[];
   scheduledFor: string; // ISO date string
   status: PostStatus;
@@ -41,6 +49,10 @@ export interface Post {
   generatedByAi: boolean;
   author?: 'User' | BotType; // Track authorship
   
+  // A/B Testing Variants
+  variants?: PostVariant[];
+  activeVariantId?: string; // ID of the currently selected/published variant
+
   // New: Track Intent & Deep Sync Data
   creationContext?: {
     source: 'Manual' | 'AI_Assistant' | BotType;
