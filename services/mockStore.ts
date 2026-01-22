@@ -1,7 +1,8 @@
 
 import { BotConfig, BotType, DashboardStats, Platform, Post, PostStatus, UserSettings, PlatformAnalytics, AnalyticsDataPoint, User, UserRole, UserStatus, MediaItem, BotLogEntry, LogLevel } from '../types';
+import { api } from './api';
 
-// Initial Mock Data
+// --- MOCK DATA CONSTANTS (Kept for Simulation Mode) ---
 const INITIAL_POSTS: Post[] = [
   {
     id: '1',
@@ -39,41 +40,6 @@ const INITIAL_POSTS: Post[] = [
     author: 'User',
     mediaUrl: 'https://www.w3schools.com/html/mov_bbb.mp4',
     mediaType: 'video'
-  },
-  {
-    id: '4',
-    content: '5 Tips for Better Productivity using AI Tools. 🧵👇 #Productivity',
-    platforms: [Platform.Twitter, Platform.LinkedIn],
-    scheduledFor: new Date(Date.now() + 250000000).toISOString(),
-    status: PostStatus.NeedsReview,
-    generatedByAi: true,
-    author: BotType.Creator,
-    creationContext: {
-        source: BotType.Creator,
-        topic: 'Productivity Hacks'
-    }
-  },
-  {
-    id: '5',
-    content: 'Why Design Systems Matter in 2025. A deep dive.',
-    platforms: [Platform.LinkedIn],
-    scheduledFor: new Date(Date.now() + 300000000).toISOString(),
-    status: PostStatus.Approved,
-    generatedByAi: true,
-    author: BotType.Creator,
-    creationContext: {
-        source: BotType.Creator,
-        topic: 'Design Systems'
-    }
-  },
-  {
-    id: '6',
-    content: 'Old announcement from last year.',
-    platforms: [Platform.Facebook],
-    scheduledFor: new Date(Date.now() - 1000000000).toISOString(),
-    status: PostStatus.Archived,
-    generatedByAi: false,
-    author: 'User'
   }
 ];
 
@@ -92,7 +58,7 @@ const generateLogs = (count: number, type: BotType): BotLogEntry[] => {
   const levels: LogLevel[] = ['Info', 'Success', 'Info', 'Warning', 'Error'];
 
   for (let i = 0; i < count; i++) {
-    const time = new Date(now.getTime() - i * 1000 * 60 * (Math.random() * 30 + 5)); // Random interval back in time
+    const time = new Date(now.getTime() - i * 1000 * 60 * (Math.random() * 30 + 5));
     const msgList = messages[type];
     const msg = msgList[Math.floor(Math.random() * msgList.length)];
     
@@ -118,31 +84,8 @@ const INITIAL_BOTS: BotConfig[] = [
     intervalMinutes: 60, 
     status: 'Running', 
     logs: generateLogs(25, BotType.Creator),
-    stats: {
-      currentDailyActions: 12,
-      maxDailyActions: 50,
-      consecutiveErrors: 0,
-      itemsCreated: 3 // 3 Drafts
-    },
-    config: {
-      contentTopics: ['SaaS', 'AI', 'Marketing'],
-      targetPlatforms: [Platform.Twitter, Platform.LinkedIn],
-      generationMode: 'AI',
-      workHoursStart: '09:00',
-      workHoursEnd: '17:00',
-      safetyLevel: 'Moderate',
-      aiStrategy: {
-        creativityLevel: 'High',
-        brandVoice: 'Professional',
-        keywordsToInclude: ['Innovation', 'Growth'],
-        topicsToAvoid: ['Politics', 'Competitors']
-      },
-      calendarConfig: {
-        enabled: true,
-        maxPostsPerDay: 3,
-        blackoutDates: []
-      }
-    }
+    stats: { currentDailyActions: 12, maxDailyActions: 50, consecutiveErrors: 0, itemsCreated: 3 },
+    config: { contentTopics: ['SaaS', 'AI', 'Marketing'], targetPlatforms: [Platform.Twitter, Platform.LinkedIn], generationMode: 'AI', workHoursStart: '09:00', workHoursEnd: '17:00', safetyLevel: 'Moderate', aiStrategy: { creativityLevel: 'High', brandVoice: 'Professional', keywordsToInclude: ['Innovation', 'Growth'], topicsToAvoid: ['Politics', 'Competitors'] }, calendarConfig: { enabled: true, maxPostsPerDay: 3, blackoutDates: [] } }
   },
   { 
     type: BotType.Engagement, 
@@ -150,27 +93,8 @@ const INITIAL_BOTS: BotConfig[] = [
     intervalMinutes: 15, 
     status: 'LimitReached', 
     logs: generateLogs(40, BotType.Engagement),
-    stats: {
-      currentDailyActions: 150,
-      maxDailyActions: 150,
-      consecutiveErrors: 0,
-      itemsCreated: 150 // Interactions
-    },
-    config: {
-      replyToMentions: true,
-      replyToComments: true,
-      watchHashtags: ['#TechNews', '#StartupLife'],
-      enableAutoLike: true,
-      maxDailyInteractions: 150,
-      mutedKeywords: ['NSFW', 'Spam', 'Crypto'],
-      safetyLevel: 'Aggressive',
-      aiStrategy: {
-        creativityLevel: 'Medium',
-        brandVoice: 'Helpful',
-        keywordsToInclude: [],
-        topicsToAvoid: ['Controversial']
-      }
-    }
+    stats: { currentDailyActions: 150, maxDailyActions: 150, consecutiveErrors: 0, itemsCreated: 150 },
+    config: { replyToMentions: true, replyToComments: true, watchHashtags: ['#TechNews', '#StartupLife'], enableAutoLike: true, maxDailyInteractions: 150, mutedKeywords: ['NSFW', 'Spam', 'Crypto'], safetyLevel: 'Aggressive', aiStrategy: { creativityLevel: 'Medium', brandVoice: 'Helpful', keywordsToInclude: [], topicsToAvoid: ['Controversial'] } }
   },
   { 
     type: BotType.Finder, 
@@ -178,18 +102,8 @@ const INITIAL_BOTS: BotConfig[] = [
     intervalMinutes: 240, 
     status: 'Idle', 
     logs: generateLogs(10, BotType.Finder),
-    stats: {
-      currentDailyActions: 0,
-      maxDailyActions: 100,
-      consecutiveErrors: 0,
-      itemsCreated: 0
-    },
-    config: {
-      trackKeywords: ['Artificial Intelligence', 'Machine Learning'],
-      trackAccounts: ['@TechCrunch', '@Verge'],
-      autoSaveToDrafts: true,
-      safetyLevel: 'Conservative'
-    }
+    stats: { currentDailyActions: 0, maxDailyActions: 100, consecutiveErrors: 0, itemsCreated: 0 },
+    config: { trackKeywords: ['Artificial Intelligence', 'Machine Learning'], trackAccounts: ['@TechCrunch', '@Verge'], autoSaveToDrafts: true, safetyLevel: 'Conservative' }
   },
   { 
     type: BotType.Growth, 
@@ -197,151 +111,78 @@ const INITIAL_BOTS: BotConfig[] = [
     intervalMinutes: 30, 
     status: 'Cooldown', 
     logs: generateLogs(35, BotType.Growth),
-    stats: {
-      currentDailyActions: 45,
-      maxDailyActions: 200,
-      consecutiveErrors: 2,
-      cooldownEndsAt: new Date(Date.now() + 45 * 60000).toISOString(),
-      itemsCreated: 45 // Follows
-    },
-    config: {
-      growthTags: ['#FollowFriday', '#TechCommunity'],
-      interactWithCompetitors: true,
-      unfollowAfterDays: 7,
-      hourlyActionLimit: 10,
-      stopOnConsecutiveErrors: 5,
-      minDelaySeconds: 60
-    }
+    stats: { currentDailyActions: 45, maxDailyActions: 200, consecutiveErrors: 2, cooldownEndsAt: new Date(Date.now() + 45 * 60000).toISOString(), itemsCreated: 45 },
+    config: { growthTags: ['#FollowFriday', '#TechCommunity'], interactWithCompetitors: true, unfollowAfterDays: 7, hourlyActionLimit: 10, stopOnConsecutiveErrors: 5, minDelaySeconds: 60 }
   },
 ];
 
 const DEFAULT_SETTINGS: UserSettings = {
   demoMode: true,
   geminiApiKey: '',
-  general: {
-    language: 'English (US)',
-    dateFormat: 'MM/DD/YYYY',
-    startOfWeek: 'Monday'
-  },
-  workspace: {
-    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-    defaultTone: 'Professional'
-  },
-  notifications: {
-    channels: {
-      email: true,
-      inApp: true,
-      slack: false
-    },
-    alerts: {
-      botActivity: true,
-      failures: true,
-      approvals: true
-    }
-  },
-  security: {
-    twoFactorEnabled: false,
-    sessionTimeout: '30m'
-  },
-  automation: {
-    globalSafetyLevel: 'Moderate',
-    defaultWorkHours: { start: '09:00', end: '17:00' }
-  }
+  general: { language: 'English (US)', dateFormat: 'MM/DD/YYYY', startOfWeek: 'Monday' },
+  workspace: { timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, defaultTone: 'Professional' },
+  notifications: { channels: { email: true, inApp: true, slack: false }, alerts: { botActivity: true, failures: true, approvals: true } },
+  security: { twoFactorEnabled: false, sessionTimeout: '30m' },
+  automation: { globalSafetyLevel: 'Moderate', defaultWorkHours: { start: '09:00', end: '17:00' } }
 };
 
 const INITIAL_USERS: User[] = [
-  { 
-    id: '1', 
-    name: 'Admin User', 
-    email: 'admin@contentcaster.ai', 
-    role: UserRole.Admin, 
-    status: UserStatus.Active, 
-    lastActive: 'Just now',
-    connectedAccounts: {
-      [Platform.Twitter]: { connected: true, handle: '@admin_x', lastSync: '10 mins ago' },
-      [Platform.LinkedIn]: { connected: true, handle: 'Admin Professional', lastSync: '1 hour ago' }
-    }
-  },
-  { 
-    id: '2', 
-    name: 'Sarah Monitor', 
-    email: 'sarah@contentcaster.ai', 
-    role: UserRole.Monitor, 
-    status: UserStatus.Active, 
-    lastActive: '2 hours ago',
-    connectedAccounts: {
-      [Platform.Instagram]: { connected: true, handle: '@sarah_snaps', lastSync: '5 mins ago' }
-    }
-  },
-  { 
-    id: '3', 
-    name: 'John Guest', 
-    email: 'john@guest.com', 
-    role: UserRole.Viewer, 
-    status: UserStatus.Suspended, 
-    lastActive: '5 days ago',
-    connectedAccounts: {}
-  },
-  { 
-    id: '4', 
-    name: 'Pending Invite', 
-    email: 'mark@marketing.com', 
-    role: UserRole.Monitor, 
-    status: UserStatus.Invited, 
-    lastActive: 'Never',
-    connectedAccounts: {}
-  },
+  { id: '1', name: 'Admin User', email: 'admin@contentcaster.ai', role: UserRole.Admin, status: UserStatus.Active, lastActive: 'Just now', connectedAccounts: { [Platform.Twitter]: { connected: true, handle: '@admin_x', lastSync: '10 mins ago' }, [Platform.LinkedIn]: { connected: true, handle: 'Admin Professional', lastSync: '1 hour ago' } } },
+  { id: '2', name: 'Sarah Monitor', email: 'sarah@contentcaster.ai', role: UserRole.Monitor, status: UserStatus.Active, lastActive: '2 hours ago', connectedAccounts: { [Platform.Instagram]: { connected: true, handle: '@sarah_snaps', lastSync: '5 mins ago' } } },
 ];
 
-// Simple in-memory store to simulate backend persistence in the frontend demo
-class MockStore {
+// Hybrid Store Implementation
+class HybridStore {
   private posts: Post[] = [];
   private bots: BotConfig[] = [];
   private settings: UserSettings;
   private users: User[];
-  private media: MediaItem[] = []; // In-memory media storage
-  private currentUserId: string = '1'; // Simulate logged in user
+  private media: MediaItem[] = [];
+  private currentUserId: string = '1';
 
   constructor() {
-    // Load settings from localStorage if available
+    // Initialize Mock Data
     const savedSettings = localStorage.getItem('postmaster_settings');
     this.settings = savedSettings ? JSON.parse(savedSettings) : { ...DEFAULT_SETTINGS };
     
-    // Ensure deep merge of defaults for new fields if loading old settings
-    this.settings = { 
-        ...DEFAULT_SETTINGS, 
-        ...this.settings,
-        general: { ...DEFAULT_SETTINGS.general, ...this.settings.general },
-        workspace: { ...DEFAULT_SETTINGS.workspace, ...this.settings.workspace },
-        notifications: { ...DEFAULT_SETTINGS.notifications, ...this.settings.notifications },
-        security: { ...DEFAULT_SETTINGS.security, ...this.settings.security },
-        automation: { ...DEFAULT_SETTINGS.automation, ...this.settings.automation },
-    };
+    // Ensure Demo Mode default
+    if (savedSettings === null) this.settings.demoMode = true;
 
+    // Load Mock Data
     const savedUsers = localStorage.getItem('postmaster_users');
     this.users = savedUsers ? JSON.parse(savedUsers) : [...INITIAL_USERS];
-
     const savedPosts = localStorage.getItem('postmaster_posts');
     this.posts = savedPosts ? JSON.parse(savedPosts) : [...INITIAL_POSTS];
-
     const savedBots = localStorage.getItem('postmaster_bots');
     this.bots = savedBots ? JSON.parse(savedBots) : [...INITIAL_BOTS];
   }
 
+  private get isSimulation(): boolean {
+    return this.settings.demoMode;
+  }
+
   // --- Session Simulation ---
   async getCurrentUser(): Promise<User | undefined> {
+    if (!this.isSimulation) {
+        // In real app, this would check JWT/Session
+        // For now, we fetch the first admin user from DB
+        const users = await api.getUsers();
+        return users[0];
+    }
     return this.users.find(u => u.id === this.currentUserId);
   }
 
-  // --- Platform Integration Methods ---
+  // --- Platform Integration ---
   async togglePlatformConnection(platform: Platform): Promise<User> {
+    if (!this.isSimulation) {
+        // Real implementation would oauth redirect
+        console.warn("Real platform connection requires OAuth backend implementation");
+        return (await this.getCurrentUser())!;
+    }
     const userIndex = this.users.findIndex(u => u.id === this.currentUserId);
     if (userIndex === -1) throw new Error("User not found");
-
     const user = this.users[userIndex];
     const isConnected = user.connectedAccounts[platform]?.connected;
-
-    // Toggle connection
     const updatedUser = {
       ...user,
       connectedAccounts: {
@@ -353,33 +194,35 @@ class MockStore {
         }
       }
     };
-
     this.users[userIndex] = updatedUser;
     this.saveUsers();
     return updatedUser;
   }
 
   // --- Posts ---
-  getPosts(): Promise<Post[]> {
-    return Promise.resolve([...this.posts]);
+  async getPosts(): Promise<Post[]> {
+    if (!this.isSimulation) return api.getPosts();
+    return [...this.posts];
   }
 
-  addPost(post: Post): Promise<Post> {
+  async addPost(post: Post): Promise<Post> {
+    if (!this.isSimulation) return api.addPost(post);
     this.posts.unshift(post);
     this.savePosts();
-    return Promise.resolve(post);
+    return post;
   }
 
-  updatePost(post: Post): Promise<Post> {
+  async updatePost(post: Post): Promise<Post> {
+    if (!this.isSimulation) return api.updatePost(post);
     this.posts = this.posts.map(p => p.id === post.id ? post : p);
     this.savePosts();
-    return Promise.resolve(post);
+    return post;
   }
 
-  deletePost(id: string): Promise<void> {
+  async deletePost(id: string): Promise<void> {
+    if (!this.isSimulation) return api.deletePost(id);
     this.posts = this.posts.filter(p => p.id !== id);
     this.savePosts();
-    return Promise.resolve();
   }
 
   private savePosts() {
@@ -387,22 +230,25 @@ class MockStore {
   }
 
   // --- Bots ---
-  getBots(): Promise<BotConfig[]> {
-    return Promise.resolve([...this.bots]);
+  async getBots(): Promise<BotConfig[]> {
+    if (!this.isSimulation) return api.getBots();
+    return [...this.bots];
   }
 
-  toggleBot(type: BotType): Promise<BotConfig[]> {
+  async toggleBot(type: BotType): Promise<BotConfig[]> {
+    if (!this.isSimulation) return api.toggleBot(type);
     this.bots = this.bots.map(b => 
       b.type === type ? { ...b, enabled: !b.enabled, status: !b.enabled ? 'Running' : 'Idle' } : b
     );
     this.saveBots();
-    return Promise.resolve([...this.bots]);
+    return [...this.bots];
   }
 
-  updateBot(updatedBot: BotConfig): Promise<BotConfig[]> {
+  async updateBot(updatedBot: BotConfig): Promise<BotConfig[]> {
+    if (!this.isSimulation) return api.updateBot(updatedBot);
     this.bots = this.bots.map(b => b.type === updatedBot.type ? updatedBot : b);
     this.saveBots();
-    return Promise.resolve([...this.bots]);
+    return [...this.bots];
   }
 
   private saveBots() {
@@ -410,51 +256,72 @@ class MockStore {
   }
 
   // --- Stats ---
-  getStats(): Promise<DashboardStats> {
+  async getStats(): Promise<DashboardStats> {
+    if (!this.isSimulation) return api.getStats();
+    
     const published = this.posts.filter(p => p.status === PostStatus.Published);
     const totalReach = published.reduce((acc, p) => acc + (p.engagement?.likes || 0) * 15, 0);
     const totalEngagement = published.reduce((acc, p) => acc + (p.engagement?.likes || 0) + (p.engagement?.comments || 0), 0);
     
-    return Promise.resolve({
+    return {
       totalPosts: this.posts.length,
       totalReach,
       engagementRate: published.length ? parseFloat((totalEngagement / totalReach * 100).toFixed(1)) : 0,
       activeBots: this.bots.filter(b => b.enabled).length
-    });
+    };
   }
 
   // --- Settings ---
-  getSettings(): Promise<UserSettings> {
-    return Promise.resolve({ ...this.settings });
+  async getSettings(): Promise<UserSettings> {
+    if (!this.isSimulation) {
+        try {
+            const remoteSettings = await api.getSettings();
+            // Sync local demo mode pref with remote if needed, but usually remote governs
+            this.settings = { ...remoteSettings, demoMode: false }; // Ensure we know we are remote
+            return this.settings;
+        } catch (e) {
+            console.error("Failed to fetch settings, falling back to local", e);
+            return this.settings;
+        }
+    }
+    return { ...this.settings };
   }
 
-  saveSettings(newSettings: UserSettings): Promise<UserSettings> {
+  async saveSettings(newSettings: UserSettings): Promise<UserSettings> {
+    // Special handling: If switching modes, we persist locally first
+    if (newSettings.demoMode !== this.settings.demoMode) {
+        this.settings.demoMode = newSettings.demoMode;
+        localStorage.setItem('postmaster_settings', JSON.stringify(this.settings));
+        window.location.reload(); // Reload to reset state context
+        return this.settings;
+    }
+
+    if (!this.isSimulation) return api.saveSettings(newSettings);
+    
     this.settings = newSettings;
     localStorage.setItem('postmaster_settings', JSON.stringify(newSettings));
-    return Promise.resolve({ ...this.settings });
+    return { ...this.settings };
   }
 
   // --- User Management ---
-  getUsers(): Promise<User[]> {
-    return Promise.resolve([...this.users]);
+  async getUsers(): Promise<User[]> {
+    if (!this.isSimulation) return api.getUsers();
+    return [...this.users];
   }
 
-  addUser(user: Omit<User, 'id' | 'lastActive' | 'connectedAccounts'>): Promise<User[]> {
-    const newUser: User = {
-      ...user,
-      id: Date.now().toString(),
-      lastActive: 'Never',
-      connectedAccounts: {}
-    };
+  async addUser(user: Omit<User, 'id' | 'lastActive' | 'connectedAccounts'>): Promise<User[]> {
+    if (!this.isSimulation) return api.addUser(user);
+    const newUser: User = { ...user, id: Date.now().toString(), lastActive: 'Never', connectedAccounts: {} };
     this.users.push(newUser);
     this.saveUsers();
-    return Promise.resolve([...this.users]);
+    return [...this.users];
   }
 
-  updateUser(id: string, updates: Partial<User>): Promise<User[]> {
+  async updateUser(id: string, updates: Partial<User>): Promise<User[]> {
+    if (!this.isSimulation) return api.updateUser(id, updates);
     this.users = this.users.map(u => u.id === id ? { ...u, ...updates } : u);
     this.saveUsers();
-    return Promise.resolve([...this.users]);
+    return [...this.users];
   }
 
   private saveUsers() {
@@ -462,66 +329,55 @@ class MockStore {
   }
 
   // --- Media Library ---
-  getMedia(): Promise<MediaItem[]> {
-    return Promise.resolve([...this.media]);
+  async getMedia(): Promise<MediaItem[]> {
+    if (!this.isSimulation) return api.getMedia();
+    return [...this.media];
   }
 
-  // Simulate file upload validation and storage
-  uploadMedia(file: File): Promise<MediaItem> {
+  async uploadMedia(file: File): Promise<MediaItem> {
+    if (!this.isSimulation) return api.uploadMedia(file);
+
     return new Promise((resolve, reject) => {
-      // 1. Validate Types (Security: Whitelist only)
       const allowedImages = ['image/jpeg', 'image/png', 'image/webp'];
       const allowedVideos = ['video/mp4'];
-      const allowedTypes = [...allowedImages, ...allowedVideos];
-
-      if (!allowedTypes.includes(file.type)) {
-        reject(new Error(`Invalid file type: ${file.type}. Only JPG, PNG, WEBP images and MP4 videos are allowed.`));
+      
+      if (![...allowedImages, ...allowedVideos].includes(file.type)) {
+        reject(new Error(`Invalid file type: ${file.type}`));
         return;
       }
-
-      // 2. Validate Size (Max 50MB for all types to prevent DOS/Storage issues)
-      const MAX_SIZE = 50 * 1024 * 1024; // 50MB
-      if (file.size > MAX_SIZE) {
-        reject(new Error(`File "${file.name}" exceeds the 50MB limit.`));
+      if (file.size > 50 * 1024 * 1024) {
+        reject(new Error(`File too large.`));
         return;
       }
       
-      // 3. Sanitize Filename (Security: Prevent path traversal, scripts, spaces)
-      // Replace spaces with underscores, remove non-alphanumeric chars except dots/underscores/hyphens
-      const sanitizedName = file.name
-        .replace(/\s+/g, '_')
-        .replace(/[^a-zA-Z0-9._-]/g, '');
-
-      // 4. Create Object URL (Simulating cloud upload)
-      const url = URL.createObjectURL(file);
-      
-      // Use random ID suffix to handle rapid bulk uploads
-      const id = Date.now().toString() + '-' + Math.random().toString(36).substr(2, 6);
-
       const newItem: MediaItem = {
-        id,
-        name: sanitizedName,
+        id: Date.now().toString() + '-' + Math.random().toString(36).substr(2, 6),
+        name: file.name.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9._-]/g, ''),
         type: allowedImages.includes(file.type) ? 'image' : 'video',
-        url,
+        url: URL.createObjectURL(file),
         size: file.size,
         createdAt: new Date().toISOString(),
         dimensions: allowedImages.includes(file.type) ? 'Original' : undefined
       };
-
       this.media.unshift(newItem);
       resolve(newItem);
     });
   }
 
-  deleteMedia(id: string): Promise<MediaItem[]> {
+  async deleteMedia(id: string): Promise<MediaItem[]> {
+    if (!this.isSimulation) return api.deleteMedia(id);
     this.media = this.media.filter(m => m.id !== id);
-    return Promise.resolve([...this.media]);
+    return [...this.media];
   }
 
-  // Helper to simulate creating an optimized copy
-  createOptimizedCopy(originalId: string, variantName: string): Promise<MediaItem> {
+  async createOptimizedCopy(originalId: string, variantName: string): Promise<MediaItem> {
+    // Note: Actual optimization requires backend processing. 
+    // In Real DB mode, we'd call an API endpoint.
+    // In Mock mode, we fake it.
+    if (!this.isSimulation) throw new Error("Optimization requires backend implementation");
+    
     const original = this.media.find(m => m.id === originalId);
-    if (!original) return Promise.reject("Original file not found");
+    if (!original) throw new Error("Original file not found");
 
     const newItem: MediaItem = {
       ...original,
@@ -530,16 +386,18 @@ class MockStore {
       createdAt: new Date().toISOString(),
       dimensions: variantName === 'Square' ? '1080x1080' : variantName === 'Story' ? '1080x1920' : 'Optimized'
     };
-
     this.media.unshift(newItem);
-    return Promise.resolve(newItem);
+    return newItem;
   }
 
-  // --- Analytics ---
-  getPlatformAnalytics(platform: Platform | 'All'): Promise<PlatformAnalytics> {
+  // --- Analytics (Mock Only for now, mapped in API) ---
+  async getPlatformAnalytics(platform: Platform | 'All'): Promise<PlatformAnalytics> {
+    // This logic is complex to duplicate on backend for this demo, 
+    // so we assume the backend has a /stats/analytics endpoint that mimics this structure.
+    // For now, we return mock data even in real mode for charts 
+    // unless the API endpoint is explicitly built.
     const isAll = platform === 'All';
     const multiplier = isAll ? 5 : 1;
-    
     const history: AnalyticsDataPoint[] = [];
     const today = new Date();
     
@@ -547,7 +405,6 @@ class MockStore {
       const d = new Date(today);
       d.setDate(today.getDate() - i);
       const dayName = d.toLocaleDateString('en-US', { weekday: 'short' });
-      
       const baseFollowers = 1200 * multiplier + (Math.random() * 50);
       const baseImpressions = 5000 * multiplier + (Math.random() * 1000);
       const baseEngagement = 300 * multiplier + (Math.random() * 100);
@@ -561,8 +418,7 @@ class MockStore {
     }
 
     const currentStats = history[history.length - 1];
-    
-    return Promise.resolve({
+    return {
       platform,
       summary: {
         followers: currentStats.followers,
@@ -573,8 +429,8 @@ class MockStore {
         engagementGrowth: 5.1
       },
       history
-    });
+    };
   }
 }
 
-export const store = new MockStore();
+export const store = new HybridStore();

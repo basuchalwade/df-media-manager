@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { Save, Server, CheckCircle, AlertTriangle, ChevronRight, Globe, Shield, Bell, Lock, User as UserIcon, Briefcase, Zap, Link as LinkIcon, CreditCard, Terminal, LogOut, Smartphone, AlertOctagon, RotateCcw, Cloud, Activity } from 'lucide-react';
+import { Save, Server, CheckCircle, AlertTriangle, ChevronRight, Globe, Shield, Bell, Lock, User as UserIcon, Briefcase, Zap, Link as LinkIcon, CreditCard, Terminal, LogOut, Smartphone, AlertOctagon, RotateCcw, Cloud, Activity, Database } from 'lucide-react';
 import { store } from '../services/mockStore';
 import { UserSettings, Platform, User } from '../types';
 import { PlatformIcon } from '../components/PlatformIcon';
@@ -153,6 +153,81 @@ export const Settings: React.FC = () => {
       {/* 2. Main Content Area */}
       <div className="flex-1 max-w-3xl pb-24">
          
+         {/* -- WORKSPACE -- */}
+         {activeTab === 'workspace' && (
+             <div className="space-y-6">
+                 <SectionTitle title="Workspace Environment" description="Configure global settings for your team." />
+                 
+                 <Card className="divide-y divide-slate-100">
+                    <div className="p-6">
+                        <div className="flex items-center gap-2 mb-4">
+                             <Server className={`w-5 h-5 ${settings.demoMode ? 'text-orange-500' : 'text-green-500'}`} />
+                             <h3 className="font-bold text-slate-900">Environment Mode</h3>
+                        </div>
+                        <div className={`border rounded-xl p-4 mb-4 ${settings.demoMode ? 'bg-orange-50 border-orange-100' : 'bg-green-50 border-green-100'}`}>
+                            <p className={`text-sm leading-relaxed ${settings.demoMode ? 'text-orange-800' : 'text-green-800'}`}>
+                                {settings.demoMode 
+                                    ? <span><strong>Simulation Mode:</strong> Using local mock database. No real API calls are being made. Ideal for testing.</span>
+                                    : <span><strong>Production Mode:</strong> Connected to PostgreSQL. Real API calls are enabled. All changes are persistent.</span>
+                                }
+                            </p>
+                            {!settings.demoMode && (
+                                <div className="mt-2 flex items-center gap-2 text-xs font-semibold text-green-700">
+                                    <Database className="w-3 h-3" />
+                                    <span>Database Connected: postgresql/production</span>
+                                </div>
+                            )}
+                        </div>
+                        <Toggle 
+                           label="Enable Simulation Mode" 
+                           description="Switch to local mock data. Unsaved production work will not be carried over."
+                           checked={settings.demoMode}
+                           onChange={(v: boolean) => updateSetting('demoMode', '', v)}
+                        />
+                    </div>
+                    
+                    <div className="p-6">
+                        <div className="flex items-center gap-2 mb-4">
+                             <Globe className="w-5 h-5 text-blue-500" />
+                             <h3 className="font-bold text-slate-900">Localization</h3>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">Timezone</label>
+                                <select 
+                                    value={settings.workspace.timezone}
+                                    onChange={(e) => updateSetting('workspace', 'timezone', e.target.value)}
+                                    className="w-full bg-white text-slate-900 rounded-lg border-slate-300 text-sm focus:ring-blue-500 focus:border-blue-500"
+                                >
+                                    <option value={Intl.DateTimeFormat().resolvedOptions().timeZone}>{Intl.DateTimeFormat().resolvedOptions().timeZone} (System)</option>
+                                    <option value="America/New_York">Eastern Time (US & Canada)</option>
+                                    <option value="America/Los_Angeles">Pacific Time (US & Canada)</option>
+                                    <option value="Europe/London">London</option>
+                                    <option value="Asia/Tokyo">Tokyo</option>
+                                </select>
+                                <p className="text-xs text-slate-500 mt-1">Used for scheduling all posts.</p>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">Default Content Tone</label>
+                                <select 
+                                    value={settings.workspace.defaultTone}
+                                    onChange={(e) => updateSetting('workspace', 'defaultTone', e.target.value)}
+                                    className="w-full bg-white text-slate-900 rounded-lg border-slate-300 text-sm focus:ring-blue-500 focus:border-blue-500"
+                                >
+                                    <option>Professional</option>
+                                    <option>Casual</option>
+                                    <option>Witty</option>
+                                    <option>Urgent</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                 </Card>
+             </div>
+         )}
+
+         {/* ... Other tabs remain largely the same, handled by the default rendering below ... */}
+         
          {/* -- GENERAL -- */}
          {activeTab === 'general' && (
              <div className="space-y-6">
@@ -207,70 +282,6 @@ export const Settings: React.FC = () => {
                                 <option value="Monday">Monday</option>
                                 <option value="Sunday">Sunday</option>
                             </select>
-                        </div>
-                    </div>
-                 </Card>
-             </div>
-         )}
-
-         {/* -- WORKSPACE -- */}
-         {activeTab === 'workspace' && (
-             <div className="space-y-6">
-                 <SectionTitle title="Workspace Environment" description="Configure global settings for your team." />
-                 
-                 <Card className="divide-y divide-slate-100">
-                    <div className="p-6">
-                        <div className="flex items-center gap-2 mb-4">
-                             <Server className="w-5 h-5 text-orange-500" />
-                             <h3 className="font-bold text-slate-900">Simulation Mode</h3>
-                        </div>
-                        <div className="bg-orange-50 border border-orange-100 rounded-xl p-4 mb-4">
-                            <p className="text-sm text-orange-800 leading-relaxed">
-                                When enabled, ContentCaster will use a local mock database and simulate API calls. 
-                                Real social media APIs will <strong>not</strong> be contacted. This is ideal for testing and demos.
-                            </p>
-                        </div>
-                        <Toggle 
-                           label="Enable Simulation Environment" 
-                           checked={settings.demoMode}
-                           onChange={(v: boolean) => updateSetting('demoMode', '', v)}
-                        />
-                    </div>
-                    
-                    <div className="p-6">
-                        <div className="flex items-center gap-2 mb-4">
-                             <Globe className="w-5 h-5 text-blue-500" />
-                             <h3 className="font-bold text-slate-900">Localization</h3>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Timezone</label>
-                                <select 
-                                    value={settings.workspace.timezone}
-                                    onChange={(e) => updateSetting('workspace', 'timezone', e.target.value)}
-                                    className="w-full bg-white text-slate-900 rounded-lg border-slate-300 text-sm focus:ring-blue-500 focus:border-blue-500"
-                                >
-                                    <option value={Intl.DateTimeFormat().resolvedOptions().timeZone}>{Intl.DateTimeFormat().resolvedOptions().timeZone} (System)</option>
-                                    <option value="America/New_York">Eastern Time (US & Canada)</option>
-                                    <option value="America/Los_Angeles">Pacific Time (US & Canada)</option>
-                                    <option value="Europe/London">London</option>
-                                    <option value="Asia/Tokyo">Tokyo</option>
-                                </select>
-                                <p className="text-xs text-slate-500 mt-1">Used for scheduling all posts.</p>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Default Content Tone</label>
-                                <select 
-                                    value={settings.workspace.defaultTone}
-                                    onChange={(e) => updateSetting('workspace', 'defaultTone', e.target.value)}
-                                    className="w-full bg-white text-slate-900 rounded-lg border-slate-300 text-sm focus:ring-blue-500 focus:border-blue-500"
-                                >
-                                    <option>Professional</option>
-                                    <option>Casual</option>
-                                    <option>Witty</option>
-                                    <option>Urgent</option>
-                                </select>
-                            </div>
                         </div>
                     </div>
                  </Card>
@@ -519,104 +530,41 @@ export const Settings: React.FC = () => {
          
          {/* -- BILLING -- */}
          {activeTab === 'billing' && (
-             <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-                 <SectionTitle title="Billing & Plan" description="Manage your subscription, payment methods, and usage limits." />
+             <div className="space-y-6">
+                 <SectionTitle title="Billing & Plan" description="Manage subscription and usage." />
                  
-                 {/* Premium Plan Card */}
-                 <div className="relative overflow-hidden rounded-[32px] bg-[#1c1c1e] text-white shadow-2xl border border-gray-800">
-                     {/* Ambient Background Glow */}
-                     <div className="absolute top-[-20%] right-[-10%] w-[500px] h-[500px] bg-blue-600/20 rounded-full blur-[120px] pointer-events-none"></div>
-                     <div className="absolute bottom-[-20%] left-[-10%] w-[400px] h-[400px] bg-purple-600/20 rounded-full blur-[100px] pointer-events-none"></div>
-
-                     <div className="relative z-10 p-8 md:p-10 flex flex-col lg:flex-row gap-10">
-                         
-                         {/* Left: Plan Details */}
-                         <div className="flex-1 flex flex-col justify-between min-h-[240px]">
-                             <div>
-                                 <div className="flex items-center gap-3 mb-4">
-                                     <span className="px-3 py-1 rounded-full bg-white/10 border border-white/5 text-[11px] font-bold uppercase tracking-widest text-white/90 backdrop-blur-md shadow-sm">
-                                         Enterprise Tier
-                                     </span>
-                                     <span className="flex items-center gap-1.5 text-emerald-400 text-xs font-bold bg-emerald-400/10 px-2 py-1 rounded-full border border-emerald-400/20">
-                                         <CheckCircle className="w-3.5 h-3.5" /> Active
-                                     </span>
-                                 </div>
-                                 <h2 className="text-5xl font-bold tracking-tight text-white mb-2">Enterprise Pro</h2>
-                                 <p className="text-lg text-white/60 font-medium leading-relaxed max-w-md">
-                                     Full access to autonomous agents, unlimited history, and priority support.
-                                 </p>
+                 <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl p-6 text-white shadow-lg">
+                     <div className="flex justify-between items-start mb-6">
+                         <div>
+                             <p className="text-slate-400 text-sm font-medium uppercase tracking-wider">Current Plan</p>
+                             <h3 className="text-3xl font-bold mt-1">Enterprise Pro</h3>
+                         </div>
+                         <div className="px-3 py-1 bg-white/10 rounded-full text-xs font-bold border border-white/20">Active</div>
+                     </div>
+                     <div className="space-y-4">
+                         <div>
+                             <div className="flex justify-between text-sm mb-1">
+                                 <span className="text-slate-300">Bot Actions</span>
+                                 <span className="font-mono">14,203 / 50,000</span>
                              </div>
-
-                             <div className="flex flex-wrap gap-4 pt-6">
-                                 <button className="px-8 py-3.5 bg-white text-black rounded-full font-bold text-sm hover:bg-gray-100 hover:scale-105 active:scale-95 transition-all shadow-xl shadow-white/5 flex items-center gap-2">
-                                     Upgrade Plan
-                                 </button>
-                                 <button className="px-8 py-3.5 bg-white/5 border border-white/10 text-white rounded-full font-bold text-sm hover:bg-white/10 transition-all backdrop-blur-md flex items-center gap-2 group">
-                                     <CreditCard className="w-4 h-4 text-white/70 group-hover:text-white transition-colors" />
-                                     View Invoices
-                                 </button>
+                             <div className="w-full bg-white/10 rounded-full h-2">
+                                 <div className="bg-blue-500 h-2 rounded-full" style={{ width: '28%' }}></div>
                              </div>
                          </div>
-
-                         {/* Right: Usage Metrics Panel */}
-                         <div className="lg:w-[400px] bg-white/5 rounded-3xl p-6 border border-white/10 backdrop-blur-md flex flex-col justify-center space-y-8">
-                             <h3 className="text-xs font-bold text-white/40 uppercase tracking-widest mb-2 flex items-center gap-2">
-                                 <Activity className="w-4 h-4" /> Current Usage
-                             </h3>
-                             
-                             {/* Bot Actions Metric */}
-                             <div className="group">
-                                 <div className="flex justify-between items-end mb-3">
-                                     <div className="flex items-center gap-3">
-                                         <div className="p-2 rounded-lg bg-blue-500/20 text-blue-400">
-                                             <Zap className="w-5 h-5" />
-                                         </div>
-                                         <div>
-                                             <p className="text-sm font-bold text-white">Bot Actions</p>
-                                             <p className="text-xs text-white/50">Automated tasks</p>
-                                         </div>
-                                     </div>
-                                     <div className="text-right">
-                                         <span className="text-xl font-bold text-white tabular-nums tracking-tight">14,203</span>
-                                         <span className="text-sm text-white/40 font-medium ml-1">/ 50k</span>
-                                     </div>
-                                 </div>
-                                 <div className="w-full bg-white/10 rounded-full h-2 overflow-hidden backdrop-blur-sm">
-                                     <div className="bg-gradient-to-r from-blue-600 to-cyan-400 h-full rounded-full shadow-[0_0_12px_rgba(59,130,246,0.5)] transition-all duration-1000 ease-out" style={{ width: '28%' }}></div>
-                                 </div>
+                         <div>
+                             <div className="flex justify-between text-sm mb-1">
+                                 <span className="text-slate-300">Storage</span>
+                                 <span className="font-mono">4.2 GB / 10 GB</span>
                              </div>
-
-                             {/* Storage Metric */}
-                             <div className="group">
-                                 <div className="flex justify-between items-end mb-3">
-                                     <div className="flex items-center gap-3">
-                                         <div className="p-2 rounded-lg bg-purple-500/20 text-purple-400">
-                                             <Cloud className="w-5 h-5" />
-                                         </div>
-                                         <div>
-                                             <p className="text-sm font-bold text-white">Cloud Storage</p>
-                                             <p className="text-xs text-white/50">Media assets</p>
-                                         </div>
-                                     </div>
-                                     <div className="text-right">
-                                         <span className="text-xl font-bold text-white tabular-nums tracking-tight">4.2</span>
-                                         <span className="text-sm text-white/40 font-medium ml-1">/ 10 GB</span>
-                                     </div>
-                                 </div>
-                                 <div className="w-full bg-white/10 rounded-full h-2 overflow-hidden backdrop-blur-sm">
-                                     <div className="bg-gradient-to-r from-purple-600 to-pink-400 h-full rounded-full shadow-[0_0_12px_rgba(168,85,247,0.5)] transition-all duration-1000 ease-out" style={{ width: '42%' }}></div>
-                                 </div>
+                             <div className="w-full bg-white/10 rounded-full h-2">
+                                 <div className="bg-purple-500 h-2 rounded-full" style={{ width: '42%' }}></div>
                              </div>
                          </div>
                      </div>
-                 </div>
-                 
-                 {/* Subtle Footer / Help text */}
-                 <div className="flex justify-center">
-                     <p className="text-xs text-slate-400 font-medium">
-                         Next billing cycle starts on <span className="text-slate-600 font-bold">Nov 1, 2024</span>. 
-                         Need help? <a href="#" className="text-blue-600 hover:underline">Contact Billing Support</a>.
-                     </p>
+                     <div className="mt-6 pt-6 border-t border-white/10 flex gap-3">
+                         <button className="px-4 py-2 bg-white text-slate-900 rounded-lg text-sm font-bold hover:bg-slate-100">Upgrade Plan</button>
+                         <button className="px-4 py-2 bg-transparent border border-white/20 text-white rounded-lg text-sm font-bold hover:bg-white/5">View Invoices</button>
+                     </div>
                  </div>
              </div>
          )}
