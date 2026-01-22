@@ -106,8 +106,6 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
                 const activeVariant = post.variants.find(v => v.id === activeId) || post.variants[0];
                 setActiveVariantId(activeId);
                 setContent(activeVariant.content);
-                // Note: Currently media isn't strictly per-variant in UI state, but model supports it.
-                // We'll load the top-level media which represents active variant.
             } else {
                 // Fallback for legacy posts
                 setContent(post.content);
@@ -977,49 +975,55 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
            {/* AI Assistant */}
            <div className="bg-white rounded-[32px] p-6 shadow-sm border border-black/5 relative overflow-hidden">
               <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-100 rounded-full blur-3xl opacity-50 -mr-10 -mt-10 pointer-events-none"></div>
-              <div className="flex items-center gap-2 mb-4">
-                 <Sparkles className="w-5 h-5 text-yellow-500 fill-current" />
-                 <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wide">AI Assistant</h2>
-              </div>
-              <div className="flex flex-col gap-4">
-                 <div className="flex gap-4">
-                    <div className="flex-1">
-                       <input 
-                         type="text" 
-                         value={topic}
-                         onChange={(e) => setTopic(e.target.value)}
-                         placeholder="What do you want to post about?"
-                         className="w-full bg-gray-50 border-transparent focus:border-blue-500 focus:bg-white focus:ring-0 rounded-xl px-4 py-3 text-sm font-medium transition-colors"
-                       />
-                    </div>
-                    <div className="w-40 shrink-0">
-                       <select 
-                          value={tone}
-                          onChange={(e) => setTone(e.target.value)}
-                          className="w-full h-full bg-gray-50 border-transparent focus:border-blue-500 focus:bg-white rounded-xl px-4 text-sm font-bold text-gray-700 cursor-pointer"
-                       >
-                          {TONES.map(t => <option key={t} value={t}>{t}</option>)}
-                       </select>
-                    </div>
-                 </div>
-                 <div className="flex gap-2">
-                    <button 
-                      onClick={handleGenerate}
-                      disabled={isGenerating || !topic}
-                      className="flex-1 py-3 bg-black text-white rounded-xl font-bold text-sm shadow-lg shadow-black/10 hover:bg-gray-800 active:scale-[0.99] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-                    >
-                        {isGenerating ? <RotateCcw className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4 text-yellow-300" />}
-                        {isGenerating ? 'Drafting...' : 'Generate Draft'}
-                    </button>
-                    <button 
-                      onClick={handleGenerateVariants}
-                      disabled={isGenerating || !topic}
-                      className="px-6 py-3 bg-purple-100 text-purple-700 rounded-xl font-bold text-sm hover:bg-purple-200 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-                      title="Create 3 unique variations"
-                    >
-                        <Split className="w-4 h-4" /> Variants
-                    </button>
-                 </div>
+              
+              {/* Content Wrapper with Z-Index to prevent clipping or masking by absolute bg */}
+              <div className="relative z-10 flex flex-col gap-4">
+                  <div className="flex items-center gap-2 mb-0">
+                     <Sparkles className="w-5 h-5 text-yellow-500 fill-current" />
+                     <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wide">AI Assistant</h2>
+                  </div>
+                  
+                  {/* Inputs - Responsive Layout */}
+                  <div className="flex flex-col sm:flex-row gap-4">
+                     <div className="flex-1">
+                        <input 
+                          type="text" 
+                          value={topic}
+                          onChange={(e) => setTopic(e.target.value)}
+                          placeholder="What do you want to post about?"
+                          className="w-full bg-gray-50 border-transparent focus:border-blue-500 focus:bg-white focus:ring-0 rounded-xl px-4 py-3 text-sm font-medium transition-colors"
+                        />
+                     </div>
+                     <div className="w-full sm:w-48 shrink-0">
+                        <select 
+                           value={tone}
+                           onChange={(e) => setTone(e.target.value)}
+                           className="w-full bg-gray-50 border-transparent focus:border-blue-500 focus:bg-white rounded-xl px-4 py-3 text-sm font-bold text-gray-700 cursor-pointer"
+                        >
+                           {TONES.map(t => <option key={t} value={t}>{t}</option>)}
+                        </select>
+                     </div>
+                  </div>
+                  
+                  {/* Action Buttons */}
+                  <div className="flex gap-2">
+                     <button 
+                       onClick={handleGenerate}
+                       disabled={isGenerating || !topic}
+                       className="flex-1 py-3 bg-black text-white rounded-xl font-bold text-sm shadow-lg shadow-black/10 hover:bg-gray-800 active:scale-[0.99] transition-all flex items-center justify-center gap-2 disabled:opacity-50 whitespace-nowrap"
+                     >
+                         {isGenerating ? <RotateCcw className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4 text-yellow-300" />}
+                         {isGenerating ? 'Drafting...' : 'Generate Draft'}
+                     </button>
+                     <button 
+                       onClick={handleGenerateVariants}
+                       disabled={isGenerating || !topic}
+                       className="px-6 py-3 bg-purple-100 text-purple-700 rounded-xl font-bold text-sm hover:bg-purple-200 transition-all flex items-center justify-center gap-2 disabled:opacity-50 whitespace-nowrap"
+                       title="Create 3 unique variations"
+                     >
+                         <Split className="w-4 h-4" /> Variants
+                     </button>
+                  </div>
               </div>
            </div>
 
@@ -1040,7 +1044,10 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
                                    ? selectedPlatforms.filter(i => i !== p) 
                                    : [...selectedPlatforms, p];
                                 setSelectedPlatforms(newSelection);
-                                // Trigger modified state logic handled by useEffect
+                                // Fix: Auto-switch preview to the newly selected platform
+                                if (!isSelected) {
+                                   setPreviewPlatform(p);
+                                }
                              }}
                              className={`
                                 flex items-center gap-2 px-3 py-2 rounded-full border transition-all duration-200 text-xs font-bold

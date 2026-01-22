@@ -1,49 +1,43 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon, 
-  Eye, Filter, LayoutList, Grid3X3,
-  Globe, Zap, CheckCircle2, RotateCcw, AlertTriangle, Archive, FileEdit, Check, Split,
-  User, Bot, Clock, CalendarDays, MoreHorizontal, ArrowRight, Trash2, StopCircle, Layers, X, AlertCircle
+  Eye, LayoutList, Grid3X3,
+  Globe, Zap, CheckCircle2, RotateCcw, AlertTriangle, Archive, FileEdit, Check, 
+  User, Bot, Clock, CalendarDays, Trash2, X, Search, Filter, 
+  ArrowRight, Sparkles, AlertOctagon, MoreHorizontal, CalendarRange, Copy
 } from 'lucide-react';
 import { store } from '../services/mockStore';
 import { Post, Platform, PostStatus, PageProps, BotType } from '../types';
 import { PlatformIcon } from '../components/PlatformIcon';
-import { validatePost } from '../services/validationService';
 
-// --- Constants & Helpers ---
+// --- Visual Config ---
 
-const TIMEZONES = [
-  { label: 'New York (EST)', value: 'America/New_York' },
-  { label: 'Los Angeles (PST)', value: 'America/Los_Angeles' },
-  { label: 'London (GMT)', value: 'Europe/London' },
-  { label: 'India (IST)', value: 'Asia/Kolkata' },
-  { label: 'Tokyo (JST)', value: 'Asia/Tokyo' },
-  { label: 'Sydney (AEDT)', value: 'Australia/Sydney' },
-];
-
-const getStatusStyle = (status: PostStatus, author?: string) => {
-  switch (status) {
-    case PostStatus.Published: return 'bg-green-100 text-green-700 border-green-200';
-    case PostStatus.Scheduled: return 'bg-blue-100 text-blue-700 border-blue-200';
-    case PostStatus.Approved: return 'bg-indigo-100 text-indigo-700 border-indigo-200';
-    case PostStatus.NeedsReview: return 'bg-amber-100 text-amber-700 border-amber-200';
-    case PostStatus.Draft: 
-        return author === 'User' 
-            ? 'bg-gray-100 text-gray-600 border-gray-200' // Human Draft
-            : 'bg-purple-50 text-purple-600 border-purple-100'; // Bot Draft (Active)
-    case PostStatus.Failed: return 'bg-red-100 text-red-700 border-red-200';
-    case PostStatus.Archived: return 'bg-slate-100 text-slate-500 border-slate-200 dashed-border';
-    default: return 'bg-gray-100 text-gray-700 border-gray-200';
-  }
+const STATUS_CONFIG: Record<PostStatus, { icon: any, color: string, bg: string, border: string, label: string }> = {
+  [PostStatus.Draft]: { icon: FileEdit, color: 'text-slate-500', bg: 'bg-slate-100', border: 'border-slate-200', label: 'Draft' },
+  [PostStatus.NeedsReview]: { icon: Eye, color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-200', label: 'Review' },
+  [PostStatus.Approved]: { icon: CheckCircle2, color: 'text-indigo-600', bg: 'bg-indigo-50', border: 'border-indigo-200', label: 'Approved' },
+  [PostStatus.Scheduled]: { icon: Clock, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-200', label: 'Scheduled' },
+  [PostStatus.Published]: { icon: Zap, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-200', label: 'Published' },
+  [PostStatus.Failed]: { icon: AlertTriangle, color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-200', label: 'Failed' },
+  [PostStatus.Archived]: { icon: Archive, color: 'text-slate-400', bg: 'bg-slate-50', border: 'border-slate-200', label: 'Archived' },
 };
 
-const getStatusLabel = (status: PostStatus, author?: string) => {
-    if (status === PostStatus.Draft) {
-        return author === 'User' ? 'Draft' : 'Bot Draft';
-    }
-    return status;
-}
+const PLATFORM_COLORS: Record<string, string> = {
+  [Platform.Twitter]: 'bg-black text-white border-black',
+  [Platform.LinkedIn]: 'bg-[#0077b5] text-white border-[#0077b5]',
+  [Platform.Instagram]: 'bg-gradient-to-tr from-yellow-400 via-red-500 to-purple-500 text-white border-transparent',
+  [Platform.Facebook]: 'bg-[#1877F2] text-white border-[#1877F2]',
+  [Platform.YouTube]: 'bg-[#FF0000] text-white border-[#FF0000]',
+  [Platform.GoogleBusiness]: 'bg-[#4285F4] text-white border-[#4285F4]',
+  'All': 'bg-slate-800 text-white border-slate-800'
+};
+
+const TIME_PRESETS = [
+    { label: 'Today', days: 0 },
+    { label: 'Tomorrow', days: 1 },
+    { label: 'Next 7 Days', days: 7 },
+];
 
 const isPastDate = (date: Date) => {
   const today = new Date();
@@ -51,71 +45,34 @@ const isPastDate = (date: Date) => {
   return date < today;
 };
 
-// Simulate AI Best Time Suggestion
-const isBestTime = (day: number) => {
-  return day % 3 === 0 || day % 7 === 0; // Mock logic
-};
-
-// --- Validation Helper ---
-const getPostValidationState = (post: Post) => {
-    // Skip validation for published/archived as they are historical
-    if (post.status === PostStatus.Published || post.status === PostStatus.Archived) return null;
-
-    // Check date only if scheduled
-    const checkDate = post.status === PostStatus.Scheduled ? new Date(post.scheduledFor) : undefined;
-
-    const result = validatePost(
-        post.content,
-        post.platforms,
-        post.mediaUrl ? { 
-            id: 'mock', 
-            name: 'media', 
-            type: post.mediaType || 'image', 
-            url: post.mediaUrl, 
-            size: 0, 
-            createdAt: '' 
-        } : null,
-        post.isCarousel,
-        post.title,
-        checkDate
-    );
-
-    if (!result.isValid) return { isError: true, message: result.errors[0] };
-    if (result.warnings.length > 0) return { isError: false, message: result.warnings[0] };
-    return null;
-};
+// --- Component ---
 
 export const Calendar: React.FC<PageProps> = ({ onNavigate, params }) => {
+  // Core State
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [posts, setPosts] = useState<Post[]>([]);
   
-  // Filter & View State
-  const [filterPlatform, setFilterPlatform] = useState<Platform | 'All'>('All');
-  const [filterStatus, setFilterStatus] = useState<PostStatus | 'All'>('All');
-  const [filterAuthor, setFilterAuthor] = useState<string | 'All'>('All');
+  // View State
   const [viewMode, setViewMode] = useState<'Month' | 'Agenda'>('Month');
   
-  // Selection & Bulk Actions
+  // Filter State
+  const [selectedPlatforms, setSelectedPlatforms] = useState<Platform[]>([]);
+  const [selectedStatuses, setSelectedStatuses] = useState<PostStatus[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showIssuesOnly, setShowIssuesOnly] = useState(false);
+
+  // Bulk Selection
   const [selectedPostIds, setSelectedPostIds] = useState<Set<string>>(new Set());
-  const [isBulkActionProcessing, setIsBulkActionProcessing] = useState(false);
-  const [isAssignMenuOpen, setIsAssignMenuOpen] = useState(false);
-  const bulkDateInputRef = useRef<HTMLInputElement>(null);
-  
-  // Timezone - Auto detect system default
+  const [isBulkProcessing, setIsBulkProcessing] = useState(false);
+
+  // Config
+  const [dailyLimit, setDailyLimit] = useState(3);
   const systemTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  const [selectedTimezone, setSelectedTimezone] = useState(systemTz);
 
-  // Capacity Limits
-  const [dailyLimit, setDailyLimit] = useState(3); // Default limit
-
-  // Drag & Drop State
-  const [draggedPost, setDraggedPost] = useState<Post | null>(null);
-
+  // Load Data
   useEffect(() => {
     loadPosts();
-    
-    // Fetch Bot Config to get Calendar Capacity
     store.getBots().then(bots => {
        const creatorBot = bots.find(b => b.type === BotType.Creator);
        if (creatorBot?.config?.calendarConfig?.maxPostsPerDay) {
@@ -123,788 +80,641 @@ export const Calendar: React.FC<PageProps> = ({ onNavigate, params }) => {
        }
     });
 
-    // Handle Navigation Params (e.g. Filter by Bot or Date)
     if (params) {
-      if (params.filterAuthor) {
-        setFilterAuthor(params.filterAuthor);
-      }
       if (params.date) {
         const d = new Date(params.date);
         if (!isNaN(d.getTime())) {
             setSelectedDate(d);
-            setCurrentDate(new Date(d.getFullYear(), d.getMonth(), 1)); // Switch month view to target
+            setCurrentDate(new Date(d.getFullYear(), d.getMonth(), 1));
         }
       }
+      if (params.view) setViewMode(params.view);
     }
   }, [params]);
 
-  const loadPosts = async () => {
-    const fetchedPosts = await store.getPosts();
-    setPosts(fetchedPosts);
+  const loadPosts = async () => setPosts(await store.getPosts());
+
+  // --- Handlers ---
+
+  const handleTimeJump = (daysOffset: number) => {
+      const target = new Date();
+      target.setDate(target.getDate() + daysOffset);
+      setSelectedDate(target);
+      setCurrentDate(new Date(target.getFullYear(), target.getMonth(), 1));
+      
+      if (daysOffset > 1) {
+          // If jumping to a range (like next 7 days), Agenda view is usually better
+          setViewMode('Agenda');
+      }
   };
 
-  const handlePrevMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
-  const handleNextMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
-
-  const handleDateClick = (date: Date) => {
-    setSelectedDate(date);
+  const togglePlatform = (p: Platform) => {
+    setSelectedPlatforms(prev => 
+      prev.includes(p) ? prev.filter(i => i !== p) : [...prev, p]
+    );
   };
 
-  const handleCreateEvent = () => {
-    let dateToUse = selectedDate;
-    if (isPastDate(selectedDate)) {
-      dateToUse = new Date();
-    }
-    // Deep Sync: Pass all relevant context to Studio
-    onNavigate('creator', { 
-      date: dateToUse.toISOString(),
-      timezone: selectedTimezone,
-      platform: filterPlatform !== 'All' ? filterPlatform : undefined
-    });
+  const toggleStatus = (s: PostStatus) => {
+    setShowIssuesOnly(false); // Disable quick filter if manual selection
+    setSelectedStatuses(prev => 
+      prev.includes(s) ? prev.filter(i => i !== s) : [...prev, s]
+    );
   };
 
-  const handleEditPost = (post: Post) => {
-    onNavigate('creator', { postId: post.id });
+  const toggleIssuesOnly = () => {
+      if (showIssuesOnly) {
+          setShowIssuesOnly(false);
+          setSelectedStatuses([]);
+      } else {
+          setShowIssuesOnly(true);
+          setSelectedStatuses([PostStatus.Failed, PostStatus.NeedsReview]);
+      }
   };
 
-  // --- Selection Logic ---
+  const clearFilters = () => {
+    setSelectedPlatforms([]);
+    setSelectedStatuses([]);
+    setSearchQuery('');
+    setShowIssuesOnly(false);
+  };
+
   const toggleSelection = (e: React.MouseEvent, postId: string) => {
     e.stopPropagation();
     const newSet = new Set(selectedPostIds);
-    if (newSet.has(postId)) {
-      newSet.delete(postId);
-    } else {
-      newSet.add(postId);
-    }
+    if (newSet.has(postId)) newSet.delete(postId);
+    else newSet.add(postId);
     setSelectedPostIds(newSet);
   };
 
-  const clearSelection = () => {
-    setSelectedPostIds(new Set());
-    setIsAssignMenuOpen(false);
+  const performBulkAction = async (actionType: 'Approve' | 'Draft' | 'Delete' | 'Archive' | 'MoveDay' | 'Duplicate') => {
+      if (selectedPostIds.size === 0) return;
+      if (actionType === 'Delete' && !confirm(`Delete ${selectedPostIds.size} posts?`)) return;
+
+      setIsBulkProcessing(true);
+      const updates = posts.filter(p => selectedPostIds.has(p.id));
+
+      for (const post of updates) {
+          let updated = { ...post };
+          
+          if (actionType === 'Approve') updated.status = PostStatus.Approved;
+          if (actionType === 'Draft') updated.status = PostStatus.Draft;
+          if (actionType === 'Archive') updated.status = PostStatus.Archived;
+          if (actionType === 'MoveDay') {
+              const d = new Date(post.scheduledFor);
+              d.setDate(d.getDate() + 1);
+              updated.scheduledFor = d.toISOString();
+          }
+          if (actionType === 'Duplicate') {
+              await store.addPost({ 
+                  ...post, 
+                  id: Date.now().toString() + Math.random(), 
+                  status: PostStatus.Draft,
+                  title: post.title ? `${post.title} (Copy)` : undefined
+              });
+              continue; 
+          }
+
+          if (actionType === 'Delete') await store.deletePost(post.id);
+          else await store.updatePost(updated);
+      }
+
+      await loadPosts();
+      setIsBulkProcessing(false);
+      setSelectedPostIds(new Set());
   };
 
-  const selectAllBots = () => {
-    const botPostIds = posts
-      .filter(p => p.author !== 'User' && p.status !== PostStatus.Published)
-      .map(p => p.id);
-    setSelectedPostIds(new Set(botPostIds));
-  };
+  // --- Filtering Logic ---
+  const filteredPosts = useMemo(() => {
+    return posts.filter(post => {
+      if (selectedPlatforms.length > 0 && !post.platforms.some(p => selectedPlatforms.includes(p))) return false;
+      if (selectedStatuses.length > 0 && !selectedStatuses.includes(post.status)) return false;
+      if (searchQuery) {
+         const q = searchQuery.toLowerCase();
+         return post.content.toLowerCase().includes(q) || post.platforms.some(p => p.toLowerCase().includes(q));
+      }
+      return true;
+    }).sort((a, b) => new Date(a.scheduledFor).getTime() - new Date(b.scheduledFor).getTime());
+  }, [posts, selectedPlatforms, selectedStatuses, searchQuery]);
 
-  // --- Bulk Actions ---
-  const performBulkAction = async (action: (post: Post) => Post) => {
-    if (selectedPostIds.size === 0) return;
-    setIsBulkActionProcessing(true);
-    
-    // Create updates based on current posts state
-    const updates = posts
-      .filter(p => selectedPostIds.has(p.id))
-      .map(p => action(p));
+  // Grouping for Agenda
+  const agendaGroups = useMemo(() => {
+      const groups: Record<string, Post[]> = { 'Today': [], 'Tomorrow': [], 'This Week': [], 'Later': [], 'Past': [] };
+      const today = new Date(); today.setHours(0,0,0,0);
+      const tomorrow = new Date(today); tomorrow.setDate(today.getDate() + 1);
+      const nextWeek = new Date(today); nextWeek.setDate(today.getDate() + 7);
 
-    for (const post of updates) {
-      await store.updatePost(post);
-    }
+      filteredPosts.forEach(post => {
+          const d = new Date(post.scheduledFor); d.setHours(0,0,0,0);
+          if (d.getTime() < today.getTime()) groups['Past'].push(post);
+          else if (d.getTime() === today.getTime()) groups['Today'].push(post);
+          else if (d.getTime() === tomorrow.getTime()) groups['Tomorrow'].push(post);
+          else if (d < nextWeek) groups['This Week'].push(post);
+          else groups['Later'].push(post);
+      });
+      return groups;
+  }, [filteredPosts]);
 
-    await loadPosts();
-    setIsBulkActionProcessing(false);
-    clearSelection();
-  };
+  // Selected Day Posts (Month View)
+  const selectedDayPosts = filteredPosts.filter(p => {
+      const d = new Date(p.scheduledFor);
+      return d.toDateString() === selectedDate.toDateString();
+  });
 
-  const handleBulkReschedule = (dateStr: string) => {
-    if (!dateStr) return;
-    
-    // Explicitly parse parts to avoid UTC/Local timezone shifts
-    const [year, month, day] = dateStr.split('-').map(Number);
-
-    performBulkAction(post => {
-      const original = new Date(post.scheduledFor);
-      
-      // Construct local date from input
-      const newDate = new Date(year, month - 1, day);
-      
-      // Preserve original time
-      newDate.setHours(original.getHours(), original.getMinutes());
-      
-      return { ...post, scheduledFor: newDate.toISOString(), status: PostStatus.Scheduled };
-    });
-
-    // Reset input value to allow re-selection of same date if needed
-    if (bulkDateInputRef.current) bulkDateInputRef.current.value = '';
-  };
-
-  const handleBulkMoveWeek = () => {
-    performBulkAction(post => {
-      const d = new Date(post.scheduledFor);
-      d.setDate(d.getDate() + 7);
-      return { ...post, scheduledFor: d.toISOString(), status: PostStatus.Scheduled };
-    });
-  };
-
-  const handleBulkPause = () => {
-    if(!confirm("Revert selected posts to Draft status? This will stop them from publishing.")) return;
-    performBulkAction(post => ({ ...post, status: PostStatus.Draft }));
-  };
-  
-  const handleBulkApprove = () => {
-    performBulkAction(post => ({ ...post, status: PostStatus.Approved }));
-  };
-
-  const handleBulkAssignBot = (botType: BotType | 'User') => {
-    performBulkAction(post => ({ ...post, author: botType }));
-    setIsAssignMenuOpen(false);
-  };
-
-  const handleBulkDelete = async () => {
-    if (selectedPostIds.size === 0) return;
-    if (!window.confirm(`Permanently delete ${selectedPostIds.size} posts?`)) return;
-    
-    setIsBulkActionProcessing(true);
-    const ids = Array.from(selectedPostIds);
-    for (const id of ids) {
-        await store.deletePost(id);
-    }
-    await loadPosts();
-    clearSelection();
-    setIsBulkActionProcessing(false);
-  };
-
-  const handleRevertToDraft = async (e: React.MouseEvent, post: Post) => {
-    e.stopPropagation();
-    if(window.confirm('Cancel scheduling and move to Drafts?')) {
-        const updated = { ...post, status: PostStatus.Draft };
-        await store.updatePost(updated);
-        await loadPosts();
-    }
-  };
-
-  const handleArchive = async (e: React.MouseEvent, post: Post) => {
-    e.stopPropagation();
-    if(window.confirm('Archive this post? It will be hidden from main views.')) {
-        const updated = { ...post, status: PostStatus.Archived };
-        await store.updatePost(updated);
-        await loadPosts();
-    }
-  };
-
-  // --- Drag & Drop Handlers ---
-  const handleDragStart = (e: React.DragEvent, post: Post) => {
-    setDraggedPost(post);
-    e.dataTransfer.setData('text/plain', post.id);
-    e.dataTransfer.effectAllowed = 'move';
-  };
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-  };
-
-  const handleDrop = async (e: React.DragEvent, date: Date) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (!draggedPost) return;
-
-    if (isPastDate(date) && (draggedPost.status === PostStatus.Scheduled || draggedPost.status === PostStatus.Published)) {
-       alert("Cannot schedule posts in the past.");
-       setDraggedPost(null);
-       return;
-    }
-
-    const originalDate = new Date(draggedPost.scheduledFor);
-    const newDate = new Date(date);
-    // Auto-update: Keep original time
-    newDate.setHours(originalDate.getHours(), originalDate.getMinutes(), 0, 0);
-
-    const updatedPost = {
-      ...draggedPost,
-      scheduledFor: newDate.toISOString(),
-      status: PostStatus.Scheduled // Auto-switch to scheduled if it was Draft
-    };
-
-    // Optimistic Update
-    setPosts(prev => prev.map(p => p.id === updatedPost.id ? updatedPost : p));
-    await store.updatePost(updatedPost);
-    setDraggedPost(null);
-    await loadPosts();
-  };
-
-  // --- Logic & Filtering ---
+  // --- Render Helpers ---
   const daysInMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate();
   const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1).getDay();
-  
-  const getPostsForDate = (date: Date) => {
-    return posts.filter(post => {
-      const pDate = new Date(post.scheduledFor);
-      return pDate.getDate() === date.getDate() && 
-             pDate.getMonth() === date.getMonth() && 
-             pDate.getFullYear() === date.getFullYear();
-    });
-  };
-
-  const rawPostsForDate = getPostsForDate(selectedDate);
-  
-  // Apply all filters
-  const filteredPosts = rawPostsForDate.filter(p => {
-    if (filterPlatform !== 'All' && !p.platforms.includes(filterPlatform)) return false;
-    if (filterStatus !== 'All' && p.status !== filterStatus) return false;
-    if (filterAuthor !== 'All' && p.author !== filterAuthor) return false;
-    return true;
-  }).sort((a, b) => new Date(a.scheduledFor).getTime() - new Date(b.scheduledFor).getTime());
-
-  const getAgendaPosts = () => {
-    return posts
-      .filter(p => new Date(p.scheduledFor) >= new Date()) // Future only
-      .filter(p => filterPlatform === 'All' || p.platforms.includes(filterPlatform))
-      .filter(p => filterStatus === 'All' || p.status === filterStatus)
-      .filter(p => filterAuthor === 'All' || p.author === filterAuthor)
-      .sort((a, b) => new Date(a.scheduledFor).getTime() - new Date(b.scheduledFor).getTime())
-      .slice(0, 50); // Increased limit for bulk operations utility
-  };
-
-  const agendaPosts = getAgendaPosts();
+  const activeFiltersCount = selectedPlatforms.length + selectedStatuses.length + (searchQuery ? 1 : 0);
+  const isSelectedDatePast = isPastDate(selectedDate);
 
   return (
-    <div className="h-full flex flex-col gap-6 animate-in fade-in duration-700 relative">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between px-2 gap-4">
+    <div className="h-full flex flex-col gap-6 animate-in fade-in duration-500 pb-24 relative">
+      
+      {/* 1. Top Control Bar */}
+      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 shrink-0">
         <div>
-          <h1 className="text-[34px] font-bold text-[#1d1d1f] tracking-tight">Calendar</h1>
-          <div className="flex items-center gap-2 mt-1">
-             <Globe className="w-4 h-4 text-gray-400" />
-             <select 
-               value={selectedTimezone}
-               onChange={(e) => setSelectedTimezone(e.target.value)}
-               className="bg-transparent text-sm font-medium text-gray-500 hover:text-gray-800 outline-none cursor-pointer"
-             >
-                <option value={systemTz}>System ({systemTz})</option>
-                {TIMEZONES.filter(t => t.value !== systemTz).map(tz => (
-                  <option key={tz.value} value={tz.value}>{tz.label}</option>
-                ))}
-             </select>
+          <h1 className="text-3xl font-bold text-[#1d1d1f] tracking-tight">Calendar</h1>
+          <div className="flex items-center gap-3 mt-1 text-sm text-gray-500 font-medium">
+             <div className="flex items-center gap-1.5">
+                <Globe className="w-3.5 h-3.5" />
+                <span>{systemTz.split('/').pop()?.replace('_', ' ')}</span>
+             </div>
+             <span>•</span>
+             <span>{posts.length} Total Posts</span>
           </div>
         </div>
         
-        <div className="flex flex-wrap gap-3">
-           <div className="bg-white border border-gray-200 rounded-lg p-1 flex">
+        <div className="flex flex-wrap items-center gap-3">
+           {/* Time Jumps */}
+           <div className="flex bg-white rounded-lg p-1 border border-gray-200 shadow-sm">
+              {TIME_PRESETS.map((preset) => (
+                  <button 
+                    key={preset.label}
+                    onClick={() => handleTimeJump(preset.days)}
+                    className="px-3 py-1.5 text-xs font-bold text-gray-600 hover:text-black hover:bg-gray-50 rounded-md transition-colors"
+                  >
+                    {preset.label}
+                  </button>
+              ))}
+           </div>
+
+           {/* View Toggle */}
+           <div className="bg-white border border-gray-200 rounded-lg p-1 flex shadow-sm">
               <button 
-                onClick={() => setViewMode('Month')}
-                className={`px-3 py-1.5 rounded-md text-xs font-bold flex items-center gap-2 transition-all ${viewMode === 'Month' ? 'bg-gray-100 text-black shadow-sm' : 'text-gray-500 hover:text-black'}`}
+                onClick={() => setViewMode('Month')} 
+                className={`px-4 py-2 rounded-md text-xs font-bold flex items-center gap-2 transition-all ${viewMode === 'Month' ? 'bg-gray-900 text-white shadow-md' : 'text-gray-500 hover:text-black hover:bg-gray-50'}`}
               >
                 <Grid3X3 className="w-3.5 h-3.5" /> Month
               </button>
               <button 
-                onClick={() => setViewMode('Agenda')}
-                className={`px-3 py-1.5 rounded-md text-xs font-bold flex items-center gap-2 transition-all ${viewMode === 'Agenda' ? 'bg-gray-100 text-black shadow-sm' : 'text-gray-500 hover:text-black'}`}
+                onClick={() => setViewMode('Agenda')} 
+                className={`px-4 py-2 rounded-md text-xs font-bold flex items-center gap-2 transition-all ${viewMode === 'Agenda' ? 'bg-gray-900 text-white shadow-md' : 'text-gray-500 hover:text-black hover:bg-gray-50'}`}
               >
                 <LayoutList className="w-3.5 h-3.5" /> Agenda
               </button>
            </div>
-           <button onClick={() => setSelectedDate(new Date())} className="px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-50 shadow-sm transition-colors">
-              Today
-           </button>
-           <button onClick={handleCreateEvent} className="px-5 py-2 bg-black text-white rounded-lg text-sm font-semibold shadow-lg shadow-black/20 hover:scale-105 active:scale-95 transition-all flex items-center gap-2">
-              <Plus className="w-4 h-4" /> New Post
+           
+           <button onClick={() => onNavigate('creator', { date: new Date().toISOString() })} className="px-5 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-blue-500/20 hover:bg-blue-700 transition-all flex items-center gap-2 active:scale-95">
+              <Plus className="w-4 h-4" /> Create Post
            </button>
         </div>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-8 h-full overflow-hidden">
-        {/* Main Content Area */}
-        <div className="flex-1 bg-white rounded-[32px] border border-black/5 shadow-sm p-6 flex flex-col overflow-hidden relative">
-          
-          {/* Top Bulk Action Bar (Replaces Headers when active) */}
-          {selectedPostIds.size > 0 ? (
-             <div className="w-full bg-[#1d1d1f] text-white p-3 rounded-2xl shadow-xl flex items-center justify-between mb-4 animate-in slide-in-from-top-2 z-30">
-                <div className="flex items-center gap-4 pl-2">
-                   <div className="flex flex-col">
-                      <span className="text-sm font-bold text-white">{selectedPostIds.size} Selected</span>
-                      <span className="text-[10px] text-gray-400 font-medium">Bulk Actions</span>
-                   </div>
-                   <div className="h-8 w-px bg-gray-700"></div>
-                   <button onClick={clearSelection} className="text-xs font-bold text-gray-400 hover:text-white transition-colors">
-                      Deselect All
-                   </button>
+      {/* 2. Enhanced Filter Toolbar */}
+      <div className="bg-white/80 backdrop-blur-xl border border-white/60 rounded-3xl p-4 shadow-[0_4px_20px_-8px_rgba(0,0,0,0.05)] flex flex-col gap-4 relative z-10 shrink-0">
+         <div className="flex flex-col lg:flex-row gap-6 items-start lg:items-center">
+             
+             {/* Search */}
+             <div className="relative w-full lg:w-64 shrink-0">
+                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                 <input 
+                    type="text" 
+                    placeholder="Search posts, tags..." 
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-9 pr-4 py-2.5 bg-gray-50 border border-transparent focus:border-blue-500/20 focus:bg-white focus:ring-2 focus:ring-blue-500/20 rounded-xl text-sm font-medium transition-all"
+                 />
+             </div>
+
+             <div className="h-8 w-px bg-gray-200 hidden lg:block"></div>
+
+             {/* Platform Filters */}
+             <div className="flex-1 flex flex-col gap-2 w-full overflow-hidden">
+                <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Platform</label>
+                    {activeFiltersCount > 0 && (
+                        <button onClick={clearFilters} className="text-[10px] font-bold text-red-500 hover:underline">Reset All</button>
+                    )}
                 </div>
-                
-                <div className="flex items-center gap-2">
-                   {/* Approve */}
-                   <button onClick={handleBulkApprove} className="flex flex-col items-center gap-1 p-2 hover:bg-white/10 rounded-lg min-w-[60px] transition-colors" title="Approve Selected">
-                      <CheckCircle2 className="w-5 h-5 text-green-400" />
-                      <span className="text-[9px] font-bold uppercase tracking-wider">Approve</span>
-                   </button>
-                   
-                   {/* Reschedule */}
-                   <div className="relative">
-                       <button className="flex flex-col items-center gap-1 p-2 hover:bg-white/10 rounded-lg min-w-[60px] transition-colors" title="Change Date">
-                          <CalendarDays className="w-5 h-5 text-blue-400" />
-                          <span className="text-[9px] font-bold uppercase tracking-wider">Move</span>
-                       </button>
-                       <input 
-                          type="date" 
-                          ref={bulkDateInputRef}
-                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                          onChange={(e) => handleBulkReschedule(e.target.value)}
-                       />
-                   </div>
-
-                   {/* Assign Bot */}
-                   <div className="relative">
-                       <button 
-                          onClick={() => setIsAssignMenuOpen(!isAssignMenuOpen)}
-                          className={`flex flex-col items-center gap-1 p-2 rounded-lg min-w-[60px] transition-colors ${isAssignMenuOpen ? 'bg-white/20' : 'hover:bg-white/10'}`}
-                        >
-                          <Bot className="w-5 h-5 text-purple-400" />
-                          <span className="text-[9px] font-bold uppercase tracking-wider">Assign</span>
-                       </button>
-                       {isAssignMenuOpen && (
-                         <>
-                           <div className="fixed inset-0 z-10" onClick={() => setIsAssignMenuOpen(false)} />
-                           <div className="absolute top-full right-0 mt-2 bg-white rounded-xl shadow-xl border border-gray-200 p-1 w-48 z-20 animate-in fade-in zoom-in-95 duration-100">
-                               <div className="px-3 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 mb-1 flex justify-between items-center">
-                                  Assign Author
-                                  <X className="w-3 h-3 cursor-pointer" onClick={() => setIsAssignMenuOpen(false)} />
-                               </div>
-                               {Object.values(BotType).map(bot => (
-                                  <button 
-                                    key={bot} 
-                                    onClick={() => handleBulkAssignBot(bot)}
-                                    className="w-full text-left px-3 py-2 text-xs font-bold text-gray-700 hover:bg-purple-50 hover:text-purple-700 rounded-lg flex items-center gap-2"
-                                  >
-                                     <Bot className="w-3 h-3" /> {bot}
-                                  </button>
-                               ))}
-                               <button 
-                                    onClick={() => handleBulkAssignBot('User' as any)}
-                                    className="w-full text-left px-3 py-2 text-xs font-bold text-gray-700 hover:bg-gray-100 rounded-lg flex items-center gap-2"
-                                  >
-                                     <User className="w-3 h-3" /> User (Manual)
-                              </button>
-                           </div>
-                         </>
-                       )}
-                   </div>
-
-                   <div className="h-8 w-px bg-gray-700 mx-2"></div>
-
-                   {/* Delete */}
-                   <button onClick={handleBulkDelete} className="flex flex-col items-center gap-1 p-2 hover:bg-red-500/20 rounded-lg group min-w-[60px] transition-colors" title="Delete Selected">
-                      <Trash2 className="w-5 h-5 text-red-500 group-hover:text-red-400" />
-                      <span className="text-[9px] font-bold uppercase tracking-wider text-red-500 group-hover:text-red-400">Delete</span>
-                   </button>
+                <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+                    {Object.values(Platform).map(p => {
+                        const isActive = selectedPlatforms.includes(p);
+                        const brandStyle = PLATFORM_COLORS[p] || 'bg-gray-100 text-gray-500';
+                        return (
+                            <button
+                                key={p}
+                                onClick={() => togglePlatform(p)}
+                                className={`
+                                    relative flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-bold transition-all whitespace-nowrap
+                                    ${isActive ? `${brandStyle} shadow-md` : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300 hover:bg-gray-50'}
+                                `}
+                                title={p}
+                            >
+                                <PlatformIcon platform={p} size={14} white={isActive} />
+                                <span className="hidden sm:inline">{p === Platform.Twitter ? 'X' : p}</span>
+                            </button>
+                        );
+                    })}
                 </div>
              </div>
-          ) : (
-             // Standard Headers
-             <>
-                {viewMode === 'Month' ? (
-                  <div className="flex items-center justify-between mb-6">
-                     <h2 className="text-xl font-bold text-gray-900">
-                       {currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-                     </h2>
-                     <div className="flex items-center gap-1 bg-gray-100 rounded-full p-1">
-                       <button onClick={handlePrevMonth} className="p-2 hover:bg-white rounded-full transition-shadow hover:shadow-sm"><ChevronLeft className="w-4 h-4 text-gray-600" /></button>
-                       <button onClick={handleNextMonth} className="p-2 hover:bg-white rounded-full transition-shadow hover:shadow-sm"><ChevronRight className="w-4 h-4 text-gray-600" /></button>
-                     </div>
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-between mb-6 pb-2 border-b border-gray-100">
-                      <h3 className="text-lg font-bold text-gray-800">Upcoming Agenda</h3>
-                      <div className="text-xs text-gray-500 font-medium">{agendaPosts.length} posts scheduled</div>
-                  </div>
-                )}
-             </>
-          )}
 
-          {viewMode === 'Month' ? (
-            <>
-              <div className="grid grid-cols-7 mb-4">
-                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                  <div key={day} className="text-center text-[11px] font-bold text-gray-400 uppercase tracking-widest">{day}</div>
-                ))}
-              </div>
+             <div className="h-8 w-px bg-gray-200 hidden lg:block"></div>
 
-              <div className="grid grid-cols-7 grid-rows-5 gap-2 flex-1 min-h-0 overflow-y-auto custom-scrollbar">
-                 {Array.from({ length: firstDayOfMonth }).map((_, i) => (
-                    <div key={`empty-${i}`} />
-                 ))}
-                 {Array.from({ length: daysInMonth }).map((_, i) => {
-                    const day = i + 1;
-                    const date = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
-                    const dayPosts = getPostsForDate(date);
-                    const isSelected = selectedDate.getDate() === day && selectedDate.getMonth() === currentDate.getMonth();
-                    const isToday = new Date().toDateString() === date.toDateString();
-                    const isPast = isPastDate(date);
-                    const isSuggested = isBestTime(day) && !isPast; 
-                    
-                    // Capacity Calculation (Active Scheduled/Published/Drafts, ignore Archived/Failed)
-                    const activeCount = dayPosts.filter(p => p.status !== PostStatus.Archived && p.status !== PostStatus.Failed).length;
-                    const isFull = activeCount >= dailyLimit;
-                    const isOverLimit = activeCount > dailyLimit;
-
-                    return (
-                      <div 
-                        key={day}
-                        onClick={() => handleDateClick(date)}
-                        onDragOver={handleDragOver}
-                        onDrop={(e) => handleDrop(e, date)}
+             {/* Status Filters */}
+             <div className="flex-1 flex flex-col gap-2 w-full overflow-hidden">
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Status</label>
+                <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+                    {/* Issues Toggle */}
+                    <button
+                        onClick={toggleIssuesOnly}
                         className={`
-                          relative rounded-xl p-2 transition-all duration-300 border flex flex-col justify-between group
-                          ${isPast ? 'bg-gray-50/50 hover:bg-gray-50' : 'cursor-pointer hover:bg-gray-50'}
-                          ${isSelected
-                            ? 'bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/30 scale-105 z-10 border-transparent ring-0' 
-                            : 'bg-white text-gray-700 hover:border-gray-100'}
-                          ${isToday && !isSelected ? 'ring-2 ring-blue-500 ring-offset-1 z-0' : ''}
-                          ${isSuggested && !isSelected && !isPast ? 'shadow-[0_0_15px_-3px_rgba(59,130,246,0.3)] border-blue-100' : ''}
-                          ${!isSelected && isFull && !isOverLimit ? 'border-orange-200 bg-orange-50/30' : ''}
-                          ${!isSelected && isOverLimit ? 'border-red-200 bg-red-50/30' : ''}
-                          ${!isSelected && !isFull && !isOverLimit && !isSuggested ? 'border-transparent' : ''}
-                        `}
-                      >
-                        <div className="flex justify-between items-start">
-                           <span className={`text-sm font-bold ${isSelected ? 'text-white' : isPast ? 'text-gray-400' : 'text-gray-900'}`}>{day}</span>
-                           <div className="flex gap-0.5">
-                              {/* Warning Dot for Over Limit */}
-                              {isOverLimit && !isSelected && (
-                                <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" title="Over Limit"></div>
-                              )}
-                              {dayPosts.length > 0 && dayPosts.some(p => p.status === PostStatus.NeedsReview) && (
-                                <div className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-yellow-300' : 'bg-amber-500'}`} title="Needs Review"></div>
-                              )}
-                              {isSuggested && !isSelected && !isPast && (
-                                <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse" title="AI Suggested Day"></div>
-                              )}
-                           </div>
-                           
-                           {/* Post Capacity Counter */}
-                           {!isPast && (
-                               <div className={`
-                                  absolute top-2 right-2 text-[9px] font-bold px-1.5 py-0.5 rounded-full border
-                                  ${isSelected 
-                                    ? 'bg-white/20 text-white border-white/20' 
-                                    : isOverLimit 
-                                        ? 'bg-red-100 text-red-600 border-red-200'
-                                        : isFull 
-                                            ? 'bg-orange-100 text-orange-600 border-orange-200'
-                                            : 'bg-gray-100 text-gray-400 border-gray-200'}
-                               `}>
-                                  {activeCount}/{dailyLimit}
-                               </div>
-                           )}
-                        </div>
-                        
-                        {!isPast && !isSelected && (
-                          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                             <div className="bg-blue-50 text-blue-600 p-1.5 rounded-full shadow-sm">
-                               <Plus className="w-3 h-3" />
-                             </div>
-                          </div>
-                        )}
-                        <div className="flex flex-wrap gap-1 mt-1 justify-end">
-                           {dayPosts.slice(0, 6).map((p, idx) => {
-                              const validation = getPostValidationState(p);
-                              return (
-                              <div 
-                                key={idx} 
-                                className="relative group/icon cursor-grab active:cursor-grabbing" 
-                                onClick={(e) => toggleSelection(e, p.id)}
-                                draggable={p.status !== PostStatus.Published && p.status !== PostStatus.Archived}
-                                onDragStart={(e) => {
-                                    e.stopPropagation();
-                                    handleDragStart(e, p);
-                                }}
-                              >
-                                {validation && (
-                                    <div 
-                                        className={`absolute -top-1 -left-1 z-20 rounded-full bg-white border border-white ${validation.isError ? 'text-red-500' : 'text-yellow-500'}`} 
-                                        title={validation.message}
-                                    >
-                                        <AlertCircle className="w-3 h-3 fill-white" />
-                                    </div>
-                                )}
-                                <PlatformIcon 
-                                  platform={p.platforms[0]} 
-                                  size={10} 
-                                  white={isSelected} 
-                                  className={`${isSelected ? 'opacity-90' : ''}`}
-                                />
-                                {selectedPostIds.has(p.id) && (
-                                  <div className="absolute -top-1 -right-1 w-2 h-2 bg-blue-600 rounded-full border border-white"></div>
-                                )}
-                              </div>
-                           )})}
-                        </div>
-                      </div>
-                    );
-                 })}
-              </div>
-            </>
-          ) : (
-            <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3 pb-24">
-               {agendaPosts.length === 0 ? (
-                  <div className="py-20 text-center text-gray-400">
-                     <CalendarIcon className="w-12 h-12 mx-auto mb-3 opacity-20" />
-                     <p>No upcoming posts found for current filters.</p>
-                  </div>
-               ) : (
-               agendaPosts.map(post => {
-                 const isSelected = selectedPostIds.has(post.id);
-                 const statusStyle = getStatusStyle(post.status, post.author);
-                 const isBot = post.author !== 'User';
-                 const validation = getPostValidationState(post);
-
-                 return (
-                 <div 
-                    key={post.id} 
-                    className={`flex gap-4 p-3 rounded-xl border transition-all group cursor-pointer ${
-                        isSelected ? 'bg-blue-50/50 border-blue-200 shadow-sm' : 'bg-white border-gray-100 hover:border-blue-200 hover:shadow-sm'
-                    }`}
-                    onClick={() => handleEditPost(post)}
-                    draggable={post.status !== PostStatus.Published && post.status !== PostStatus.Archived}
-                    onDragStart={(e) => handleDragStart(e, post)}
-                 >
-                    {/* Selection Checkbox */}
-                    <div className="flex items-center justify-center pl-1 cursor-pointer" onClick={(e) => toggleSelection(e, post.id)}>
-                       <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${
-                          isSelected ? 'bg-blue-600 border-blue-600 text-white' : 'border-gray-300 text-transparent hover:border-blue-400'
-                       }`}>
-                          <Check className="w-3.5 h-3.5" strokeWidth={3} />
-                       </div>
-                    </div>
-
-                    {/* Date Block */}
-                    <div className="flex flex-col items-center justify-center w-14 h-14 bg-gray-50 rounded-lg border border-gray-200 shrink-0">
-                       <span className="text-[10px] font-bold text-gray-500 uppercase">{new Date(post.scheduledFor).toLocaleDateString('en-US', { month: 'short' })}</span>
-                       <span className="text-lg font-bold text-gray-900">{new Date(post.scheduledFor).getDate()}</span>
-                    </div>
-
-                    <div className="flex-1 min-w-0 flex flex-col justify-center">
-                       <div className="flex items-center gap-2 mb-1.5">
-                          {/* Time */}
-                          <div className="flex items-center gap-1 text-xs font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
-                             <Clock className="w-3 h-3" />
-                             {new Date(post.scheduledFor).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
-                          </div>
-                          
-                          {/* Platforms */}
-                          <div className="flex -space-x-1">
-                             {post.platforms.map(p => (
-                               <div key={p} className="w-5 h-5 rounded-full bg-white border border-gray-200 flex items-center justify-center shadow-sm z-10 relative">
-                                  <PlatformIcon platform={p} size={10} />
-                               </div>
-                             ))}
-                          </div>
-
-                          {/* Status Badge */}
-                          <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${getStatusStyle(post.status, post.author)}`}>
-                             {getStatusLabel(post.status, post.author)}
-                          </span>
-                          
-                          {/* Validation Badge for Agenda View */}
-                          {validation && (
-                             <span 
-                                className={`flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${validation.isError ? 'bg-red-50 text-red-600 border-red-200' : 'bg-yellow-50 text-yellow-600 border-yellow-200'}`}
-                                title={validation.message}
-                             >
-                                <AlertCircle className="w-3 h-3" />
-                                {validation.isError ? 'Error' : 'Warning'}
-                             </span>
-                          )}
-
-                          {/* Bot/User Icon */}
-                          {isBot ? (
-                             <span title="Bot Generated" className="flex items-center">
-                               <Bot className="w-3.5 h-3.5 text-purple-500 ml-1" />
-                             </span>
-                          ) : (
-                             <span title="Manually Created" className="flex items-center">
-                               <User className="w-3.5 h-3.5 text-gray-400 ml-1" />
-                             </span>
-                          )}
-                       </div>
-                       
-                       <p className="text-sm text-gray-700 font-medium truncate pr-4">{post.content}</p>
-                    </div>
-
-                    <div className="flex items-center px-2">
-                       <ChevronRight className="w-4 h-4 text-gray-300" />
-                    </div>
-                 </div>
-               )}))}
-            </div>
-          )}
-        </div>
-
-        {/* Right: Day View / Detail Sidebar */}
-        <div 
-            className="w-full lg:w-[400px] bg-[#F5F5F7]/80 backdrop-blur-xl rounded-[32px] border border-white/60 flex flex-col h-full overflow-hidden shadow-xl shadow-gray-200/50"
-            onDragOver={handleDragOver}
-            onDrop={(e) => handleDrop(e, selectedDate)}
-        >
-           {/* Sidebar Timeline Content */}
-           <div className="p-6 border-b border-gray-200/50 bg-white/60 sticky top-0 z-20 backdrop-blur-md">
-              <div className="flex items-center justify-between mb-2">
-                 <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></div>
-                    <span className="text-xs font-bold text-blue-600 uppercase tracking-widest">Selected Date</span>
-                 </div>
-                 {/* Smart Select Action */}
-                 <button 
-                    onClick={selectAllBots}
-                    className="text-[10px] font-bold text-purple-600 hover:bg-purple-50 px-2 py-1 rounded transition-colors flex items-center gap-1"
-                 >
-                    <Bot className="w-3 h-3" /> Select All Bots
-                 </button>
-              </div>
-              <h3 className="text-2xl font-bold text-gray-900">
-                {selectedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
-              </h3>
-              <div className="mt-5 flex flex-col gap-3">
-                 <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar items-center">
-                   <Filter className="w-4 h-4 text-gray-400 shrink-0" />
-                   <button 
-                      onClick={() => setFilterPlatform('All')}
-                      className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap ${filterPlatform === 'All' ? 'bg-gray-900 text-white shadow-md' : 'bg-white text-gray-600 border border-gray-100 hover:bg-gray-50'}`}
-                   >
-                     All
-                   </button>
-                   {Object.values(Platform).map(p => (
-                     <button
-                       key={p}
-                       onClick={() => setFilterPlatform(p)}
-                       className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${filterPlatform === p ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-gray-600 border border-gray-100 hover:bg-gray-50'}`}
-                     >
-                       <PlatformIcon platform={p} size={12} white={filterPlatform === p} />
-                       {p === Platform.Twitter ? 'X' : p}
-                     </button>
-                   ))}
-                 </div>
-                 
-                 {/* Status & Author Filter Row */}
-                 <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar items-center pl-6">
-                    {/* Bot Filter Toggle */}
-                    <button 
-                        onClick={() => setFilterAuthor(filterAuthor === 'All' ? BotType.Creator : 'All')}
-                        className={`
-                            px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider border transition-all whitespace-nowrap flex items-center gap-1
-                            ${filterAuthor !== 'All' 
-                                ? 'bg-orange-500 text-white border-orange-500 shadow-md' 
-                                : 'bg-white text-slate-500 border-gray-100 hover:bg-gray-50'}
+                             flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-all whitespace-nowrap
+                             ${showIssuesOnly ? 'bg-red-600 text-white border-red-600 shadow-md' : 'bg-white border-gray-200 text-gray-500 hover:text-red-600 hover:border-red-200'}
                         `}
                     >
-                        <Zap className="w-3 h-3" /> Bot Created
+                        <AlertOctagon className="w-3.5 h-3.5" /> Only Issues
                     </button>
-                    <div className="w-px h-4 bg-gray-300 mx-1"></div>
-                    {['All', ...Object.values(PostStatus)].map(status => (
-                        <button
-                            key={status}
-                            onClick={() => setFilterStatus(status as PostStatus | 'All')}
-                            className={`
-                                px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider border transition-all whitespace-nowrap
-                                ${filterStatus === status 
-                                    ? 'bg-slate-800 text-white border-slate-800 shadow-md' 
-                                    : 'bg-white text-slate-500 border-gray-100 hover:bg-gray-50'}
-                            `}
-                        >
-                            {status}
-                        </button>
-                    ))}
-                 </div>
-              </div>
-           </div>
 
-           <div className="flex-1 overflow-y-auto custom-scrollbar p-5 space-y-6 relative">
-              {filteredPosts.length === 0 ? (
-                 <div className="h-full flex flex-col items-center justify-center text-gray-400 py-12">
-                    <CalendarIcon className="w-8 h-8 text-gray-300 mb-4" />
-                    <p className="font-medium text-sm text-center px-8">No posts found.</p>
-                    <button onClick={handleCreateEvent} className="mt-4 text-blue-600 font-bold text-xs hover:underline">
-                       Create one for this day
-                    </button>
-                 </div>
-              ) : (
-                <>
-                <div className="absolute left-9 top-4 bottom-4 w-px bg-gradient-to-b from-transparent via-gray-200 to-transparent z-0 hidden lg:block" />
-                {filteredPosts.map((post, idx) => {
-                  const label = getStatusLabel(post.status, post.author);
-                  const validation = getPostValidationState(post);
+                    <div className="w-px h-6 bg-gray-200 mx-1"></div>
 
-                  return (
-                  <div 
-                     key={post.id} 
-                     className="relative z-10 animate-in slide-in-from-right-4 duration-500" 
-                     draggable={post.status !== PostStatus.Published && post.status !== PostStatus.Archived}
-                     onDragStart={(e) => handleDragStart(e, post)}
-                     onClick={() => handleEditPost(post)}
-                  >
-                     <div className="flex gap-4 group cursor-pointer">
-                        <div className="w-12 pt-2 flex flex-col items-center gap-2 shrink-0">
-                           <span className="text-[11px] font-bold text-gray-500 uppercase leading-tight text-center">
-                             {new Date(post.scheduledFor).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }).replace(' ', '\n')}
-                           </span>
-                           <div className={`w-2.5 h-2.5 rounded-full border-2 z-10 bg-white border-gray-300 group-hover:border-blue-500`}></div>
-                        </div>
-                        <div className={`flex-1 bg-white rounded-2xl shadow-sm border p-3 transition-colors ${post.author === BotType.Creator ? 'border-purple-50 bg-purple-50/20' : 'border-gray-100 hover:border-blue-100'}`}>
-                           <div className="flex justify-between items-center mb-2">
-                              <div className="flex -space-x-2 pl-1">
-                                 {post.platforms.map((p, i) => (
-                                    <div key={p} className="w-6 h-6 rounded-full bg-white shadow-sm border border-gray-100 flex items-center justify-center z-10 relative" style={{ zIndex: 10 - i }}>
-                                       <PlatformIcon platform={p} size={12} />
-                                    </div>
-                                 ))}
-                              </div>
-                              <div className="flex gap-1 items-center">
-                                {validation && (
-                                   <div 
-                                      className={`flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${validation.isError ? 'bg-red-50 text-red-600 border-red-200' : 'bg-yellow-50 text-yellow-600 border-yellow-200'}`}
-                                      title={validation.message}
-                                   >
-                                      <AlertCircle className="w-3 h-3" /> Fix
-                                   </div>
-                                )}
-                                {post.author === BotType.Creator && (
-                                    <div className="bg-purple-100 text-purple-700 p-1 rounded-full" title="Drafted by Creator Bot">
-                                        <Zap className="w-3 h-3" />
-                                    </div>
-                                )}
-                                {post.variants && post.variants.length > 1 && (
-                                    <div className="bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded flex items-center gap-1 border border-purple-100" title="Has A/B Variants">
-                                        <Split className="w-3 h-3" />
-                                    </div>
-                                )}
-                                <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${getStatusStyle(post.status, post.author)}`}>{label}</span>
-                              </div>
-                           </div>
-                           <p className={`text-sm font-medium line-clamp-2 ${post.status === PostStatus.Archived ? 'text-gray-400' : 'text-gray-700'}`}>{post.content}</p>
-                           
-                           {/* Quick Actions on Hover */}
-                           <div className="mt-2 pt-2 border-t border-gray-100 flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                              {(post.status === PostStatus.Scheduled || post.status === PostStatus.NeedsReview) && (
-                                  <button 
-                                    onClick={(e) => handleRevertToDraft(e, post)}
-                                    className="text-xs font-bold text-gray-400 hover:text-red-500 flex items-center gap-1"
-                                    title="Move to Drafts"
-                                  >
-                                    <RotateCcw className="w-3 h-3" /> Draft
-                                  </button>
-                              )}
-                              {post.status !== PostStatus.Archived && (
-                                  <button 
-                                    onClick={(e) => handleArchive(e, post)}
-                                    className="text-xs font-bold text-gray-400 hover:text-slate-600 flex items-center gap-1"
-                                    title="Archive"
-                                  >
-                                    <Archive className="w-3 h-3" />
-                                  </button>
-                              )}
-                           </div>
-                        </div>
-                     </div>
-                  </div>
-                )})}
-                </>
-              )}
-           </div>
-        </div>
+                    {Object.values(PostStatus).slice(0, 5).map(s => { // Show main ones
+                        const isActive = selectedStatuses.includes(s);
+                        const config = STATUS_CONFIG[s];
+                        return (
+                            <button
+                                key={s}
+                                onClick={() => toggleStatus(s)}
+                                className={`
+                                    flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-all whitespace-nowrap
+                                    ${isActive 
+                                        ? `${config.bg} ${config.color} ${config.border} ring-1 ring-black/5 shadow-sm` 
+                                        : 'bg-white text-slate-500 border-slate-100 hover:border-slate-300 hover:bg-slate-50'}
+                                `}
+                            >
+                                <div className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-current' : 'bg-gray-300'}`}></div>
+                                {config.label}
+                            </button>
+                        );
+                    })}
+                </div>
+             </div>
+         </div>
       </div>
+
+      {/* 3. Main Views */}
+      <div className="flex-1 min-h-0 flex flex-col lg:flex-row gap-6 overflow-hidden">
+        
+        {/* === MONTH VIEW === */}
+        {viewMode === 'Month' && (
+            <>
+                <div className="flex-1 bg-white rounded-[32px] border border-black/5 shadow-sm p-6 flex flex-col overflow-hidden relative">
+                    {/* Navigation */}
+                    <div className="flex items-center justify-between mb-6 shrink-0">
+                        <div className="flex items-center gap-4">
+                            <h2 className="text-2xl font-bold text-[#1d1d1f] tracking-tight">{currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</h2>
+                            <div className="flex items-center gap-1 bg-gray-100 p-0.5 rounded-lg">
+                                <button onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1))} className="p-1.5 hover:bg-white rounded-md transition-all shadow-sm text-gray-600"><ChevronLeft className="w-4 h-4" /></button>
+                                <button onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1))} className="p-1.5 hover:bg-white rounded-md transition-all shadow-sm text-gray-600"><ChevronRight className="w-4 h-4" /></button>
+                            </div>
+                        </div>
+                        <button onClick={() => { setCurrentDate(new Date()); setSelectedDate(new Date()); }} className="text-xs font-bold text-blue-600 hover:underline">
+                            Jump to Today
+                        </button>
+                    </div>
+
+                    {/* Grid Header */}
+                    <div className="grid grid-cols-7 mb-2 border-b border-gray-100 pb-2 shrink-0">
+                        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
+                            <div key={d} className="text-center text-[11px] font-bold text-gray-400 uppercase tracking-widest">{d}</div>
+                        ))}
+                    </div>
+                    
+                    {/* Grid Body */}
+                    <div className="grid grid-cols-7 flex-1 auto-rows-fr gap-px bg-gray-100 rounded-2xl overflow-hidden border border-gray-100 ring-4 ring-gray-50">
+                        {Array.from({ length: firstDayOfMonth }).map((_, i) => (
+                            <div key={`pad-${i}`} className="bg-gray-50/50 h-full w-full" />
+                        ))}
+                        
+                        {Array.from({ length: daysInMonth }).map((_, i) => {
+                            const day = i + 1;
+                            const date = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
+                            const isToday = new Date().toDateString() === date.toDateString();
+                            const isSelected = selectedDate.toDateString() === date.toDateString();
+                            const isPast = isPastDate(date);
+                            
+                            const dayPosts = filteredPosts.filter(p => new Date(p.scheduledFor).toDateString() === date.toDateString());
+                            const activePosts = dayPosts.filter(p => p.status !== PostStatus.Failed && p.status !== PostStatus.Archived);
+                            const hasIssues = dayPosts.some(p => p.status === PostStatus.Failed || p.status === PostStatus.NeedsReview);
+                            const isFull = activePosts.length >= dailyLimit;
+
+                            return (
+                                <div
+                                    key={day}
+                                    onClick={() => setSelectedDate(date)}
+                                    className={`
+                                        relative bg-white p-2 flex flex-col justify-between transition-all duration-200 group cursor-pointer
+                                        ${isSelected ? 'bg-blue-50/50 ring-inset ring-2 ring-blue-500 z-10' : 'hover:bg-gray-50'}
+                                        ${isPast ? 'bg-gray-50/30' : ''}
+                                    `}
+                                >
+                                    <div className="flex justify-between items-start">
+                                        <span className={`
+                                            text-sm font-semibold w-7 h-7 flex items-center justify-center rounded-full transition-colors
+                                            ${isToday ? 'bg-blue-600 text-white shadow-md' : isSelected ? 'text-blue-600' : isPast ? 'text-gray-400' : 'text-gray-700'}
+                                        `}>
+                                            {day}
+                                        </span>
+                                        {activePosts.length > 0 && (
+                                            <div className={`
+                                                text-[9px] font-bold px-1.5 py-0.5 rounded-full border
+                                                ${isFull ? 'bg-orange-50 text-orange-600 border-orange-100' : 'bg-gray-100 text-gray-500 border-gray-200'}
+                                            `}>
+                                                {activePosts.length}/{dailyLimit}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Issue Dot */}
+                                    {hasIssues && (
+                                        <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-red-500 ring-2 ring-white animate-pulse"></div>
+                                    )}
+
+                                    {/* Platform Indicators */}
+                                    <div className="flex items-end justify-between mt-1">
+                                        <div className="flex -space-x-1.5 overflow-hidden py-1 px-1">
+                                            {activePosts.slice(0, 3).map((p, idx) => (
+                                                <div key={p.id} className="w-5 h-5 rounded-full bg-white ring-1 ring-gray-100 flex items-center justify-center shadow-sm relative z-0">
+                                                    <PlatformIcon platform={p.platforms[0]} size={11} />
+                                                </div>
+                                            ))}
+                                            {activePosts.length > 3 && (
+                                                <div className="w-5 h-5 rounded-full bg-gray-100 ring-1 ring-white flex items-center justify-center text-[8px] font-bold text-gray-500 z-0">
+                                                    +{activePosts.length - 3}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                {/* Right: Sidebar Day Detail */}
+                <div className="w-full lg:w-[360px] bg-white/80 backdrop-blur-xl rounded-[32px] border border-white/60 flex flex-col h-full shadow-xl shadow-gray-200/50 overflow-hidden shrink-0">
+                    <div className="p-5 border-b border-gray-100 bg-white/50 backdrop-blur-md z-20 flex justify-between items-end">
+                        <div>
+                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-1">
+                                {selectedDate.toDateString() === new Date().toDateString() ? 'Today' : 'Selected Date'}
+                            </span>
+                            <h3 className="text-xl font-bold text-gray-900 leading-tight">
+                                {selectedDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                            </h3>
+                        </div>
+                        <div className="text-right">
+                             <div className="text-2xl font-bold text-blue-600 leading-none">{selectedDayPosts.length}</div>
+                             <div className="text-[10px] font-bold text-gray-400 uppercase">Posts</div>
+                        </div>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-3 bg-gray-50/50">
+                        {selectedDayPosts.length === 0 ? (
+                            <div className="h-full flex flex-col items-center justify-center text-center p-8">
+                                <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mb-4">
+                                    <Sparkles className="w-8 h-8 text-blue-300" />
+                                </div>
+                                <h3 className="text-sm font-bold text-gray-900">
+                                   {isSelectedDatePast ? 'No Past Activity' : 'No Content Scheduled'}
+                                </h3>
+                                <p className="text-xs text-gray-500 mt-1 mb-4 max-w-[200px]">
+                                    {isSelectedDatePast 
+                                      ? "No posts were scheduled for this date." 
+                                      : "This day is clear. Use the button below to add a new post."}
+                                </p>
+                                {!isSelectedDatePast && (
+                                    <button 
+                                        onClick={() => onNavigate('creator', { date: selectedDate.toISOString() })}
+                                        className="px-4 py-2 bg-black text-white rounded-lg text-xs font-bold hover:scale-105 transition-transform"
+                                    >
+                                        Create Post
+                                    </button>
+                                )}
+                            </div>
+                        ) : (
+                            <>
+                                {selectedDayPosts.map(post => (
+                                    <PostListItem 
+                                        key={post.id} 
+                                        post={post} 
+                                        isSelected={selectedPostIds.has(post.id)}
+                                        onToggleSelect={(e) => toggleSelection(e, post.id)}
+                                        onClick={() => onNavigate('creator', { postId: post.id })}
+                                    />
+                                ))}
+                                {filteredPosts.length > selectedDayPosts.length && selectedDayPosts.length === 0 && (
+                                    <div className="text-center p-4 text-xs text-gray-400">
+                                        Posts are hidden by current filters.
+                                    </div>
+                                )}
+                            </>
+                        )}
+                    </div>
+                </div>
+            </>
+        )}
+
+        {/* === AGENDA VIEW === */}
+        {viewMode === 'Agenda' && (
+            <div className="flex-1 bg-white/50 backdrop-blur-md rounded-[32px] border border-white/60 shadow-sm p-0 overflow-hidden flex flex-col relative">
+                <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
+                    {Object.entries(agendaGroups).map(([groupName, groupPosts]) => {
+                        if (groupPosts.length === 0) return null;
+                        return (
+                            <div key={groupName} className="mb-8 animate-in slide-in-from-bottom-2 duration-500">
+                                <div className="flex items-center gap-4 mb-4 sticky top-0 bg-[#F5F5F7]/95 backdrop-blur-md py-3 z-10 px-2 border-b border-gray-200/50">
+                                    <div className={`p-1.5 rounded-lg ${groupName === 'Today' ? 'bg-blue-100 text-blue-600' : 'bg-gray-200 text-gray-500'}`}>
+                                        <CalendarIcon className="w-4 h-4" />
+                                    </div>
+                                    <h3 className={`text-lg font-bold ${groupName === 'Today' ? 'text-blue-600' : 'text-gray-900'}`}>{groupName}</h3>
+                                    <span className="text-xs font-bold text-gray-400 bg-white px-2 py-1 rounded-full border border-gray-100">
+                                        {groupPosts.length}
+                                    </span>
+                                </div>
+                                
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4 px-2">
+                                    {groupPosts.map(post => (
+                                        <PostListItem 
+                                            key={post.id} 
+                                            post={post} 
+                                            isSelected={selectedPostIds.has(post.id)}
+                                            onToggleSelect={(e) => toggleSelection(e, post.id)}
+                                            onClick={() => onNavigate('creator', { postId: post.id })}
+                                            showDate={true}
+                                            compact={false}
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+                        );
+                    })}
+                    
+                    {Object.values(agendaGroups).every(g => g.length === 0) && (
+                        <div className="h-full flex flex-col items-center justify-center text-gray-400 opacity-60 min-h-[400px]">
+                             <Filter className="w-16 h-16 mb-4 stroke-1 text-gray-300" />
+                             <p className="text-lg font-medium text-gray-500">No posts found.</p>
+                             <p className="text-sm">Try adjusting your filters or search.</p>
+                             <button onClick={clearFilters} className="mt-4 text-blue-600 font-bold hover:underline">Clear Filters</button>
+                        </div>
+                    )}
+                </div>
+            </div>
+        )}
+
+      </div>
+
+      {/* 4. Floating Bulk Actions Bar */}
+      {selectedPostIds.size > 0 && (
+          <div className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-[#1d1d1f] text-white p-2 pl-4 rounded-2xl shadow-2xl z-50 flex items-center gap-4 animate-in slide-in-from-bottom-6 zoom-in-95 duration-300 border border-white/10 ring-1 ring-black/5">
+              <div className="flex items-center gap-3 border-r border-gray-700 pr-4">
+                  <div className="flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-[10px] font-bold ring-2 ring-[#1d1d1f]">
+                      {selectedPostIds.size}
+                  </div>
+                  <span className="text-xs font-bold text-gray-300 hidden sm:inline">Selected</span>
+              </div>
+
+              <div className="flex items-center gap-1">
+                  <BulkActionButton 
+                      icon={CheckCircle2} label="Approve" 
+                      onClick={() => performBulkAction('Approve')} color="text-green-400 hover:bg-white/10" 
+                  />
+                   <BulkActionButton 
+                      icon={CalendarRange} label="+1 Day" 
+                      onClick={() => performBulkAction('MoveDay')} color="text-blue-400 hover:bg-white/10" 
+                  />
+                  <BulkActionButton 
+                      icon={RotateCcw} label="Draft" 
+                      onClick={() => performBulkAction('Draft')} color="text-yellow-400 hover:bg-white/10" 
+                  />
+                   <BulkActionButton 
+                      icon={Copy} label="Duplicate" 
+                      onClick={() => performBulkAction('Duplicate')} color="text-purple-400 hover:bg-white/10" 
+                  />
+                  <div className="w-px h-6 bg-gray-700 mx-2"></div>
+                  <BulkActionButton 
+                      icon={Trash2} label="Delete" 
+                      onClick={() => performBulkAction('Delete')} color="text-red-500 hover:bg-red-500/20" 
+                  />
+              </div>
+              
+              <button onClick={() => setSelectedPostIds(new Set())} className="ml-2 p-2 hover:bg-white/10 rounded-full transition-colors">
+                  <X className="w-4 h-4 text-gray-400" />
+              </button>
+          </div>
+      )}
     </div>
   );
+};
+
+// --- Sub-components ---
+
+const BulkActionButton: React.FC<{ icon: any, label: string, onClick: () => void, color: string }> = ({ icon: Icon, label, onClick, color }) => (
+    <button 
+        onClick={onClick}
+        className={`flex flex-col items-center justify-center gap-1 px-3 py-2 rounded-xl transition-all ${color} group relative`}
+        title={label}
+    >
+        <Icon className="w-5 h-5" strokeWidth={2} />
+        <span className="sr-only">{label}</span>
+        {/* Tooltip */}
+        <span className="absolute -top-10 bg-white text-black text-[10px] font-bold px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap shadow-lg pointer-events-none">
+            {label}
+            <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-white rotate-45"></div>
+        </span>
+    </button>
+);
+
+const PostListItem: React.FC<{ post: Post, isSelected: boolean, onToggleSelect: (e: any) => void, onClick: () => void, showDate?: boolean, compact?: boolean }> = ({ post, isSelected, onToggleSelect, onClick, showDate, compact = true }) => {
+    const statusConfig = STATUS_CONFIG[post.status];
+    const StatusIcon = statusConfig.icon;
+    const isBot = post.author !== 'User';
+    
+    return (
+        <div 
+            onClick={onClick}
+            className={`
+                group relative bg-white rounded-2xl border transition-all cursor-pointer overflow-hidden
+                ${isSelected ? 'border-blue-500 ring-1 ring-blue-500 bg-blue-50/10' : 'border-gray-100 hover:border-blue-200 hover:shadow-md'}
+                ${compact ? 'p-3' : 'p-4'}
+            `}
+        >
+             {/* Status Stripe */}
+             <div className={`absolute left-0 top-0 bottom-0 w-1 ${statusConfig.bg.replace('bg-', 'bg-').replace('50', '400')}`}></div>
+             
+             <div className="pl-3 flex gap-3">
+                 {/* Checkbox */}
+                 <div 
+                    onClick={onToggleSelect}
+                    className={`
+                        w-5 h-5 rounded-[6px] border-2 flex items-center justify-center transition-all shrink-0 mt-0.5
+                        ${isSelected ? 'bg-blue-600 border-blue-600' : 'border-gray-200 bg-white text-transparent opacity-0 group-hover:opacity-100'}
+                    `}
+                 >
+                    <Check className="w-3.5 h-3.5 text-white" strokeWidth={4} />
+                 </div>
+
+                 <div className="flex-1 min-w-0">
+                    <div className="flex justify-between items-start mb-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                             <div className="flex -space-x-1">
+                                {post.platforms.map(p => (
+                                    <div key={p} className="bg-white rounded-full p-0.5 border border-gray-100 shadow-sm z-10 relative">
+                                        <PlatformIcon platform={p} size={12} />
+                                    </div>
+                                ))}
+                             </div>
+                             {showDate && (
+                                 <span className="text-[10px] font-bold text-gray-500 uppercase bg-gray-50 px-1.5 py-0.5 rounded border border-gray-100">
+                                     {new Date(post.scheduledFor).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric' })}
+                                 </span>
+                             )}
+                             <span className="text-[10px] font-bold text-gray-400 uppercase">
+                                {new Date(post.scheduledFor).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                             </span>
+                        </div>
+                        <div className={`flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full border ${statusConfig.bg} ${statusConfig.color} ${statusConfig.border}`}>
+                            <StatusIcon className="w-3 h-3" /> 
+                            <span className={compact ? "hidden xl:inline" : ""}>{statusConfig.label}</span>
+                        </div>
+                    </div>
+                    
+                    <p className={`font-semibold text-gray-800 line-clamp-2 leading-snug ${compact ? 'text-xs' : 'text-sm mb-2'}`}>
+                        {post.content}
+                    </p>
+
+                    <div className="flex justify-between items-center pt-2 mt-1 border-t border-gray-50">
+                        <div className="flex items-center gap-1.5">
+                            {isBot ? (
+                                <Bot className="w-3 h-3 text-purple-500" />
+                            ) : (
+                                <User className="w-3 h-3 text-gray-400" />
+                            )}
+                            <span className="text-[10px] font-medium text-gray-400">
+                                {isBot ? 'AI Agent' : 'Manual'}
+                            </span>
+                        </div>
+                        <ArrowRight className="w-3 h-3 text-gray-300 group-hover:text-blue-500 transition-colors" />
+                    </div>
+                 </div>
+             </div>
+        </div>
+    );
 };

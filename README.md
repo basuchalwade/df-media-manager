@@ -11,25 +11,31 @@
 
 ---
 
-## 🏗️ Tech Stack
+## 🏗️ Detailed Tech Stack
 
 This application is built with a modern, performant, and type-safe stack designed for scalability.
 
-### Core Framework
-*   **React 19**: Utilizing the latest concurrent features and hooks.
-*   **Vite**: Next-generation frontend tooling for instant HMR and optimized builds.
-*   **TypeScript**: Strict type checking for robustness and maintainability.
+### 💻 Core Framework
+*   **React 19**: Utilizing the latest concurrent features and hooks for fluid, non-blocking UI interactions.
+*   **Vite**: Next-generation frontend tooling providing instant Hot Module Replacement (HMR) and highly optimized production builds.
+*   **TypeScript 5**: Strict type checking ensures enterprise-grade robustness, refactoring safety, and self-documenting code.
 
-### UI & Styling
-*   **Tailwind CSS**: Utility-first CSS framework for rapid UI development.
-*   **Lucide React**: consistent, lightweight icon library.
-*   **Recharts**: Composable charting library for analytics visualization.
-*   **Apple-System Fonts**: Native font stack integration for a premium OS-like feel.
+### 🎨 UI & Design System
+*   **Tailwind CSS**: Utility-first framework enabling the custom "Apple-like" design system (clean whitespace, subtle borders).
+*   **Glassmorphism**: Custom CSS implementation for translucent panels, blur effects, and depth (see `index.html` global styles).
+*   **Lucide React**: Lightweight, consistent, and tree-shakeable icon set.
+*   **Recharts**: Composable charting library used for the high-performance, responsive Analytics dashboard.
+*   **Apple-System Fonts**: Native font stack integration for a premium OS-like feel across devices.
 
-### AI & Logic
-*   **@google/genai**: Official SDK for Google's Gemini models (Flash 2.5 & Pro).
-*   **Service Layer Pattern**: Decoupled business logic via `services/` directory.
-*   **Deep Sync™ State**: Custom state management ensuring draft persistence across views.
+### 🧠 AI & Intelligence
+*   **@google/genai**: Official SDK for Google's Gemini models.
+*   **Gemini 1.5 Flash**: Primary model used for high-speed, low-latency tasks like content drafting, validation, and hashtag generation.
+*   **Prompt Engineering**: Context-aware prompts located in `geminiService.ts` that inject platform constraints and brand voice dynamically.
+
+### 🏗️ Architecture & State
+*   **Service Layer Pattern**: Decoupled business logic via `services/` directory, keeping React components focused purely on UI.
+*   **MockStore (Backend-in-a-Box)**: A robust singleton service (`mockStore.ts`) that simulates database CRUD operations, API latency, and relational data integrity (Users <-> Posts <-> Bots) without needing a real backend for demos.
+*   **Deep Sync™ State**: Custom state management ensuring draft persistence across views without using Redux or Context API, optimizing performance.
 
 ---
 
@@ -39,7 +45,7 @@ ContentCaster follows a **Service-Oriented Frontend Architecture (SOFA)**.
 
 ### 1. The Service Layer (`/services`)
 Instead of embedding logic in components, all business logic lives in singleton services:
-*   **`mockStore.ts`**: Acts as the "Backend-in-a-Box". It simulates database CRUD operations, API latency, and relational data integrity (Users <-> Posts <-> Bots). It is designed to be easily swapped with a real GraphQL/REST client.
+*   **`mockStore.ts`**: Acts as the "Backend-in-a-Box". It simulates database CRUD operations, API latency, and relational data integrity. It is designed to be easily swapped with a real GraphQL/REST client.
 *   **`geminiService.ts`**: Encapsulates all AI interaction. It handles prompt engineering, context injection (date, tone, platform constraints), and JSON schema enforcement.
 *   **`validationService.ts`**: Centralized validation logic for platform-specific rules (e.g., Twitter 280 char limit, Instagram aspect ratios).
 
@@ -68,7 +74,9 @@ A state preservation strategy where navigation parameters (passed via `onNavigat
 │   ├── BotManager.tsx  # Agent configuration & logs
 │   ├── Calendar.tsx    # Drag-and-drop scheduling grid
 │   ├── CreatorStudio.tsx # Main AI editor & previewer
-│   └── ...
+│   ├── Integrations.tsx # API Gateway management
+│   ├── MediaLibrary.tsx # Digital Asset Management
+│   └── Settings.tsx    # App configuration
 ├── services/           # Business Logic & Data Access
 │   ├── geminiService.ts # AI Prompt Engineering
 │   ├── mockStore.ts    # Data persistence simulation
