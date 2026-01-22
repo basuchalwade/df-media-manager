@@ -1,127 +1,711 @@
+
 import React, { useEffect, useState } from 'react';
-import { Save, Server, CheckCircle, AlertTriangle, ChevronRight, Globe, Shield, Bell } from 'lucide-react';
+import { Save, Server, CheckCircle, AlertTriangle, ChevronRight, Globe, Shield, Bell, Lock, User as UserIcon, Briefcase, Zap, Link as LinkIcon, CreditCard, Terminal, LogOut, Smartphone, AlertOctagon, RotateCcw, Cloud, Activity } from 'lucide-react';
 import { store } from '../services/mockStore';
-import { UserSettings } from '../types';
+import { UserSettings, Platform, User } from '../types';
+import { PlatformIcon } from '../components/PlatformIcon';
+
+type SettingsTab = 'general' | 'workspace' | 'notifications' | 'security' | 'integrations' | 'automation' | 'billing' | 'advanced';
 
 export const Settings: React.FC = () => {
   const [settings, setSettings] = useState<UserSettings | null>(null);
+  const [originalSettings, setOriginalSettings] = useState<UserSettings | null>(null);
+  const [currentUser, setCurrentUser] = useState<User | undefined>(undefined);
+  const [activeTab, setActiveTab] = useState<SettingsTab>('general');
   const [isSaving, setIsSaving] = useState(false);
+  const [isDirty, setIsDirty] = useState(false);
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
-  const systemTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const [securityLogOpen, setSecurityLogOpen] = useState(false);
 
   useEffect(() => {
-    store.getSettings().then(setSettings);
+    loadData();
   }, []);
+
+  const loadData = async () => {
+    const s = await store.getSettings();
+    const u = await store.getCurrentUser();
+    setSettings(s);
+    setOriginalSettings(JSON.parse(JSON.stringify(s))); // Deep copy
+    setCurrentUser(u);
+  };
+
+  useEffect(() => {
+    if (settings && originalSettings) {
+      setIsDirty(JSON.stringify(settings) !== JSON.stringify(originalSettings));
+    }
+  }, [settings, originalSettings]);
 
   const handleSave = async () => {
     if (!settings) return;
     setIsSaving(true);
     try {
       await store.saveSettings(settings);
-      setMessage({ text: 'Settings saved', type: 'success' });
+      setOriginalSettings(JSON.parse(JSON.stringify(settings)));
+      setIsDirty(false);
+      setMessage({ text: 'Changes saved successfully', type: 'success' });
       setTimeout(() => setMessage(null), 3000);
     } catch (e) {
-      setMessage({ text: 'Error saving', type: 'error' });
+      setMessage({ text: 'Failed to save settings', type: 'error' });
     } finally {
       setIsSaving(false);
     }
   };
 
-  if (!settings) return <div className="p-8 text-slate-400">Loading...</div>;
+  const updateSetting = (section: keyof UserSettings, key: string, value: any) => {
+    if (!settings) return;
+    setSettings(prev => {
+      if (!prev) return null;
+      if (section === 'demoMode' || section === 'geminiApiKey') {
+          return { ...prev, [section]: value };
+      }
+      return {
+        ...prev,
+        [section]: {
+          ...(prev[section] as object),
+          [key]: value
+        }
+      };
+    });
+  };
+
+  const updateNestedSetting = (section: keyof UserSettings, subSection: string, key: string, value: any) => {
+    if (!settings) return;
+    setSettings(prev => {
+        if (!prev) return null;
+        // @ts-ignore - Complexity of nested generic types for UserSettings
+        const currentSection = prev[section] as any;
+        return {
+            ...prev,
+            [section]: {
+                ...currentSection,
+                [subSection]: {
+                    ...currentSection[subSection],
+                    [key]: value
+                }
+            }
+        };
+    });
+  };
+
+  if (!settings || !currentUser) return <div className="p-8 text-slate-400">Loading settings...</div>;
+
+  // Render Helpers
+  const Toggle = ({ checked, onChange, label, description }: any) => (
+    <div className="flex items-center justify-between py-4">
+       <div>
+         <div className="text-sm font-semibold text-gray-900">{label}</div>
+         {description && <div className="text-xs text-gray-500 mt-1">{description}</div>}
+       </div>
+       <button 
+         onClick={() => onChange(!checked)}
+         className={`relative w-11 h-6 rounded-full transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${checked ? 'bg-blue-600' : 'bg-gray-200'}`}
+       >
+         <span className={`inline-block w-4 h-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${checked ? 'translate-x-6' : 'translate-x-1'} mt-1`} />
+       </button>
+    </div>
+  );
+
+  const SectionTitle = ({ title, description }: any) => (
+      <div className="mb-6">
+          <h2 className="text-xl font-bold text-slate-900">{title}</h2>
+          <p className="text-sm text-slate-500 mt-1">{description}</p>
+      </div>
+  );
+
+  const Card = ({ children, className = "" }: any) => (
+      <div className={`bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden ${className}`}>
+          {children}
+      </div>
+  );
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8 animate-in slide-in-from-bottom-4 duration-500">
-      <header className="flex items-end justify-between px-2">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Settings</h1>
-          <p className="text-slate-500 font-medium mt-1">Manage your workspace preferences.</p>
-        </div>
-        <button
-          onClick={handleSave}
-          disabled={isSaving}
-          className="bg-blue-600 text-white px-5 py-2.5 rounded-full font-semibold shadow-lg shadow-blue-500/30 hover:bg-blue-700 transition-all active:scale-95 flex items-center gap-2"
-        >
-          {isSaving ? 'Saving...' : 'Save Changes'}
-        </button>
-      </header>
+    <div className="flex flex-col md:flex-row gap-8 min-h-[80vh] animate-in fade-in duration-500">
+      
+      {/* 1. Sidebar Navigation */}
+      <nav className="w-full md:w-64 flex-shrink-0 space-y-1">
+        <h1 className="text-2xl font-bold text-slate-900 px-3 mb-6 tracking-tight">Settings</h1>
+        
+        {[
+            { id: 'general', label: 'General', icon: UserIcon },
+            { id: 'workspace', label: 'Workspace', icon: Briefcase },
+            { id: 'notifications', label: 'Notifications', icon: Bell },
+            { id: 'security', label: 'Security', icon: Lock },
+            { id: 'integrations', label: 'Integrations', icon: LinkIcon },
+            { id: 'automation', label: 'Automation', icon: Zap },
+            { id: 'billing', label: 'Billing', icon: CreditCard },
+            { id: 'advanced', label: 'Advanced', icon: Terminal },
+        ].map((item) => (
+            <button
+                key={item.id}
+                onClick={() => setActiveTab(item.id as SettingsTab)}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                    activeTab === item.id 
+                    ? 'bg-slate-100 text-slate-900' 
+                    : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'
+                }`}
+            >
+                <item.icon className={`w-4 h-4 ${activeTab === item.id ? 'text-blue-600' : 'text-slate-400'}`} />
+                {item.label}
+            </button>
+        ))}
+      </nav>
 
+      {/* 2. Main Content Area */}
+      <div className="flex-1 max-w-3xl pb-24">
+         
+         {/* -- GENERAL -- */}
+         {activeTab === 'general' && (
+             <div className="space-y-6">
+                 <SectionTitle title="General" description="Manage your profile and display preferences." />
+                 
+                 <Card className="p-6">
+                    <div className="flex items-center gap-4 mb-6">
+                        <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-blue-500 to-purple-500 flex items-center justify-center text-white text-2xl font-bold">
+                            {currentUser.name.charAt(0)}
+                        </div>
+                        <div>
+                            <h3 className="font-bold text-lg text-slate-900">{currentUser.name}</h3>
+                            <p className="text-sm text-slate-500">{currentUser.email}</p>
+                            <p className="text-xs font-semibold text-blue-600 mt-1 uppercase">{currentUser.role}</p>
+                        </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Display Language</label>
+                            <select 
+                                value={settings.general.language}
+                                onChange={(e) => updateSetting('general', 'language', e.target.value)}
+                                className="w-full bg-white text-slate-900 rounded-lg border-slate-300 text-sm focus:ring-blue-500 focus:border-blue-500"
+                            >
+                                <option>English (US)</option>
+                                <option>English (UK)</option>
+                                <option>Spanish</option>
+                                <option>French</option>
+                                <option>German</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Date Format</label>
+                            <select 
+                                value={settings.general.dateFormat}
+                                onChange={(e) => updateSetting('general', 'dateFormat', e.target.value)}
+                                className="w-full bg-white text-slate-900 rounded-lg border-slate-300 text-sm focus:ring-blue-500 focus:border-blue-500"
+                            >
+                                <option value="MM/DD/YYYY">MM/DD/YYYY</option>
+                                <option value="DD/MM/YYYY">DD/MM/YYYY</option>
+                                <option value="YYYY-MM-DD">YYYY-MM-DD</option>
+                            </select>
+                        </div>
+                         <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">First Day of Week</label>
+                            <select 
+                                value={settings.general.startOfWeek}
+                                onChange={(e) => updateSetting('general', 'startOfWeek', e.target.value)}
+                                className="w-full bg-white text-slate-900 rounded-lg border-slate-300 text-sm focus:ring-blue-500 focus:border-blue-500"
+                            >
+                                <option value="Monday">Monday</option>
+                                <option value="Sunday">Sunday</option>
+                            </select>
+                        </div>
+                    </div>
+                 </Card>
+             </div>
+         )}
+
+         {/* -- WORKSPACE -- */}
+         {activeTab === 'workspace' && (
+             <div className="space-y-6">
+                 <SectionTitle title="Workspace Environment" description="Configure global settings for your team." />
+                 
+                 <Card className="divide-y divide-slate-100">
+                    <div className="p-6">
+                        <div className="flex items-center gap-2 mb-4">
+                             <Server className="w-5 h-5 text-orange-500" />
+                             <h3 className="font-bold text-slate-900">Simulation Mode</h3>
+                        </div>
+                        <div className="bg-orange-50 border border-orange-100 rounded-xl p-4 mb-4">
+                            <p className="text-sm text-orange-800 leading-relaxed">
+                                When enabled, ContentCaster will use a local mock database and simulate API calls. 
+                                Real social media APIs will <strong>not</strong> be contacted. This is ideal for testing and demos.
+                            </p>
+                        </div>
+                        <Toggle 
+                           label="Enable Simulation Environment" 
+                           checked={settings.demoMode}
+                           onChange={(v: boolean) => updateSetting('demoMode', '', v)}
+                        />
+                    </div>
+                    
+                    <div className="p-6">
+                        <div className="flex items-center gap-2 mb-4">
+                             <Globe className="w-5 h-5 text-blue-500" />
+                             <h3 className="font-bold text-slate-900">Localization</h3>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">Timezone</label>
+                                <select 
+                                    value={settings.workspace.timezone}
+                                    onChange={(e) => updateSetting('workspace', 'timezone', e.target.value)}
+                                    className="w-full bg-white text-slate-900 rounded-lg border-slate-300 text-sm focus:ring-blue-500 focus:border-blue-500"
+                                >
+                                    <option value={Intl.DateTimeFormat().resolvedOptions().timeZone}>{Intl.DateTimeFormat().resolvedOptions().timeZone} (System)</option>
+                                    <option value="America/New_York">Eastern Time (US & Canada)</option>
+                                    <option value="America/Los_Angeles">Pacific Time (US & Canada)</option>
+                                    <option value="Europe/London">London</option>
+                                    <option value="Asia/Tokyo">Tokyo</option>
+                                </select>
+                                <p className="text-xs text-slate-500 mt-1">Used for scheduling all posts.</p>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">Default Content Tone</label>
+                                <select 
+                                    value={settings.workspace.defaultTone}
+                                    onChange={(e) => updateSetting('workspace', 'defaultTone', e.target.value)}
+                                    className="w-full bg-white text-slate-900 rounded-lg border-slate-300 text-sm focus:ring-blue-500 focus:border-blue-500"
+                                >
+                                    <option>Professional</option>
+                                    <option>Casual</option>
+                                    <option>Witty</option>
+                                    <option>Urgent</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                 </Card>
+             </div>
+         )}
+
+         {/* -- NOTIFICATIONS -- */}
+         {activeTab === 'notifications' && (
+             <div className="space-y-6">
+                 <SectionTitle title="Notifications" description="Choose how and when you want to be alerted." />
+
+                 <Card className="p-6">
+                     <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wide mb-4">Delivery Channels</h3>
+                     <Toggle 
+                        label="Email Notifications" 
+                        description="Receive digests and critical alerts via email."
+                        checked={settings.notifications.channels.email}
+                        onChange={(v: boolean) => updateNestedSetting('notifications', 'channels', 'email', v)}
+                     />
+                     <Toggle 
+                        label="In-App Notifications" 
+                        description="Show badges and toasts within the dashboard."
+                        checked={settings.notifications.channels.inApp}
+                        onChange={(v: boolean) => updateNestedSetting('notifications', 'channels', 'inApp', v)}
+                     />
+                      <Toggle 
+                        label="Slack / Webhook" 
+                        description="Forward alerts to a configured webhook URL."
+                        checked={settings.notifications.channels.slack}
+                        onChange={(v: boolean) => updateNestedSetting('notifications', 'channels', 'slack', v)}
+                     />
+                 </Card>
+
+                 <Card className="p-6">
+                     <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wide mb-4">Alert Types</h3>
+                     <Toggle 
+                        label="Bot Activity" 
+                        checked={settings.notifications.alerts.botActivity}
+                        onChange={(v: boolean) => updateNestedSetting('notifications', 'alerts', 'botActivity', v)}
+                     />
+                     <Toggle 
+                        label="Publishing Failures" 
+                        checked={settings.notifications.alerts.failures}
+                        onChange={(v: boolean) => updateNestedSetting('notifications', 'alerts', 'failures', v)}
+                     />
+                     <Toggle 
+                        label="Approval Requests" 
+                        checked={settings.notifications.alerts.approvals}
+                        onChange={(v: boolean) => updateNestedSetting('notifications', 'alerts', 'approvals', v)}
+                     />
+                 </Card>
+             </div>
+         )}
+
+         {/* -- SECURITY -- */}
+         {activeTab === 'security' && (
+             <div className="space-y-6">
+                 <SectionTitle title="Security" description="Protect your account and organization data." />
+
+                 <Card className="p-6 divide-y divide-slate-100">
+                     <div className="pb-4">
+                        <Toggle 
+                            label="Two-Factor Authentication (2FA)" 
+                            description="Require an authenticator code when logging in."
+                            checked={settings.security.twoFactorEnabled}
+                            onChange={(v: boolean) => updateSetting('security', 'twoFactorEnabled', v)}
+                        />
+                     </div>
+                     <div className="pt-4 pb-4">
+                        <div className="flex justify-between items-center">
+                            <div>
+                                <div className="text-sm font-semibold text-gray-900">Session Timeout</div>
+                                <div className="text-xs text-gray-500 mt-1">Force logout inactive users after this period.</div>
+                            </div>
+                            <select 
+                                value={settings.security.sessionTimeout}
+                                onChange={(e) => updateSetting('security', 'sessionTimeout', e.target.value)}
+                                className="bg-white text-slate-900 rounded-lg border-slate-300 text-sm focus:ring-blue-500"
+                            >
+                                <option value="15m">15 Minutes</option>
+                                <option value="30m">30 Minutes</option>
+                                <option value="1h">1 Hour</option>
+                                <option value="4h">4 Hours</option>
+                            </select>
+                        </div>
+                     </div>
+                     <div className="pt-4">
+                        <h4 className="text-sm font-bold text-slate-900 mb-3">Active Sessions</h4>
+                        <div className="bg-slate-50 rounded-lg p-3 border border-slate-100 flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-3">
+                                <Smartphone className="w-5 h-5 text-slate-400" />
+                                <div>
+                                    <p className="text-xs font-bold text-slate-700">Chrome on macOS (Current)</p>
+                                    <p className="text-[10px] text-slate-400">San Francisco, US • 192.168.1.1</p>
+                                </div>
+                            </div>
+                            <div className="text-xs text-green-600 font-bold px-2 py-1 bg-green-50 rounded">Active</div>
+                        </div>
+                         <div className="bg-slate-50 rounded-lg p-3 border border-slate-100 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <Smartphone className="w-5 h-5 text-slate-400" />
+                                <div>
+                                    <p className="text-xs font-bold text-slate-700">Safari on iPhone</p>
+                                    <p className="text-[10px] text-slate-400">San Francisco, US • 2 hours ago</p>
+                                </div>
+                            </div>
+                            <button className="text-xs text-red-600 hover:underline">Revoke</button>
+                        </div>
+                     </div>
+                 </Card>
+
+                 <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 flex items-center justify-between">
+                     <div className="flex items-center gap-3">
+                         <Shield className="w-5 h-5 text-blue-600" />
+                         <div>
+                             <h4 className="font-bold text-blue-900 text-sm">Security Audit Log</h4>
+                             <p className="text-xs text-blue-700">View recent sensitive actions.</p>
+                         </div>
+                     </div>
+                     <button onClick={() => setSecurityLogOpen(!securityLogOpen)} className="text-xs font-bold bg-white text-blue-700 px-3 py-2 rounded-lg border border-blue-200 shadow-sm">
+                         {securityLogOpen ? 'Hide Log' : 'View Log'}
+                     </button>
+                 </div>
+                 
+                 {securityLogOpen && (
+                     <Card className="overflow-hidden animate-in slide-in-from-top-2">
+                         <table className="w-full text-left text-sm">
+                             <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-100">
+                                 <tr>
+                                     <th className="px-4 py-2">Event</th>
+                                     <th className="px-4 py-2">User</th>
+                                     <th className="px-4 py-2">Date</th>
+                                 </tr>
+                             </thead>
+                             <tbody className="divide-y divide-slate-100 text-slate-700">
+                                 <tr>
+                                     <td className="px-4 py-2">Settings Updated</td>
+                                     <td className="px-4 py-2">Admin User</td>
+                                     <td className="px-4 py-2 text-slate-400">Just now</td>
+                                 </tr>
+                                 <tr>
+                                     <td className="px-4 py-2">Bot Config Change</td>
+                                     <td className="px-4 py-2">Sarah Monitor</td>
+                                     <td className="px-4 py-2 text-slate-400">2 hours ago</td>
+                                 </tr>
+                                 <tr>
+                                     <td className="px-4 py-2">Login</td>
+                                     <td className="px-4 py-2">Admin User</td>
+                                     <td className="px-4 py-2 text-slate-400">1 day ago</td>
+                                 </tr>
+                             </tbody>
+                         </table>
+                     </Card>
+                 )}
+             </div>
+         )}
+         
+         {/* -- INTEGRATIONS -- */}
+         {activeTab === 'integrations' && (
+             <div className="space-y-6">
+                 <SectionTitle title="Integrations" description="Manage platform connections and API permissions." />
+                 
+                 <div className="grid grid-cols-1 gap-4">
+                     {Object.values(Platform).map(p => {
+                        const isConnected = currentUser.connectedAccounts[p]?.connected;
+                        return (
+                            <Card key={p} className="p-4 flex items-center justify-between">
+                                <div className="flex items-center gap-4">
+                                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${isConnected ? 'bg-slate-50' : 'bg-slate-100 grayscale'}`}>
+                                        <PlatformIcon platform={p} size={20} />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-bold text-slate-900">{p === Platform.Twitter ? 'X (Twitter)' : p}</h3>
+                                        <p className="text-xs text-slate-500">
+                                            {isConnected 
+                                              ? `Connected as ${currentUser.connectedAccounts[p]?.handle}` 
+                                              : 'Not connected'}
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    {isConnected && <div className="text-[10px] bg-green-50 text-green-700 px-2 py-1 rounded-full font-bold border border-green-100">Active</div>}
+                                    <button className="text-sm font-semibold text-slate-600 hover:text-blue-600">Configure</button>
+                                </div>
+                            </Card>
+                        );
+                     })}
+                 </div>
+             </div>
+         )}
+
+         {/* -- AUTOMATION -- */}
+         {activeTab === 'automation' && (
+             <div className="space-y-6">
+                 <SectionTitle title="Automation Defaults" description="Set global rules for all autonomous agents." />
+                 
+                 <Card className="p-6">
+                     <h3 className="font-bold text-slate-900 mb-4">Global Safety Standards</h3>
+                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+                        {['Conservative', 'Moderate', 'Aggressive'].map((level) => (
+                            <button
+                                key={level}
+                                onClick={() => updateSetting('automation', 'globalSafetyLevel', level)}
+                                className={`px-4 py-3 rounded-xl border text-sm font-bold transition-all ${
+                                    settings.automation.globalSafetyLevel === level 
+                                    ? 'bg-blue-50 border-blue-500 text-blue-700 ring-1 ring-blue-500 shadow-sm' 
+                                    : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300'
+                                }`}
+                            >
+                                {level}
+                            </button>
+                        ))}
+                     </div>
+                     <p className="text-xs text-slate-500 mb-6 bg-slate-50 p-3 rounded-lg border border-slate-100">
+                         {settings.automation.globalSafetyLevel === 'Conservative' && "Strict content filtering, lower daily limits. Best for new accounts."}
+                         {settings.automation.globalSafetyLevel === 'Moderate' && "Balanced limits and standard content filtering. Recommended for established accounts."}
+                         {settings.automation.globalSafetyLevel === 'Aggressive' && "Higher limits, minimal filtering. Use with caution for rapid growth."}
+                     </p>
+
+                     <div className="border-t border-slate-100 pt-6">
+                        <h3 className="font-bold text-slate-900 mb-4">Default Working Hours</h3>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Start Time</label>
+                                <input 
+                                    type="time" 
+                                    value={settings.automation.defaultWorkHours.start}
+                                    onChange={(e) => updateNestedSetting('automation', 'defaultWorkHours', 'start', e.target.value)}
+                                    className="w-full bg-white text-slate-900 rounded-lg border-slate-300 text-sm focus:ring-blue-500 focus:border-blue-500" 
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">End Time</label>
+                                <input 
+                                    type="time" 
+                                    value={settings.automation.defaultWorkHours.end}
+                                    onChange={(e) => updateNestedSetting('automation', 'defaultWorkHours', 'end', e.target.value)}
+                                    className="w-full bg-white text-slate-900 rounded-lg border-slate-300 text-sm focus:ring-blue-500 focus:border-blue-500" 
+                                />
+                            </div>
+                        </div>
+                     </div>
+                 </Card>
+             </div>
+         )}
+         
+         {/* -- BILLING -- */}
+         {activeTab === 'billing' && (
+             <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                 <SectionTitle title="Billing & Plan" description="Manage your subscription, payment methods, and usage limits." />
+                 
+                 {/* Premium Plan Card */}
+                 <div className="relative overflow-hidden rounded-[32px] bg-[#1c1c1e] text-white shadow-2xl border border-gray-800">
+                     {/* Ambient Background Glow */}
+                     <div className="absolute top-[-20%] right-[-10%] w-[500px] h-[500px] bg-blue-600/20 rounded-full blur-[120px] pointer-events-none"></div>
+                     <div className="absolute bottom-[-20%] left-[-10%] w-[400px] h-[400px] bg-purple-600/20 rounded-full blur-[100px] pointer-events-none"></div>
+
+                     <div className="relative z-10 p-8 md:p-10 flex flex-col lg:flex-row gap-10">
+                         
+                         {/* Left: Plan Details */}
+                         <div className="flex-1 flex flex-col justify-between min-h-[240px]">
+                             <div>
+                                 <div className="flex items-center gap-3 mb-4">
+                                     <span className="px-3 py-1 rounded-full bg-white/10 border border-white/5 text-[11px] font-bold uppercase tracking-widest text-white/90 backdrop-blur-md shadow-sm">
+                                         Enterprise Tier
+                                     </span>
+                                     <span className="flex items-center gap-1.5 text-emerald-400 text-xs font-bold bg-emerald-400/10 px-2 py-1 rounded-full border border-emerald-400/20">
+                                         <CheckCircle className="w-3.5 h-3.5" /> Active
+                                     </span>
+                                 </div>
+                                 <h2 className="text-5xl font-bold tracking-tight text-white mb-2">Enterprise Pro</h2>
+                                 <p className="text-lg text-white/60 font-medium leading-relaxed max-w-md">
+                                     Full access to autonomous agents, unlimited history, and priority support.
+                                 </p>
+                             </div>
+
+                             <div className="flex flex-wrap gap-4 pt-6">
+                                 <button className="px-8 py-3.5 bg-white text-black rounded-full font-bold text-sm hover:bg-gray-100 hover:scale-105 active:scale-95 transition-all shadow-xl shadow-white/5 flex items-center gap-2">
+                                     Upgrade Plan
+                                 </button>
+                                 <button className="px-8 py-3.5 bg-white/5 border border-white/10 text-white rounded-full font-bold text-sm hover:bg-white/10 transition-all backdrop-blur-md flex items-center gap-2 group">
+                                     <CreditCard className="w-4 h-4 text-white/70 group-hover:text-white transition-colors" />
+                                     View Invoices
+                                 </button>
+                             </div>
+                         </div>
+
+                         {/* Right: Usage Metrics Panel */}
+                         <div className="lg:w-[400px] bg-white/5 rounded-3xl p-6 border border-white/10 backdrop-blur-md flex flex-col justify-center space-y-8">
+                             <h3 className="text-xs font-bold text-white/40 uppercase tracking-widest mb-2 flex items-center gap-2">
+                                 <Activity className="w-4 h-4" /> Current Usage
+                             </h3>
+                             
+                             {/* Bot Actions Metric */}
+                             <div className="group">
+                                 <div className="flex justify-between items-end mb-3">
+                                     <div className="flex items-center gap-3">
+                                         <div className="p-2 rounded-lg bg-blue-500/20 text-blue-400">
+                                             <Zap className="w-5 h-5" />
+                                         </div>
+                                         <div>
+                                             <p className="text-sm font-bold text-white">Bot Actions</p>
+                                             <p className="text-xs text-white/50">Automated tasks</p>
+                                         </div>
+                                     </div>
+                                     <div className="text-right">
+                                         <span className="text-xl font-bold text-white tabular-nums tracking-tight">14,203</span>
+                                         <span className="text-sm text-white/40 font-medium ml-1">/ 50k</span>
+                                     </div>
+                                 </div>
+                                 <div className="w-full bg-white/10 rounded-full h-2 overflow-hidden backdrop-blur-sm">
+                                     <div className="bg-gradient-to-r from-blue-600 to-cyan-400 h-full rounded-full shadow-[0_0_12px_rgba(59,130,246,0.5)] transition-all duration-1000 ease-out" style={{ width: '28%' }}></div>
+                                 </div>
+                             </div>
+
+                             {/* Storage Metric */}
+                             <div className="group">
+                                 <div className="flex justify-between items-end mb-3">
+                                     <div className="flex items-center gap-3">
+                                         <div className="p-2 rounded-lg bg-purple-500/20 text-purple-400">
+                                             <Cloud className="w-5 h-5" />
+                                         </div>
+                                         <div>
+                                             <p className="text-sm font-bold text-white">Cloud Storage</p>
+                                             <p className="text-xs text-white/50">Media assets</p>
+                                         </div>
+                                     </div>
+                                     <div className="text-right">
+                                         <span className="text-xl font-bold text-white tabular-nums tracking-tight">4.2</span>
+                                         <span className="text-sm text-white/40 font-medium ml-1">/ 10 GB</span>
+                                     </div>
+                                 </div>
+                                 <div className="w-full bg-white/10 rounded-full h-2 overflow-hidden backdrop-blur-sm">
+                                     <div className="bg-gradient-to-r from-purple-600 to-pink-400 h-full rounded-full shadow-[0_0_12px_rgba(168,85,247,0.5)] transition-all duration-1000 ease-out" style={{ width: '42%' }}></div>
+                                 </div>
+                             </div>
+                         </div>
+                     </div>
+                 </div>
+                 
+                 {/* Subtle Footer / Help text */}
+                 <div className="flex justify-center">
+                     <p className="text-xs text-slate-400 font-medium">
+                         Next billing cycle starts on <span className="text-slate-600 font-bold">Nov 1, 2024</span>. 
+                         Need help? <a href="#" className="text-blue-600 hover:underline">Contact Billing Support</a>.
+                     </p>
+                 </div>
+             </div>
+         )}
+
+         {/* -- ADVANCED -- */}
+         {activeTab === 'advanced' && (
+             <div className="space-y-6">
+                 <SectionTitle title="Advanced Settings" description="Developer tools and danger zone." />
+                 
+                 <Card className="p-6">
+                     <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
+                         <Terminal className="w-4 h-4" /> API Configuration
+                     </h3>
+                     <div className="space-y-4">
+                         <div>
+                             <label className="block text-sm font-medium text-slate-700 mb-1">Gemini API Key</label>
+                             <input 
+                                 type="password" 
+                                 value={settings.geminiApiKey}
+                                 onChange={(e) => updateSetting('geminiApiKey', '', e.target.value)}
+                                 className="w-full rounded-lg border-slate-300 text-sm font-mono"
+                                 placeholder="AIza..."
+                             />
+                             <p className="text-xs text-slate-500 mt-1">Required for content generation and AI features.</p>
+                         </div>
+                     </div>
+                 </Card>
+
+                 <div className="border border-red-200 bg-red-50 rounded-2xl p-6">
+                     <h3 className="font-bold text-red-900 mb-2 flex items-center gap-2">
+                         <AlertOctagon className="w-5 h-5" /> Danger Zone
+                     </h3>
+                     <p className="text-sm text-red-700 mb-4">
+                         Irreversible actions. Please proceed with caution.
+                     </p>
+                     <div className="flex flex-wrap gap-3">
+                         <button className="px-4 py-2 bg-white border border-red-200 text-red-600 font-bold text-xs rounded-lg hover:bg-red-50">
+                             Reset Workspace
+                         </button>
+                         <button className="px-4 py-2 bg-red-600 text-white font-bold text-xs rounded-lg hover:bg-red-700">
+                             Delete Organization
+                         </button>
+                     </div>
+                 </div>
+             </div>
+         )}
+
+      </div>
+
+      {/* Sticky Save Bar */}
+      {isDirty && (
+          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom-4 fade-in">
+              <div className="bg-[#1d1d1f] text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-6 border border-gray-700">
+                  <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-orange-500 animate-pulse"></div>
+                      <span className="text-sm font-bold">Unsaved Changes</span>
+                  </div>
+                  <div className="h-4 w-px bg-gray-600"></div>
+                  <div className="flex gap-2">
+                      <button 
+                         onClick={() => {
+                             setSettings(JSON.parse(JSON.stringify(originalSettings)));
+                             setIsDirty(false);
+                         }}
+                         className="px-3 py-1.5 text-xs font-bold text-gray-400 hover:text-white transition-colors"
+                      >
+                          Reset
+                      </button>
+                      <button 
+                         onClick={handleSave}
+                         disabled={isSaving}
+                         className="px-4 py-1.5 bg-white text-black rounded-full text-xs font-bold hover:bg-gray-100 transition-colors flex items-center gap-2"
+                      >
+                         {isSaving && <RotateCcw className="w-3 h-3 animate-spin" />}
+                         Save Changes
+                      </button>
+                  </div>
+              </div>
+          </div>
+      )}
+      
+      {/* Toast Message */}
       {message && (
-        <div className={`mx-2 p-3 rounded-xl flex items-center gap-3 text-sm font-medium ${message.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-          {message.type === 'success' ? <CheckCircle className="w-5 h-5" /> : <AlertTriangle className="w-5 h-5" />}
-          {message.text}
-        </div>
+          <div className={`fixed top-6 right-6 z-50 px-4 py-3 rounded-xl shadow-lg flex items-center gap-3 animate-in slide-in-from-top-2 fade-in ${message.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+              {message.type === 'success' ? <CheckCircle className="w-5 h-5" /> : <AlertTriangle className="w-5 h-5" />}
+              <span className="text-sm font-bold">{message.text}</span>
+          </div>
       )}
 
-      <div className="space-y-6">
-        {/* Group 1: System */}
-        <div className="space-y-2">
-          <h2 className="px-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Environment</h2>
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden divide-y divide-slate-100">
-            <div className="p-4 flex items-center justify-between group cursor-pointer hover:bg-slate-50 transition-colors">
-               <div className="flex items-center gap-4">
-                 <div className="w-8 h-8 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center">
-                   <Server className="w-5 h-5" />
-                 </div>
-                 <div>
-                   <h3 className="font-semibold text-slate-900">Simulation Mode</h3>
-                   <p className="text-xs text-slate-500">Use mock data instead of real APIs</p>
-                 </div>
-               </div>
-               <div className="flex items-center gap-3">
-                 <button 
-                   onClick={() => setSettings({...settings, demoMode: !settings.demoMode})}
-                   className={`w-12 h-7 rounded-full transition-colors duration-300 p-1 ${settings.demoMode ? 'bg-green-500' : 'bg-slate-200'}`}
-                 >
-                   <div className={`w-5 h-5 bg-white rounded-full shadow-sm transform transition-transform duration-300 ${settings.demoMode ? 'translate-x-5' : ''}`} />
-                 </button>
-               </div>
-            </div>
-            
-            <div className="p-4 flex items-center justify-between group cursor-pointer hover:bg-slate-50 transition-colors">
-               <div className="flex items-center gap-4">
-                 <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center">
-                   <Globe className="w-5 h-5" />
-                 </div>
-                 <div>
-                   <h3 className="font-semibold text-slate-900">Region</h3>
-                   <p className="text-xs text-slate-500">{systemTz} (System Default)</p>
-                 </div>
-               </div>
-               <ChevronRight className="w-5 h-5 text-slate-300" />
-            </div>
-          </div>
-        </div>
-
-        {/* Group 3: General */}
-        <div className="space-y-2">
-           <h2 className="px-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">General</h2>
-           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden divide-y divide-slate-100">
-              <div className="p-4 flex items-center justify-between group cursor-pointer hover:bg-slate-50 transition-colors">
-                 <div className="flex items-center gap-4">
-                   <div className="w-8 h-8 rounded-lg bg-gray-100 text-gray-600 flex items-center justify-center">
-                     <Shield className="w-5 h-5" />
-                   </div>
-                   <span className="font-semibold text-slate-900">Security Log</span>
-                 </div>
-                 <ChevronRight className="w-5 h-5 text-slate-300" />
-              </div>
-              <div className="p-4 flex items-center justify-between group cursor-pointer hover:bg-slate-50 transition-colors">
-                 <div className="flex items-center gap-4">
-                   <div className="w-8 h-8 rounded-lg bg-gray-100 text-gray-600 flex items-center justify-center">
-                     <Bell className="w-5 h-5" />
-                   </div>
-                   <span className="font-semibold text-slate-900">Notifications</span>
-                 </div>
-                 <ChevronRight className="w-5 h-5 text-slate-300" />
-              </div>
-           </div>
-        </div>
-
-        <div className="pt-4 text-center">
-          <p className="text-xs text-slate-400">ContentCaster Enterprise v1.2.0 (8492)</p>
-          <p className="text-[10px] text-slate-300 mt-1">Powered by Dossiefoyer Private Limited</p>
-        </div>
-      </div>
     </div>
   );
 };

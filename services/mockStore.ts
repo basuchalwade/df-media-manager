@@ -218,6 +218,35 @@ const INITIAL_BOTS: BotConfig[] = [
 const DEFAULT_SETTINGS: UserSettings = {
   demoMode: true,
   geminiApiKey: '',
+  general: {
+    language: 'English (US)',
+    dateFormat: 'MM/DD/YYYY',
+    startOfWeek: 'Monday'
+  },
+  workspace: {
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    defaultTone: 'Professional'
+  },
+  notifications: {
+    channels: {
+      email: true,
+      inApp: true,
+      slack: false
+    },
+    alerts: {
+      botActivity: true,
+      failures: true,
+      approvals: true
+    }
+  },
+  security: {
+    twoFactorEnabled: false,
+    sessionTimeout: '30m'
+  },
+  automation: {
+    globalSafetyLevel: 'Moderate',
+    defaultWorkHours: { start: '09:00', end: '17:00' }
+  }
 };
 
 const INITIAL_USERS: User[] = [
@@ -277,6 +306,17 @@ class MockStore {
     // Load settings from localStorage if available
     const savedSettings = localStorage.getItem('postmaster_settings');
     this.settings = savedSettings ? JSON.parse(savedSettings) : { ...DEFAULT_SETTINGS };
+    
+    // Ensure deep merge of defaults for new fields if loading old settings
+    this.settings = { 
+        ...DEFAULT_SETTINGS, 
+        ...this.settings,
+        general: { ...DEFAULT_SETTINGS.general, ...this.settings.general },
+        workspace: { ...DEFAULT_SETTINGS.workspace, ...this.settings.workspace },
+        notifications: { ...DEFAULT_SETTINGS.notifications, ...this.settings.notifications },
+        security: { ...DEFAULT_SETTINGS.security, ...this.settings.security },
+        automation: { ...DEFAULT_SETTINGS.automation, ...this.settings.automation },
+    };
 
     const savedUsers = localStorage.getItem('postmaster_users');
     this.users = savedUsers ? JSON.parse(savedUsers) : [...INITIAL_USERS];

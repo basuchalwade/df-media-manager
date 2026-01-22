@@ -170,6 +170,37 @@ export interface DashboardStats {
 export interface UserSettings {
   demoMode: boolean;
   geminiApiKey: string;
+  
+  // Enhanced Settings Structure
+  general: {
+    language: string;
+    dateFormat: 'MM/DD/YYYY' | 'DD/MM/YYYY' | 'YYYY-MM-DD';
+    startOfWeek: 'Sunday' | 'Monday';
+  };
+  workspace: {
+    timezone: string;
+    defaultTone: string;
+  };
+  notifications: {
+    channels: {
+      email: boolean;
+      inApp: boolean;
+      slack: boolean;
+    };
+    alerts: {
+      botActivity: boolean;
+      failures: boolean;
+      approvals: boolean;
+    };
+  };
+  security: {
+    twoFactorEnabled: boolean;
+    sessionTimeout: string;
+  };
+  automation: {
+    globalSafetyLevel: 'Conservative' | 'Moderate' | 'Aggressive';
+    defaultWorkHours: { start: string; end: string };
+  };
 }
 
 export interface AnalyticsDataPoint {
