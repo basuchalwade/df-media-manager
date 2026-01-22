@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Sparkles, Send, Calendar as CalendarIcon, RotateCcw, Image as ImageIcon, ChevronDown, CheckCircle, Briefcase, Smile, Rocket, GraduationCap, X, FileVideo, Clock, Save, AlertCircle, Check, Zap, Eye, Copy, Hash, MoreHorizontal, ThumbsUp, MessageSquare, Share2, Repeat, Bookmark, Globe, Heart, Layers, UploadCloud, RefreshCw, ShieldCheck, AlertTriangle, Bot } from 'lucide-react';
+import { Sparkles, Send, Calendar as CalendarIcon, RotateCcw, Image as ImageIcon, ChevronDown, CheckCircle, Briefcase, Smile, Rocket, GraduationCap, X, FileVideo, Clock, Save, AlertCircle, Check, Zap, Eye, Copy, Hash, MoreHorizontal, ThumbsUp, MessageSquare, Share2, Repeat, Bookmark, Globe, Heart, Layers, UploadCloud, RefreshCw, ShieldCheck, AlertTriangle, Bot, Info } from 'lucide-react';
 import { generatePostContent, generateHashtags, validateContentSafety } from '../services/geminiService';
 import { validatePost, PLATFORM_LIMITS } from '../services/validationService';
 import { store } from '../services/mockStore';
@@ -18,6 +18,10 @@ const EMOJI_CATEGORIES = {
 };
 
 export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
+  // --- Deep Sync State ---
+  const [originalPost, setOriginalPost] = useState<Post | null>(null);
+  const [postTimezone, setPostTimezone] = useState<string | undefined>(undefined);
+
   // --- AI State ---
   const [topic, setTopic] = useState('');
   const [tone, setTone] = useState('Professional');
@@ -51,6 +55,7 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
   // --- Automation State ---
   const [autoEngage, setAutoEngage] = useState(false);
   const [isAiGenerated, setIsAiGenerated] = useState(false);
+  const [bypassSafety, setBypassSafety] = useState(false); // Deep Sync: Safety Override
 
   // --- UI State ---
   const [previewPlatform, setPreviewPlatform] = useState<Platform>(Platform.Twitter);
@@ -72,6 +77,8 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
         store.getPosts().then(posts => {
           const post = posts.find(p => p.id === params.postId);
           if (post) {
+            setOriginalPost(post); // DEEP SYNC: Store original to preserve metadata
+            
             setCurrentPostId(post.id);
             setContent(post.content);
             setSelectedPlatforms(post.platforms);
@@ -79,6 +86,16 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
             setIsCarousel(post.isCarousel || false);
             setIsAiGenerated(post.generatedByAi);
             setPostAuthor(post.author || 'User');
+            
+            // Deep Sync: Auto-Ops & Safety
+            setAutoEngage(!!post.autoOps?.autoEngage);
+            setBypassSafety(!!post.safetySettings?.bypassSafety);
+            setPostTimezone(post.timezone);
+
+            // Restore Creation Context if available
+            if (post.creationContext?.topic) {
+                setTopic(post.creationContext.topic);
+            }
             
             // Media
             if (post.mediaUrl) {
@@ -119,6 +136,13 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
         setScheduleMode('later');
         setScheduledDate(new Date(params.date));
         resetForm(false); // Reset but keep date
+        
+        // Deep Sync: Initialize from Calendar Context
+        if (params.timezone) setPostTimezone(params.timezone);
+        if (params.platform) {
+            setSelectedPlatforms([params.platform]);
+            setPreviewPlatform(params.platform);
+        }
       }
     } else {
       resetForm(true);
@@ -184,6 +208,7 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
     }
   };
 
+  // DEEP SYNC: Merges original post data with new form changes to prevent data loss
   const constructPostObject = (status: PostStatus, forceNewId: boolean = false): Post => {
     let finalDate = new Date();
     if (scheduleMode === 'later') {
@@ -196,10 +221,14 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
 
     const id = (currentPostId && !forceNewId) ? currentPostId : Date.now().toString() + Math.random().toString(36).substr(2, 5);
 
-    return {
+    // If duplicating, we don't merge original stats. If updating, we merge.
+    const basePost = (!forceNewId && originalPost) ? originalPost : {};
+
+    const newPost: Post = {
+      ...basePost, // DEEP SYNC: Spread original first
       id: id,
       title: youtubeTitle,
-      description: content, // Reuse content as description
+      description: content, 
       thumbnailUrl: youtubeThumbnail?.url,
       isCarousel,
       content: content,
@@ -209,12 +238,29 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
       generatedByAi: isAiGenerated,
       mediaUrl: selectedMedia?.url,
       mediaType: selectedMedia?.type,
-      author: forceNewId ? 'User' : postAuthor, // Keep original author unless duplicating
-      engagement: { likes: 0, shares: 0, comments: 0 }
+      author: forceNewId ? 'User' : postAuthor,
+      // Deep Sync: Settings
+      timezone: postTimezone,
+      autoOps: { autoEngage },
+      safetySettings: { bypassSafety, lastChecked: new Date().toISOString() },
+      // If original had engagement, keep it. If new/duplicate, init to 0.
+      engagement: (!forceNewId && originalPost?.engagement) ? originalPost.engagement : { likes: 0, shares: 0, comments: 0 }
     };
+
+    // Add creation context if new
+    if (!originalPost && !newPost.creationContext) {
+        newPost.creationContext = {
+            source: isAiGenerated ? 'AI_Assistant' : 'Manual',
+            topic: topic || undefined,
+        };
+    }
+
+    return newPost;
   };
 
   const performSafetyCheck = async (): Promise<boolean> => {
+    // If previously bypassed, do we re-check? Yes, unless strict override logic.
+    // For now, always re-check if not strictly just saving draft without changes.
     setIsCheckingSafety(true);
     const result = await validateContentSafety(content, selectedPlatforms);
     setIsCheckingSafety(false);
@@ -230,9 +276,13 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
   const handlePublish = async (skipSafety: boolean = false) => {
     if (validationErrors.length > 0 || !content) return;
     
-    if (!skipSafety) {
+    if (!skipSafety && !bypassSafety) {
       const isSafe = await performSafetyCheck();
       if (!isSafe) return; // Modal will show
+    }
+
+    if (skipSafety) {
+        setBypassSafety(true);
     }
 
     setIsSaving(true);
@@ -262,6 +312,9 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
     
     if (currentPostId) {
        await store.updatePost(newPost);
+       // Update originalPost so subsequent saves don't lose the latest state
+       setOriginalPost(newPost);
+       
        const btn = document.getElementById('save-draft-btn');
        if(btn) {
          const originalText = btn.innerText;
@@ -271,6 +324,7 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
     } else {
        const saved = await store.addPost(newPost);
        setCurrentPostId(saved.id);
+       setOriginalPost(saved);
        alert('Draft saved. You can continue editing.');
     }
     
@@ -286,12 +340,15 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
     const saved = await store.addPost(newPost);
     setCurrentPostId(saved.id);
     setPostAuthor('User'); // Cloned post is owned by user
+    setOriginalPost(saved); // Update context to new copy
+    setBypassSafety(false); // Reset safety for new copy
     
     alert("Version duplicated! You are now editing the copy.");
     setIsSaving(false);
   };
 
   const resetForm = (clearDate: boolean = true) => {
+    setOriginalPost(null);
     setContent('');
     setYoutubeTitle('');
     setYoutubeThumbnail(null);
@@ -306,6 +363,9 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
     setCurrentPostId(null);
     setSafetyIssues([]);
     setPostAuthor('User');
+    setBypassSafety(false);
+    setAutoEngage(false);
+    setPostTimezone(undefined);
   };
 
   const formatBytes = (bytes: number) => {
@@ -526,6 +586,17 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
          </div>
       </div>
       
+      {/* Creation Context / Intent Display */}
+      {originalPost?.creationContext && (
+         <div className="flex items-center gap-2 text-xs font-semibold text-gray-500 bg-gray-100 px-3 py-1.5 rounded-lg w-fit">
+            <Info className="w-3.5 h-3.5" />
+            <span>
+                Original Intent: {originalPost.creationContext.source.replace('_', ' ')} 
+                {originalPost.creationContext.topic ? ` — Topic: "${originalPost.creationContext.topic}"` : ''}
+            </span>
+         </div>
+      )}
+
       {/* Bot Review Mode Banner */}
       {postAuthor !== 'User' && (
          <div className="bg-orange-50 border border-orange-100 rounded-2xl p-4 flex items-start gap-4 animate-in slide-in-from-top-2">
@@ -538,6 +609,11 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
                    This draft was automatically created by the <strong>{postAuthor}</strong>. 
                    Please review facts, hashtags, and tone before publishing.
                 </p>
+                {bypassSafety && (
+                    <div className="mt-2 text-xs text-red-600 font-bold flex items-center gap-1">
+                        <AlertTriangle className="w-3 h-3" /> Safety checks have been bypassed for this post.
+                    </div>
+                )}
              </div>
              <div className="flex gap-2">
                 <button 
@@ -913,6 +989,14 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
                           </div>
                        )}
                     </div>
+                 </div>
+              )}
+              
+              {/* Timezone Indicator */}
+              {postTimezone && (
+                 <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-wide justify-end px-1">
+                    <Globe className="w-3 h-3" />
+                    <span>Scheduling in {postTimezone}</span>
                  </div>
               )}
 

@@ -84,10 +84,16 @@ export const Calendar: React.FC<PageProps> = ({ onNavigate, params }) => {
     if (isPastDate(selectedDate)) {
       dateToUse = new Date();
     }
-    onNavigate('creator', { date: dateToUse.toISOString() });
+    // Deep Sync: Pass all relevant context to Studio
+    onNavigate('creator', { 
+      date: dateToUse.toISOString(),
+      timezone: selectedTimezone,
+      platform: filterPlatform !== 'All' ? filterPlatform : undefined
+    });
   };
 
   const handleEditPost = (post: Post) => {
+    // Deep Sync: Also pass current view context if needed
     onNavigate('creator', { postId: post.id });
   };
 

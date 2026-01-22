@@ -37,6 +37,25 @@ export interface Post {
   mediaType?: 'image' | 'video'; // Explicit type
   generatedByAi: boolean;
   author?: 'User' | BotType; // Track authorship
+  
+  // New: Track Intent & Deep Sync Data
+  creationContext?: {
+    source: 'Manual' | 'AI_Assistant' | BotType;
+    topic?: string;
+    originalPrompt?: string;
+    strategyUsed?: string;
+  };
+
+  // Deep Sync Settings Parity
+  timezone?: string; // Persist scheduling timezone
+  autoOps?: {
+    autoEngage?: boolean; // Bot auto-reply enabled for this post
+  };
+  safetySettings?: {
+    bypassSafety?: boolean; // If user overrode safety checks
+    lastChecked?: string;
+  };
+
   engagement?: {
     likes: number;
     shares: number;
