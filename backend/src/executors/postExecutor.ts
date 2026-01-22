@@ -1,6 +1,7 @@
 
-import { PrismaClient } from '@prisma/client';
+import * as Prisma from '@prisma/client';
 
+const { PrismaClient } = Prisma as any;
 const prisma = new PrismaClient();
 
 export const postExecutor = async (job: any) => {

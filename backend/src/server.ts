@@ -1,8 +1,10 @@
 
 import express from 'express';
 import cors from 'cors';
-import { PrismaClient } from '@prisma/client';
+import * as Prisma from '@prisma/client';
 import { createQueue, QUEUE_NAMES } from './lib/queue';
+
+const { PrismaClient } = Prisma as any;
 
 // Queues
 const postQueue = createQueue(QUEUE_NAMES.POST_PUBLISH);

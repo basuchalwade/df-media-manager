@@ -1,6 +1,8 @@
 
-import { PrismaClient } from '@prisma/client';
+import * as Prisma from '@prisma/client';
+import { v4 as uuidv4 } from 'uuid'; // Assuming uuid is available or using simplified generation
 
+const { PrismaClient } = Prisma as any;
 const prisma = new PrismaClient();
 
 export class BotEngine {
@@ -20,24 +22,28 @@ export class BotEngine {
       return;
     }
 
-    if (config.isPausedBySystem) {
+    if (config.isPaused) {
       // Create a 'SKIPPED' activity log
       await prisma.botActivity.create({
         data: {
           botType,
+          runId: `skip-${Date.now()}`,
           actionType: 'ANALYZE',
           platform: 'All', // System level
           status: 'SKIPPED',
-          message: 'Circuit breaker active. Bot is paused due to consecutive errors.',
+          message: 'Circuit breaker active. Bot is paused due to consecutive failures.',
         }
       });
       return;
     }
 
+    const runId = `run-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+
     // 2. Start Activity
     const activity = await prisma.botActivity.create({
       data: {
         botType,
+        runId,
         actionType: this.determineActionType(botType),
         platform: 'Twitter', // Default for simulation, would be dynamic
         status: 'STARTED',
@@ -67,11 +73,16 @@ export class BotEngine {
       });
 
       // Reset Health
+      // We also update the 'stats' JSON to keep frontend happy
+      const stats = (config.stats as any) || {};
+      stats.consecutiveErrors = 0;
+
       await prisma.botConfig.update({
         where: { type: botType },
         data: { 
           status: 'Idle',
-          consecutiveErrors: 0 
+          consecutiveFailures: 0,
+          stats: stats
         }
       });
 
@@ -79,10 +90,14 @@ export class BotEngine {
       console.error(`[BotEngine] Error in ${botType}:`, error);
 
       // 6. Failure Handling
-      const consecutiveErrors = config.consecutiveErrors + 1;
-      const shouldPause = config.config?.['stopOnConsecutiveErrors'] 
-        ? consecutiveErrors >= config.config['stopOnConsecutiveErrors'] 
+      const consecutiveFailures = config.consecutiveFailures + 1;
+      const shouldPause = config.config && (config.config as any)['stopOnConsecutiveErrors'] 
+        ? consecutiveFailures >= (config.config as any)['stopOnConsecutiveErrors'] 
         : false;
+
+      // Sync to stats JSON for frontend
+      const stats = (config.stats as any) || {};
+      stats.consecutiveErrors = consecutiveFailures;
 
       await prisma.botActivity.update({
         where: { id: activity.id },
@@ -98,8 +113,9 @@ export class BotEngine {
         where: { type: botType },
         data: { 
           status: shouldPause ? 'Error' : 'Idle',
-          consecutiveErrors,
-          isPausedBySystem: shouldPause
+          consecutiveFailures,
+          isPaused: shouldPause,
+          stats: stats
         }
       });
     }

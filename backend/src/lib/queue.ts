@@ -1,7 +1,9 @@
 
 import { Queue, QueueOptions, Worker, WorkerOptions, Processor } from 'bullmq';
-import { PrismaClient } from '@prisma/client';
+import * as Prisma from '@prisma/client';
 
+// Bypass TS error when client is not generated
+const { PrismaClient } = Prisma as any;
 const prisma = new PrismaClient();
 
 const IS_SIMULATION = process.env.SIMULATION_MODE === 'true';

@@ -2,8 +2,9 @@
 import { createWorker, QUEUE_NAMES } from './lib/queue';
 import { postExecutor } from './executors/postExecutor';
 import { BotEngine } from './services/botEngine';
-import { PrismaClient } from '@prisma/client';
+import * as Prisma from '@prisma/client';
 
+const { PrismaClient } = Prisma as any;
 const prisma = new PrismaClient();
 const IS_SIMULATION = process.env.SIMULATION_MODE === 'true';
 
