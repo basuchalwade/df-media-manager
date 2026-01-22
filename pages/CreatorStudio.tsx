@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Sparkles, Send, Calendar as CalendarIcon, RotateCcw, Image as ImageIcon, ChevronDown, CheckCircle, Briefcase, Smile, Rocket, GraduationCap, X, FileVideo, Clock, Save, AlertCircle, Check, Zap, Eye, Copy, Hash, MoreHorizontal, ThumbsUp, MessageSquare, Share2, Repeat, Bookmark, Globe, Heart, Layers, UploadCloud, RefreshCw, ShieldCheck, AlertTriangle, Bot, Info, Cloud, CheckSquare, Plus, Split, ExternalLink, MapPin } from 'lucide-react';
-import { generatePostContent, generatePostVariants, generateHashtags, validateContentSafety } from '../services/geminiService';
+import { generatePostContent, generatePostVariants, generateHashtags, validateContentSafety, refinePostContent } from '../services/geminiService';
 import { validatePost, PLATFORM_LIMITS } from '../services/validationService';
 import { store } from '../services/mockStore';
 import { Platform, PostStatus, MediaItem, Post, PageProps, BotType, PostVariant, BotConfig } from '../types';
@@ -28,6 +28,7 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
   const [tone, setTone] = useState('Professional');
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationPlatform, setGenerationPlatform] = useState<Platform>(Platform.Twitter);
+  const [isOptimizing, setIsOptimizing] = useState(false);
 
   // --- Variant State (A/B Testing) ---
   const [variants, setVariants] = useState<PostVariant[]>([{ id: 'v1', name: 'Variant A', content: '' }]);
@@ -253,10 +254,10 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
     const charLimit = PLATFORM_LIMITS[contextPlatform];
     let constraints = `Strictly keep under ${charLimit} characters.`;
     if (contextPlatform === Platform.LinkedIn) constraints += " Use professional spacing, bullet points, and a 'hook' in the first line.";
-    if (contextPlatform === Platform.Twitter) constraints += " Use thread-style brevity if needed, focus on impact. No intro fluff.";
-    if (contextPlatform === Platform.Instagram) constraints += " Write an engaging caption. Assume visuals are attached.";
+    if (contextPlatform === Platform.Twitter) constraints += " Make it short and punchy. No intro fluff. Focus on impact.";
+    if (contextPlatform === Platform.Instagram) constraints += " Write an engaging caption. Use engaging emojis and 5-10 relevant hashtags.";
     if (contextPlatform === Platform.YouTube) constraints += " Write a compelling video description with a clear CTA.";
-    if (contextPlatform === Platform.GoogleBusiness) constraints += " Keep it local and actionable. Focus on updates, offers, or events.";
+    if (contextPlatform === Platform.GoogleBusiness) constraints += " Professional tone with a clear Call to Action (CTA). Focus on updates/offers.";
 
     return {
         contextPlatform,
@@ -289,6 +290,36 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
     setSyncStatus('modified');
     setPostAuthor(BotType.Creator); // Explicitly mark as bot content
     setPostStatus(PostStatus.NeedsReview); // Bot content needs review
+  };
+
+  const handleSmartOptimize = async () => {
+    if (!content) return;
+    setIsOptimizing(true);
+
+    let instruction = "Improve clarity and engagement.";
+    switch (previewPlatform) {
+        case Platform.Twitter:
+            instruction = "Make it short, punchy, and under 280 characters. Remove fluff.";
+            break;
+        case Platform.Instagram:
+            instruction = "Add engaging emojis and 5-10 relevant hashtags. Make the tone visual and exciting.";
+            break;
+        case Platform.GoogleBusiness:
+            instruction = "Make it professional, local-focused, and add a clear Call to Action (CTA) like 'Book Now' or 'Learn More'.";
+            break;
+        case Platform.LinkedIn:
+            instruction = "Make it professional, insightful, and structure with bullet points if applicable.";
+            break;
+        case Platform.YouTube:
+            instruction = "Format as a video description with a hook in the first sentence and a 'Subscribe' CTA.";
+            break;
+    }
+
+    const optimized = await refinePostContent(content, instruction, previewPlatform);
+    setContent(optimized);
+    setVariants(prev => prev.map(v => v.id === activeVariantId ? { ...v, content: optimized } : v));
+    setIsOptimizing(false);
+    setSyncStatus('modified');
   };
 
   const handleGenerateVariants = async () => {
@@ -1019,7 +1050,7 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
                              `}
                           >
                              <PlatformIcon platform={p} size={14} white={isSelected} />
-                             {p}
+                             {p === Platform.Twitter ? 'X' : p}
                           </button>
                        );
                     })}
@@ -1205,8 +1236,14 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
                                 )}
                             </div>
                         </div>
-                        <button className="p-2 bg-purple-50 rounded-lg shadow-sm text-purple-600 hover:bg-purple-100 border border-purple-100 transition-colors text-xs font-bold flex items-center gap-1.5 px-3" title="AI Rewrite">
-                           <Zap className="w-3 h-3" /> Auto-Fix
+                        <button 
+                           onClick={handleSmartOptimize}
+                           disabled={isOptimizing || !content}
+                           className="p-2 bg-purple-50 rounded-lg shadow-sm text-purple-600 hover:bg-purple-100 border border-purple-100 transition-colors text-xs font-bold flex items-center gap-1.5 px-3 disabled:opacity-50" 
+                           title={`Rewrite content specifically for ${previewPlatform === Platform.Twitter ? 'X' : previewPlatform}`}
+                        >
+                           {isOptimizing ? <RotateCcw className="w-3 h-3 animate-spin" /> : <Zap className="w-3 h-3" />}
+                           Optimize for {previewPlatform === Platform.Twitter ? 'X' : previewPlatform}
                         </button>
                     </div>
                  </div>
@@ -1392,7 +1429,7 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
                           `}
                        >
                           <PlatformIcon platform={p} size={12} white={true} />
-                          {p}
+                          {p === Platform.Twitter ? 'X' : p}
                        </button>
                     ))}
                  </div>

@@ -84,9 +84,9 @@ const generateLogs = (count: number, type: BotType): BotLogEntry[] => {
   
   const messages = {
     [BotType.Creator]: ['Drafted post for LinkedIn', 'Checked content calendar', 'Analyzing trending topics', 'Content generation successful', 'Added 3 new drafts to Studio'],
-    [BotType.Engagement]: ['Replied to @user123', 'Liked post #882', 'Checked for new mentions', 'Daily limit warning'],
-    [BotType.Finder]: ['Scanned 50 tweets', 'Found new competitor activity', 'Saved draft to library', 'Keyword alert: "AI"'],
-    [BotType.Growth]: ['Followed @dev_jane', 'Unfollowed inactive user', 'API Rate Limit (429) detected', 'Cooling down']
+    [BotType.Engagement]: ['Replied to @user123 on X', 'Liked post #882', 'Checked for new mentions', 'Daily limit warning'],
+    [BotType.Finder]: ['Scanned 50 posts', 'Found new competitor activity on X', 'Saved draft to library', 'Keyword alert: "AI"'],
+    [BotType.Growth]: ['Followed @dev_jane on X', 'Unfollowed inactive user', 'API Rate Limit (429) detected', 'Cooling down']
   };
 
   const levels: LogLevel[] = ['Info', 'Success', 'Info', 'Warning', 'Error'];
@@ -229,7 +229,7 @@ const INITIAL_USERS: User[] = [
     status: UserStatus.Active, 
     lastActive: 'Just now',
     connectedAccounts: {
-      [Platform.Twitter]: { connected: true, handle: '@admin_tweets', lastSync: '10 mins ago' },
+      [Platform.Twitter]: { connected: true, handle: '@admin_x', lastSync: '10 mins ago' },
       [Platform.LinkedIn]: { connected: true, handle: 'Admin Professional', lastSync: '1 hour ago' }
     }
   },
@@ -308,7 +308,7 @@ class MockStore {
         ...user.connectedAccounts,
         [platform]: {
           connected: !isConnected,
-          handle: !isConnected ? `@demo_${platform.toLowerCase()}` : undefined,
+          handle: !isConnected ? `@demo_${platform.toLowerCase().replace('twitter', 'x')}` : undefined,
           lastSync: !isConnected ? 'Just now' : undefined
         }
       }

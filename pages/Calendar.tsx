@@ -773,6 +773,7 @@ export const Calendar: React.FC<PageProps> = ({ onNavigate, params }) => {
                        className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${filterPlatform === p ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-gray-600 border border-gray-100 hover:bg-gray-50'}`}
                      >
                        <PlatformIcon platform={p} size={12} white={filterPlatform === p} />
+                       {p === Platform.Twitter ? 'X' : p}
                      </button>
                    ))}
                  </div>

@@ -25,7 +25,8 @@ export const validatePost = (
   platforms.forEach(p => {
     const limit = PLATFORM_LIMITS[p];
     if (content.length > limit) {
-      errors.push(`${p}: Text limit exceeded (${content.length}/${limit})`);
+      const label = p === Platform.Twitter ? 'X' : p;
+      errors.push(`${label}: Text limit exceeded (${content.length}/${limit})`);
     }
     
     // YouTube Rules
@@ -40,10 +41,10 @@ export const validatePost = (
        if (!media && !content) errors.push("Instagram: Must include media or text.");
     }
 
-    // Twitter Rules
+    // Twitter / X Rules
     if (p === Platform.Twitter) {
        if (media && media.size > 5 * 1024 * 1024) { // 5MB limit
-          errors.push("Twitter: Image exceeds 5MB limit.");
+          errors.push("X: Image exceeds 5MB limit.");
        }
     }
   });

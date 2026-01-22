@@ -52,7 +52,7 @@ Our bots don't just post; they *think* before they act.
 An integrated AI layer that audits every keystroke before publication.
 - **Compliance Checks**: Scans for hate speech, violence, NSFW content, and aggressive language.
 - **Platform Policy**: Warns about character limits and aspect ratios (e.g., "Instagram images should be 1:1 or 4:5").
-- **Safety Override**: Admins can explicitly bypass safety checks with audit logging.
+- **Safety Override**: Admins can explicitly bypass safety checks with audit logging..
 
 ---
 

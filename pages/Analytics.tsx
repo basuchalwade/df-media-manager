@@ -25,6 +25,8 @@ export const Analytics: React.FC = () => {
 
   const tabs = ['All', ...Object.values(Platform)];
 
+  const getPlatformLabel = (p: string) => p === Platform.Twitter ? 'X' : p;
+
   return (
     <div className="space-y-6">
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -52,7 +54,7 @@ export const Analytics: React.FC = () => {
               }`}
             >
               <PlatformIcon platform={tab} size={16} white={isActive} />
-              {tab === 'All' ? 'All Networks' : tab}
+              {tab === 'All' ? 'All Networks' : getPlatformLabel(tab)}
             </button>
           );
         })}
@@ -61,7 +63,7 @@ export const Analytics: React.FC = () => {
       {isLoading || !data ? (
         <div className="h-96 flex flex-col items-center justify-center text-slate-400">
           <Activity className="w-10 h-10 animate-pulse mb-4" />
-          <p>Gathering insights for {selectedPlatform}...</p>
+          <p>Gathering insights for {selectedPlatform === 'All' ? 'All Networks' : getPlatformLabel(selectedPlatform)}...</p>
         </div>
       ) : (
         <div className="space-y-6 animate-in fade-in duration-500">
@@ -160,11 +162,11 @@ export const Analytics: React.FC = () => {
                <h3 className="font-semibold text-lg">AI Performance Insight</h3>
              </div>
              <p className="text-slate-300 leading-relaxed">
-               Your engagement on <strong>{selectedPlatform}</strong> is trending upwards by <strong>{data.summary.engagementGrowth}%</strong> this week. 
-               {selectedPlatform === 'Twitter' && " Short-form content posted between 9AM-11AM is performing best."}
-               {selectedPlatform === 'LinkedIn' && " Professional case studies are generating 2x more shares."}
-               {selectedPlatform === 'Instagram' && " Reels are outperforming static images by 40%."}
-               {selectedPlatform === 'Google Business' && " Updates with 'Offer' CTAs are driving 20% more clicks to your site."}
+               Your engagement on <strong>{selectedPlatform === 'All' ? 'All Networks' : getPlatformLabel(selectedPlatform)}</strong> is trending upwards by <strong>{data.summary.engagementGrowth}%</strong> this week. 
+               {selectedPlatform === Platform.Twitter && " Short-form content posted between 9AM-11AM is performing best."}
+               {selectedPlatform === Platform.LinkedIn && " Professional case studies are generating 2x more shares."}
+               {selectedPlatform === Platform.Instagram && " Reels are outperforming static images by 40%."}
+               {selectedPlatform === Platform.GoogleBusiness && " Updates with 'Offer' CTAs are driving 20% more clicks to your site."}
                {selectedPlatform === 'All' && " We recommend increasing video content frequency across all channels to sustain this growth."}
              </p>
           </div>

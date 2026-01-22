@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Twitter, Facebook, Instagram, Linkedin, Youtube, MapPin, AtSign, Share2, Layers } from 'lucide-react';
+import { X, Facebook, Instagram, Linkedin, Youtube, MapPin, AtSign, Share2, Layers } from 'lucide-react';
 import { Platform } from '../types';
 
 interface PlatformIconProps {
@@ -14,7 +14,7 @@ export const PlatformIcon: React.FC<PlatformIconProps> = ({ platform, size = 18,
   const getColorClass = (p: string) => {
     if (white) return 'text-white';
     switch (p) {
-      case Platform.Twitter: return 'text-blue-400';
+      case Platform.Twitter: return 'text-black';
       case Platform.Facebook: return 'text-blue-600';
       case Platform.Instagram: return 'text-pink-600';
       case Platform.LinkedIn: return 'text-blue-700';
@@ -31,7 +31,7 @@ export const PlatformIcon: React.FC<PlatformIconProps> = ({ platform, size = 18,
 
   switch (platform) {
     case Platform.Twitter:
-      return <Twitter size={size} className={finalClass} />;
+      return <X size={size} className={finalClass} />;
     case Platform.Facebook:
       return <Facebook size={size} className={finalClass} />;
     case Platform.Instagram:

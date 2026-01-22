@@ -549,7 +549,8 @@ const BotConfigModal: React.FC<BotConfigModalProps> = ({ bot, onClose, onSave })
                  }}
                  className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-bold transition-colors ${isSelected ? 'bg-black text-white border-black' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}
                >
-                 <PlatformIcon platform={p} size={12} white={isSelected} /> {p}
+                 <PlatformIcon platform={p} size={12} white={isSelected} /> 
+                 {p === Platform.Twitter ? 'X' : p}
                </button>
              );
           })}

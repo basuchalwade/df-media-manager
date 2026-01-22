@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { Link, CheckCircle, ExternalLink, RefreshCw, AlertCircle, Plus } from 'lucide-react';
 import { store } from '../services/mockStore';
@@ -59,7 +60,7 @@ export const Integrations: React.FC = () => {
                   <div className={`w-3 h-3 rounded-full border-2 border-white shadow-sm ${isConnected ? 'bg-green-500' : 'bg-slate-200'}`}></div>
                 </div>
 
-                <h3 className="text-lg font-bold text-slate-900">{platform}</h3>
+                <h3 className="text-lg font-bold text-slate-900">{platform === Platform.Twitter ? 'X' : platform}</h3>
                 
                 {isConnected ? (
                   <div className="mt-1">
