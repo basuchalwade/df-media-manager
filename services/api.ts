@@ -36,6 +36,7 @@ export const api = {
   getBotActivity: (type: BotType) => request<BotActivity[]>(`/bots/${encodeURIComponent(type)}/activity`),
   toggleBot: (type: BotType) => request<BotConfig[]>(`/bots/${encodeURIComponent(type)}/toggle`, { method: 'POST' }),
   updateBot: (bot: BotConfig) => request<BotConfig[]>(`/bots/${encodeURIComponent(bot.type)}`, { method: 'PUT', body: JSON.stringify(bot) }),
+  simulateBot: (type: BotType) => request<BotActivity[]>(`/bots/${encodeURIComponent(type)}/simulate`, { method: 'POST' }),
 
   // Settings
   getSettings: () => request<UserSettings>('/settings'),

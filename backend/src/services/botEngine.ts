@@ -5,47 +5,60 @@ import { v4 as uuidv4 } from 'uuid'; // Assuming uuid is available or using simp
 const { PrismaClient } = Prisma as any;
 const prisma = new PrismaClient();
 
+const SIMULATION_STEPS: Record<string, string[]> = {
+  'Creator Bot': [
+    "Analyzing trending topics...",
+    "Drafting content with Gemini...",
+    "Applying brand voice rules...",
+    "Validating safety compliance...",
+    "Scheduling post."
+  ],
+  'Engagement Bot': [
+    "Checking new mentions...",
+    "Filtering spam accounts...",
+    "Generating replies...",
+    "Applying human-delay...",
+    "Reply posted."
+  ],
+  'Finder Bot': [
+    "Scanning keywords...",
+    "Analyzing sentiment...",
+    "Filtering noise...",
+    "Saving leads."
+  ],
+  'Growth Bot': [
+    "Identifying target audience...",
+    "Checking limits...",
+    "Executing actions..."
+  ]
+};
+
 export class BotEngine {
   
   static async executeBotCycle(botType: string) {
-    console.log(`[BotEngine] Starting cycle for: ${botType}`);
+    console.log(`[BotEngine] Triggered cycle for: ${botType}`);
     
+    // We do NOT await the internal process here to allow the API to return immediately
+    // This effectively makes it "fire and forget" from the API controller's perspective
+    this._runCycleAsync(botType).catch(err => {
+        console.error(`[BotEngine] Background cycle failed for ${botType}`, err);
+    });
+  }
+
+  private static async _runCycleAsync(botType: string) {
     // 1. Fetch Config
     const config = await prisma.botConfig.findUnique({ where: { type: botType } });
-    if (!config) {
-      console.error(`[BotEngine] Config not found for ${botType}`);
-      return;
-    }
-
-    if (!config.enabled) {
-      console.log(`[BotEngine] ${botType} is disabled. Skipping.`);
-      return;
-    }
-
-    if (config.isPaused) {
-      // Create a 'SKIPPED' activity log
-      await prisma.botActivity.create({
-        data: {
-          botType,
-          runId: `skip-${Date.now()}`,
-          actionType: 'ANALYZE',
-          platform: 'All', // System level
-          status: 'SKIPPED',
-          message: 'Circuit breaker active. Bot is paused due to consecutive failures.',
-        }
-      });
-      return;
-    }
+    if (!config) return;
 
     const runId = `run-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
 
-    // 2. Start Activity
-    const activity = await prisma.botActivity.create({
+    // 2. Initial Start Log
+    await prisma.botActivity.create({
       data: {
         botType,
         runId,
         actionType: this.determineActionType(botType),
-        platform: 'Twitter', // Default for simulation, would be dynamic
+        platform: 'Twitter',
         status: 'STARTED',
         message: 'Bot cycle initiated.',
       }
@@ -55,32 +68,51 @@ export class BotEngine {
       // 3. Update Status
       await prisma.botConfig.update({
         where: { type: botType },
-        data: { status: 'Running', lastRun: new Date() }
+        data: { status: 'Running' }
       });
 
-      // 4. Run Logic (Simulation / Actual)
-      const result = await this.performBotLogic(botType, config.config);
+      // 4. Run Steps (Simulated Delay)
+      const steps = SIMULATION_STEPS[botType] || SIMULATION_STEPS['Creator Bot'];
+      
+      for (const stepMsg of steps) {
+          await new Promise(resolve => setTimeout(resolve, 800 + Math.random() * 500));
+          
+          await prisma.botActivity.create({
+              data: {
+                  botType,
+                  runId,
+                  actionType: 'ANALYZE',
+                  platform: 'Twitter',
+                  status: 'STARTED', // Intermediate status
+                  message: stepMsg
+              }
+          });
+      }
 
-      // 5. Success
-      await prisma.botActivity.update({
-        where: { id: activity.id },
+      // 5. Final Success
+      await new Promise(resolve => setTimeout(resolve, 500));
+      await prisma.botActivity.create({
         data: {
+          botType,
+          runId,
+          actionType: this.determineActionType(botType),
+          platform: 'Twitter',
           status: 'SUCCESS',
-          finishedAt: new Date(),
-          message: result.message,
-          metadata: result.metadata
+          message: 'Cycle completed successfully.',
+          finishedAt: new Date()
         }
       });
 
-      // Reset Health
-      // We also update the 'stats' JSON to keep frontend happy
+      // Reset & Update Stats
       const stats = (config.stats as any) || {};
+      stats.currentDailyActions = (stats.currentDailyActions || 0) + 1;
       stats.consecutiveErrors = 0;
 
       await prisma.botConfig.update({
         where: { type: botType },
         data: { 
           status: 'Idle',
+          lastRun: new Date(),
           consecutiveFailures: 0,
           stats: stats
         }
@@ -89,19 +121,16 @@ export class BotEngine {
     } catch (error: any) {
       console.error(`[BotEngine] Error in ${botType}:`, error);
 
-      // 6. Failure Handling
       const consecutiveFailures = config.consecutiveFailures + 1;
-      const shouldPause = config.config && (config.config as any)['stopOnConsecutiveErrors'] 
-        ? consecutiveFailures >= (config.config as any)['stopOnConsecutiveErrors'] 
-        : false;
-
-      // Sync to stats JSON for frontend
       const stats = (config.stats as any) || {};
       stats.consecutiveErrors = consecutiveFailures;
 
-      await prisma.botActivity.update({
-        where: { id: activity.id },
+      await prisma.botActivity.create({
         data: {
+          botType,
+          runId,
+          actionType: 'ANALYZE',
+          platform: 'System',
           status: 'FAILED',
           finishedAt: new Date(),
           message: 'Cycle failed due to internal error.',
@@ -112,9 +141,8 @@ export class BotEngine {
       await prisma.botConfig.update({
         where: { type: botType },
         data: { 
-          status: shouldPause ? 'Error' : 'Idle',
+          status: 'Error',
           consecutiveFailures,
-          isPaused: shouldPause,
           stats: stats
         }
       });
@@ -131,43 +159,5 @@ export class BotEngine {
       case 'Finder Bot': return 'ANALYZE';
       default: return 'ANALYZE';
     }
-  }
-
-  private static async performBotLogic(type: string, config: any): Promise<{ message: string, metadata: any }> {
-    // SIMULATION OF COMPLEX LOGIC
-    // In a real app, this would call TwitterAPI, OpenAI, etc.
-    
-    await new Promise(resolve => setTimeout(resolve, 2000)); // Latency
-
-    // Random failure injection (10% chance)
-    if (Math.random() < 0.1) {
-      throw new Error("Simulated platform connection timeout (504)");
-    }
-
-    if (type === 'Engagement Bot') {
-      return {
-        message: 'Replied to user @tech_guru regarding AI trends.',
-        metadata: { targetUser: '@tech_guru', tweetId: '123456789' }
-      };
-    }
-
-    if (type === 'Creator Bot') {
-      return {
-        message: 'Drafted new post about "SaaS Marketing".',
-        metadata: { topic: 'SaaS Marketing', wordCount: 45 }
-      };
-    }
-    
-    if (type === 'Growth Bot') {
-      return {
-        message: 'Followed 3 new accounts in #Startup sector.',
-        metadata: { accounts: ['@start1', '@found2', '@vc3'] }
-      };
-    }
-
-    return {
-      message: 'Scanned 50 recent posts. No actionable trends found.',
-      metadata: { itemsScanned: 50 }
-    };
   }
 }

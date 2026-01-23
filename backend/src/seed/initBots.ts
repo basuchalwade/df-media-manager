@@ -1,3 +1,4 @@
+
 import * as Prisma from '@prisma/client';
 
 export const seedDefaultBots = async (prisma: any) => {
@@ -18,14 +19,17 @@ export const seedDefaultBots = async (prisma: any) => {
         status: 'Idle',
         intervalMinutes: 60,
         config: {
-          contentTopics: ['Industry News', 'Tips & Tricks', 'Company Updates'],
+          contentTopics: ['Industry News', 'Tips & Tricks', 'Company Updates', 'Thought Leadership'],
           targetPlatforms: ['Twitter', 'LinkedIn'],
           generationMode: 'AI',
+          safetyLevel: 'Moderate',
+          workHoursStart: '09:00',
+          workHoursEnd: '17:00',
           aiStrategy: {
             creativityLevel: 'Medium',
             brandVoice: 'Professional',
-            keywordsToInclude: [],
-            topicsToAvoid: []
+            keywordsToInclude: ['Innovation', 'Growth'],
+            topicsToAvoid: ['Politics', 'Religion']
           }
         },
         stats: {
@@ -43,7 +47,11 @@ export const seedDefaultBots = async (prisma: any) => {
           replyToMentions: true,
           replyToComments: true,
           maxDailyInteractions: 50,
-          safetyLevel: 'Moderate'
+          safetyLevel: 'Moderate',
+          workHoursStart: '08:00',
+          workHoursEnd: '20:00',
+          minDelaySeconds: 60,
+          maxDelaySeconds: 300
         },
         stats: {
           currentDailyActions: 0,
@@ -53,13 +61,16 @@ export const seedDefaultBots = async (prisma: any) => {
       },
       {
         type: 'Finder Bot',
-        enabled: false, // Default to disabled to let user configure keywords first
+        enabled: false, 
         status: 'Idle',
         intervalMinutes: 120,
         config: {
-          trackKeywords: ['SaaS', 'AI', 'Automation'],
+          trackKeywords: ['SaaS', 'AI', 'Automation', 'Marketing'],
           trackAccounts: [],
-          autoSaveToDrafts: true
+          autoSaveToDrafts: true,
+          safetyLevel: 'Conservative',
+          workHoursStart: '00:00',
+          workHoursEnd: '23:59'
         },
         stats: {
           currentDailyActions: 0,
@@ -73,10 +84,12 @@ export const seedDefaultBots = async (prisma: any) => {
         status: 'Idle',
         intervalMinutes: 240,
         config: {
-          growthTags: ['#Tech', '#Startup', '#Marketing'],
+          growthTags: ['#Tech', '#Startup', '#Marketing', '#Founder'],
           interactWithCompetitors: false,
           unfollowAfterDays: 7,
-          safetyLevel: 'Conservative'
+          safetyLevel: 'Conservative',
+          workHoursStart: '10:00',
+          workHoursEnd: '18:00'
         },
         stats: {
           currentDailyActions: 0,

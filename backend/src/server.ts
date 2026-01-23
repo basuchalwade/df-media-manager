@@ -4,6 +4,7 @@ import cors from 'cors';
 import * as Prisma from '@prisma/client';
 import { createQueue, QUEUE_NAMES } from './lib/queue';
 import { seedDefaultBots } from './seed/initBots';
+import { BotEngine } from './services/botEngine';
 
 const { PrismaClient } = Prisma as any;
 
@@ -17,7 +18,7 @@ const app = express();
 const PORT = process.env.PORT || 8000;
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json() as any);
 
 // --- Routes ---
 
@@ -49,28 +50,47 @@ app.post('/api/posts', async (req, res) => {
 
 // 2. Bots Config
 app.get('/api/bots', async (req, res) => {
-  const bots = await prisma.botConfig.findMany({
-    include: {
-      // Get recent 5 activities as "logs" for the card view
-      activities: {
-        take: 5,
-        orderBy: { createdAt: 'desc' }
+  try {
+    let bots = await prisma.botConfig.findMany({
+      include: {
+        // Get recent 5 activities as "logs" for the card view
+        activities: {
+          take: 5,
+          orderBy: { createdAt: 'desc' }
+        }
       }
+    });
+
+    // Failsafe: Auto-seed if empty
+    if (bots.length === 0) {
+      console.log('⚠️ [API] No bots found. Triggering failsafe seed...');
+      await seedDefaultBots(prisma);
+      bots = await prisma.botConfig.findMany({
+        include: {
+          activities: {
+            take: 5,
+            orderBy: { createdAt: 'desc' }
+          }
+        }
+      });
     }
-  });
 
-  // Map activities to the "logs" structure expected by frontend
-  const mappedBots = bots.map(b => ({
-    ...b,
-    logs: b.activities.map(a => ({
-      id: a.id,
-      timestamp: a.createdAt,
-      level: a.status === 'FAILED' ? 'Error' : a.status === 'SKIPPED' ? 'Warning' : 'Info',
-      message: a.message
-    }))
-  }));
+    // Map activities to the "logs" structure expected by frontend
+    const mappedBots = bots.map((b: any) => ({
+      ...b,
+      logs: b.activities.map((a: any) => ({
+        id: a.id,
+        timestamp: a.createdAt,
+        level: a.status === 'FAILED' ? 'Error' : a.status === 'SKIPPED' ? 'Warning' : 'Info',
+        message: a.message
+      }))
+    }));
 
-  res.json(mappedBots);
+    res.json(mappedBots);
+  } catch (error) {
+    console.error("Failed to fetch bots:", error);
+    res.status(500).json({ error: "Failed to fetch bot configuration" });
+  }
 });
 
 // 3. Bot Activity (Specific)
@@ -87,7 +107,23 @@ app.get('/api/bots/:type/activity', async (req, res) => {
   res.json(activities);
 });
 
-// 4. Global Activity
+// 4. Simulate Bot Cycle
+app.post('/api/bots/:type/simulate', async (req, res) => {
+  const { type } = req.params;
+  console.log(`[API] Triggering simulation for ${type}`);
+  try {
+    // Fire and forget - client will poll for logs
+    BotEngine.executeBotCycle(type);
+    
+    // Return immediately so client knows it started
+    res.json({ message: 'Simulation started' });
+  } catch (error) {
+    console.error(`[API] Simulation failed for ${type}:`, error);
+    res.status(500).json({ error: 'Simulation execution failed' });
+  }
+});
+
+// 5. Global Activity
 app.get('/api/activity/recent', async (req, res) => {
   const activities = await prisma.botActivity.findMany({
     orderBy: { createdAt: 'desc' },
@@ -119,24 +155,18 @@ app.put('/api/bots/:type', async (req, res) => {
   delete updates.id;
   delete updates.type;
   
-  // Ensure we keep existing logs if not provided (though usually handled by frontend state)
-  // Prisma update handles partials well.
-  
   try {
-    const updated = await prisma.botConfig.update({
+    await prisma.botConfig.update({
         where: { type },
         data: updates
     });
-    // Return array to match frontend expectations of list update or single item
-    // But frontend api.updateBot expects array of all bots usually? 
-    // Actually api.ts: updateBot calls GET /bots usually or replaces local state.
-    // Let's return the full list to be safe and consistent with toggleBot
+    
     const allBots = await prisma.botConfig.findMany({
         include: { activities: { take: 5, orderBy: { createdAt: 'desc' } } }
     });
-    const mapped = allBots.map(b => ({
+    const mapped = allBots.map((b: any) => ({
         ...b,
-        logs: b.activities.map(a => ({
+        logs: b.activities.map((a: any) => ({
             id: a.id,
             timestamp: a.createdAt,
             level: a.status === 'FAILED' ? 'Error' : a.status === 'SKIPPED' ? 'Warning' : 'Info',
@@ -145,6 +175,7 @@ app.put('/api/bots/:type', async (req, res) => {
     }));
     res.json(mapped);
   } catch (e) {
+    console.error("Update failed", e);
     res.status(500).json({ error: 'Update failed' });
   }
 });
@@ -152,7 +183,11 @@ app.put('/api/bots/:type', async (req, res) => {
 // Initialize and Start
 async function startServer() {
   // Run seeds
-  await seedDefaultBots(prisma);
+  try {
+    await seedDefaultBots(prisma);
+  } catch (e) {
+    console.error("Startup seed failed, continuing...", e);
+  }
 
   app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
