@@ -1,5 +1,5 @@
 
-import { BotConfig, BotType, DashboardStats, Platform, Post, PostStatus, UserSettings, PlatformAnalytics, User, UserRole, UserStatus, MediaItem, BotActivity, ActivityStatus, ActionType, MediaMetadata, SimulationReport, SimulationCycle, AssetDecision, MediaAuditEvent, MediaVariant, EnhancementType, PostPerformance, FinderBotRules, GrowthBotRules, EngagementBotRules, CreatorBotRules, GlobalPolicyConfig, BotActionRequest, OrchestrationLogEntry, BotExecutionEvent } from '../types';
+import { BotConfig, BotType, DashboardStats, Platform, Post, PostStatus, UserSettings, PlatformAnalytics, User, UserRole, UserStatus, MediaItem, BotActivity, ActivityStatus, ActionType, MediaMetadata, SimulationReport, SimulationCycle, AssetDecision, MediaAuditEvent, MediaVariant, EnhancementType, PostPerformance, FinderBotRules, GrowthBotRules, EngagementBotRules, CreatorBotRules, GlobalPolicyConfig, BotActionRequest, OrchestrationLogEntry, BotExecutionEvent, AdaptiveConfig, OptimizationSuggestion, StrategyMode, PlatformConfig, BotLearningConfig, OptimizationEvent } from '../types';
 import { api } from './api';
 import { logAudit } from './auditStore';
 import { evaluateCompatibility } from './platformCompatibility';
@@ -13,8 +13,18 @@ import { OrchestrationPolicy } from './orchestrationPolicy';
 import { BotCoordinator } from './botCoordinator';
 import { logOrchestrationEvent, getOrchestrationLogs } from './orchestrationLogs';
 import { emitExecutionEvent } from './executionTelemetry';
+import { analyzePerformance, getStrategyProfile } from './strategyOptimizer';
+import { recordLearning } from './learningMemory';
+import { analyzeBotPerformance } from './learningEngine'; // New import
 
 // --- MOCK DATA CONSTANTS ---
+
+const DEFAULT_LEARNING_CONFIG: BotLearningConfig = {
+    enabled: true,
+    strategy: 'Balanced',
+    maxChangePerDay: 10,
+    lockedFields: []
+};
 
 const DEFAULT_BOTS: BotConfig[] = [
   {
@@ -23,6 +33,8 @@ const DEFAULT_BOTS: BotConfig[] = [
     status: 'Idle',
     intervalMinutes: 60,
     logs: [],
+    learning: { ...DEFAULT_LEARNING_CONFIG },
+    optimizationHistory: [],
     config: {
       contentTopics: ['Industry News', 'Tips & Tricks', 'Company Updates', 'Thought Leadership'],
       targetPlatforms: [Platform.Twitter, Platform.LinkedIn],
@@ -50,6 +62,8 @@ const DEFAULT_BOTS: BotConfig[] = [
     status: 'Idle',
     intervalMinutes: 30,
     logs: [],
+    learning: { ...DEFAULT_LEARNING_CONFIG },
+    optimizationHistory: [],
     config: {
       replyToMentions: true,
       replyToComments: true,
@@ -74,6 +88,8 @@ const DEFAULT_BOTS: BotConfig[] = [
     status: 'Idle',
     intervalMinutes: 120,
     logs: [],
+    learning: { ...DEFAULT_LEARNING_CONFIG },
+    optimizationHistory: [],
     config: {
       trackKeywords: ['SaaS', 'AI', 'Automation', 'Marketing'],
       trackAccounts: [],
@@ -96,6 +112,8 @@ const DEFAULT_BOTS: BotConfig[] = [
     status: 'Idle',
     intervalMinutes: 240,
     logs: [],
+    learning: { ...DEFAULT_LEARNING_CONFIG },
+    optimizationHistory: [],
     config: {
       growthTags: ['#Tech', '#Startup', '#Marketing', '#Founder'],
       interactWithCompetitors: false,
@@ -111,6 +129,72 @@ const DEFAULT_BOTS: BotConfig[] = [
       } as GrowthBotRules
     },
     stats: { currentDailyActions: 0, maxDailyActions: 25, consecutiveErrors: 0 }
+  }
+];
+
+const DEFAULT_PLATFORMS: PlatformConfig[] = [
+  {
+    id: Platform.Twitter,
+    name: 'X (Twitter)',
+    enabled: true,
+    connected: true,
+    outage: false,
+    supports: { [ActionType.POST]: true, [ActionType.LIKE]: true, [ActionType.FOLLOW]: true, [ActionType.REPLY]: true },
+    rateLimits: { [ActionType.POST]: 50, [ActionType.LIKE]: 100, [ActionType.FOLLOW]: 20, [ActionType.REPLY]: 50 }
+  },
+  {
+    id: Platform.LinkedIn,
+    name: 'LinkedIn',
+    enabled: true,
+    connected: true,
+    outage: false,
+    supports: { [ActionType.POST]: true, [ActionType.LIKE]: true, [ActionType.FOLLOW]: false, [ActionType.REPLY]: true },
+    rateLimits: { [ActionType.POST]: 10, [ActionType.LIKE]: 50, [ActionType.REPLY]: 20 }
+  },
+  {
+    id: Platform.Instagram,
+    name: 'Instagram',
+    enabled: true,
+    connected: true,
+    outage: false,
+    supports: { [ActionType.POST]: true, [ActionType.LIKE]: true, [ActionType.FOLLOW]: true, [ActionType.REPLY]: true },
+    rateLimits: { [ActionType.POST]: 15, [ActionType.LIKE]: 100, [ActionType.FOLLOW]: 50 }
+  },
+  {
+    id: Platform.Facebook,
+    name: 'Facebook',
+    enabled: true,
+    connected: false,
+    outage: false,
+    supports: { [ActionType.POST]: true, [ActionType.LIKE]: true, [ActionType.REPLY]: true },
+    rateLimits: { [ActionType.POST]: 25, [ActionType.LIKE]: 100 }
+  },
+  {
+    id: Platform.YouTube,
+    name: 'YouTube',
+    enabled: true,
+    connected: false,
+    outage: false,
+    supports: { [ActionType.POST]: true, [ActionType.LIKE]: true, [ActionType.REPLY]: true },
+    rateLimits: { [ActionType.POST]: 5, [ActionType.LIKE]: 50 }
+  },
+  {
+    id: Platform.GoogleBusiness,
+    name: 'Google Business',
+    enabled: true,
+    connected: false,
+    outage: false,
+    supports: { [ActionType.POST]: true, [ActionType.REPLY]: true },
+    rateLimits: { [ActionType.POST]: 10, [ActionType.REPLY]: 20 }
+  },
+  {
+    id: Platform.Threads,
+    name: 'Threads',
+    enabled: true,
+    connected: false,
+    outage: false,
+    supports: { [ActionType.POST]: true, [ActionType.LIKE]: true, [ActionType.REPLY]: true },
+    rateLimits: { [ActionType.POST]: 30, [ActionType.LIKE]: 100 }
   }
 ];
 
@@ -321,26 +405,34 @@ class HybridStore {
   private globalPolicy: GlobalPolicyConfig = {
       emergencyStop: false,
       quietHours: { enabled: true, startTime: '22:00', endTime: '06:00', timezone: 'UTC' },
-      platformLimits: {
-          [Platform.Twitter]: { [ActionType.POST]: 50, [ActionType.LIKE]: 100, [ActionType.FOLLOW]: 20 },
-          [Platform.LinkedIn]: { [ActionType.POST]: 10, [ActionType.LIKE]: 50 },
-          [Platform.Instagram]: { [ActionType.POST]: 15, [ActionType.LIKE]: 100 },
-      }
+      // platformLimits are now managed in `platforms` registry
+      platformLimits: {} 
   };
   private dailyGlobalActions: Record<Platform, Record<ActionType, number>> = {
-      [Platform.Twitter]: { [ActionType.POST]: 0, [ActionType.LIKE]: 0, [ActionType.REPLY]: 0, [ActionType.FOLLOW]: 0, [ActionType.UNFOLLOW]: 0, [ActionType.ANALYZE]: 0 },
-      [Platform.LinkedIn]: { [ActionType.POST]: 0, [ActionType.LIKE]: 0, [ActionType.REPLY]: 0, [ActionType.FOLLOW]: 0, [ActionType.UNFOLLOW]: 0, [ActionType.ANALYZE]: 0 },
-      [Platform.Instagram]: { [ActionType.POST]: 0, [ActionType.LIKE]: 0, [ActionType.REPLY]: 0, [ActionType.FOLLOW]: 0, [ActionType.UNFOLLOW]: 0, [ActionType.ANALYZE]: 0 },
-      [Platform.Facebook]: { [ActionType.POST]: 0, [ActionType.LIKE]: 0, [ActionType.REPLY]: 0, [ActionType.FOLLOW]: 0, [ActionType.UNFOLLOW]: 0, [ActionType.ANALYZE]: 0 },
-      [Platform.YouTube]: { [ActionType.POST]: 0, [ActionType.LIKE]: 0, [ActionType.REPLY]: 0, [ActionType.FOLLOW]: 0, [ActionType.UNFOLLOW]: 0, [ActionType.ANALYZE]: 0 },
-      [Platform.GoogleBusiness]: { [ActionType.POST]: 0, [ActionType.LIKE]: 0, [ActionType.REPLY]: 0, [ActionType.FOLLOW]: 0, [ActionType.UNFOLLOW]: 0, [ActionType.ANALYZE]: 0 },
-      [Platform.Threads]: { [ActionType.POST]: 0, [ActionType.LIKE]: 0, [ActionType.REPLY]: 0, [ActionType.FOLLOW]: 0, [ActionType.UNFOLLOW]: 0, [ActionType.ANALYZE]: 0 },
+      [Platform.Twitter]: { [ActionType.POST]: 0, [ActionType.LIKE]: 0, [ActionType.REPLY]: 0, [ActionType.FOLLOW]: 0, [ActionType.UNFOLLOW]: 0, [ActionType.ANALYZE]: 0, [ActionType.OPTIMIZE]: 0 },
+      [Platform.LinkedIn]: { [ActionType.POST]: 0, [ActionType.LIKE]: 0, [ActionType.REPLY]: 0, [ActionType.FOLLOW]: 0, [ActionType.UNFOLLOW]: 0, [ActionType.ANALYZE]: 0, [ActionType.OPTIMIZE]: 0 },
+      [Platform.Instagram]: { [ActionType.POST]: 0, [ActionType.LIKE]: 0, [ActionType.REPLY]: 0, [ActionType.FOLLOW]: 0, [ActionType.UNFOLLOW]: 0, [ActionType.ANALYZE]: 0, [ActionType.OPTIMIZE]: 0 },
+      [Platform.Facebook]: { [ActionType.POST]: 0, [ActionType.LIKE]: 0, [ActionType.REPLY]: 0, [ActionType.FOLLOW]: 0, [ActionType.UNFOLLOW]: 0, [ActionType.ANALYZE]: 0, [ActionType.OPTIMIZE]: 0 },
+      [Platform.YouTube]: { [ActionType.POST]: 0, [ActionType.LIKE]: 0, [ActionType.REPLY]: 0, [ActionType.FOLLOW]: 0, [ActionType.UNFOLLOW]: 0, [ActionType.ANALYZE]: 0, [ActionType.OPTIMIZE]: 0 },
+      [Platform.GoogleBusiness]: { [ActionType.POST]: 0, [ActionType.LIKE]: 0, [ActionType.REPLY]: 0, [ActionType.FOLLOW]: 0, [ActionType.UNFOLLOW]: 0, [ActionType.ANALYZE]: 0, [ActionType.OPTIMIZE]: 0 },
+      [Platform.Threads]: { [ActionType.POST]: 0, [ActionType.LIKE]: 0, [ActionType.REPLY]: 0, [ActionType.FOLLOW]: 0, [ActionType.UNFOLLOW]: 0, [ActionType.ANALYZE]: 0, [ActionType.OPTIMIZE]: 0 },
   };
   private actionHistory: BotActionRequest[] = []; // Simple in-memory history for conflict check
   
   // Phase 7: Live Execution State
   private botTimers: Map<string, NodeJS.Timeout> = new Map();
   private dayRolloverTimer: NodeJS.Timeout | null = null;
+
+  // Phase 8: Adaptive Strategy State
+  private adaptiveConfig: AdaptiveConfig = {
+      mode: 'Balanced',
+      autoOptimize: false,
+      lastOptimization: new Date().toISOString()
+  };
+  private optimizationSuggestions: OptimizationSuggestion[] = [];
+
+  // Phase 8.5: Platform Registry State
+  private platforms: PlatformConfig[] = [];
 
   constructor() {
     // Initialize Mock Data
@@ -376,6 +468,10 @@ class HybridStore {
     const savedMedia = localStorage.getItem('postmaster_media');
     this.media = savedMedia ? JSON.parse(savedMedia) : INITIAL_MEDIA;
 
+    // Initialize Platforms
+    const savedPlatforms = localStorage.getItem('postmaster_platforms');
+    this.platforms = savedPlatforms ? JSON.parse(savedPlatforms) : DEFAULT_PLATFORMS;
+
     if (this.isSimulation) {
       this.startAutomation();
     }
@@ -393,13 +489,235 @@ class HybridStore {
           localStorage.setItem('postmaster_settings', JSON.stringify(this.settings));
           localStorage.setItem('postmaster_users', JSON.stringify(this.users));
           localStorage.setItem('postmaster_media', JSON.stringify(this.media));
+          localStorage.setItem('postmaster_platforms', JSON.stringify(this.platforms));
+      }
+  }
+
+  // --- Phase 8.5: Platform Registry Methods ---
+
+  getPlatforms(): PlatformConfig[] {
+      return this.platforms;
+  }
+
+  togglePlatformEnabled(id: Platform) {
+      this.platforms = this.platforms.map(p => 
+          p.id === id ? { ...p, enabled: !p.enabled } : p
+      );
+      this.saveState();
+  }
+
+  setPlatformOutage(id: Platform, isOutage: boolean) {
+      this.platforms = this.platforms.map(p => 
+          p.id === id ? { ...p, outage: isOutage } : p
+      );
+      this.saveState();
+  }
+
+  async togglePlatformConnection(p: Platform): Promise<User> { 
+      // Update integration status in User object
+      if (!this.isSimulation) return await api.togglePlatformConnection(p);
+
+      const user = await this.getCurrentUser();
+      if (!user) return {} as User;
+
+      const currentStatus = user.connectedAccounts[p]?.connected || false;
+      const newStatus = !currentStatus;
+
+      // Update User State
+      user.connectedAccounts[p] = {
+          connected: newStatus,
+          handle: newStatus ? `@demo_${p.toLowerCase()}` : undefined,
+          lastSync: newStatus ? new Date().toISOString() : undefined
+      };
+      
+      this.users = this.users.map(u => u.id === user.id ? user : u);
+      
+      // Update Platform Registry State to match integration
+      this.platforms = this.platforms.map(plat => 
+          plat.id === p ? { ...plat, connected: newStatus } : plat
+      );
+
+      this.saveState();
+      return user;
+  }
+
+  // --- Phase 8: Adaptive Strategy Methods ---
+
+  getAdaptiveConfig() {
+      return this.adaptiveConfig;
+  }
+
+  setAdaptiveConfig(config: Partial<AdaptiveConfig>) {
+      this.adaptiveConfig = { ...this.adaptiveConfig, ...config };
+      
+      // If mode changes, we might want to trigger an immediate optimization check
+      if (config.mode || config.autoOptimize) {
+          this.triggerOptimizationCycle();
+      }
+  }
+
+  getOptimizationSuggestions() {
+      return this.optimizationSuggestions;
+  }
+
+  private triggerOptimizationCycle() {
+      if (!this.isSimulation) return;
+
+      this.bots.forEach(bot => {
+          const suggestion = analyzePerformance(bot, this.adaptiveConfig.mode);
+          if (suggestion) {
+              this.optimizationSuggestions.unshift(suggestion);
+              // Keep last 20
+              if (this.optimizationSuggestions.length > 20) this.optimizationSuggestions.pop();
+
+              if (this.adaptiveConfig.autoOptimize) {
+                  this.applyOptimization(suggestion);
+              }
+          }
+      });
+  }
+
+  private applyOptimization(suggestion: OptimizationSuggestion) {
+      // Find the bot
+      const botIndex = this.bots.findIndex(b => b.type === suggestion.botType);
+      if (botIndex === -1) return;
+
+      const bot = this.bots[botIndex];
+      let rules = bot.config.rules as any;
+
+      // Apply changes based on param mapping
+      if (suggestion.parameter === 'Replies/Hour' && rules.maxRepliesPerHour) {
+          rules.maxRepliesPerHour = suggestion.newValue;
+      } else if (suggestion.parameter === 'Emoji Level' && rules.emojiLevel !== undefined) {
+          rules.emojiLevel = suggestion.newValue;
+      } else if (suggestion.parameter === 'Follow Rate' && rules.followRatePerHour) {
+          rules.followRatePerHour = suggestion.newValue;
+      } else if (suggestion.parameter === 'Tone Personality' && rules.personality) {
+          rules.personality.tone = suggestion.newValue;
+      }
+
+      // Update Bot
+      bot.config.rules = rules;
+      this.bots[botIndex] = { ...bot };
+      this.saveState();
+
+      // Mark suggestion as applied
+      suggestion.applied = true;
+
+      // Log to Telemetry
+      emitExecutionEvent({
+          id: `opt-exec-${Date.now()}`,
+          botId: suggestion.botType,
+          botType: suggestion.botType,
+          timestamp: Date.now(),
+          platform: Platform.Twitter, // Generic platform for sys event
+          action: ActionType.OPTIMIZE,
+          status: 'optimized',
+          reason: `${suggestion.parameter} adjusted to ${suggestion.newValue}: ${suggestion.reason}`,
+          riskLevel: 'low'
+      });
+  }
+
+  // --- Phase 9: Self-Optimizing Bot Engine ---
+
+  private triggerLearningCycle(botType: BotType) {
+      const botIndex = this.bots.findIndex(b => b.type === botType);
+      if (botIndex === -1) return;
+      const bot = this.bots[botIndex];
+
+      if (!bot.learning?.enabled) return;
+
+      // Analyze performance
+      const newEvents = analyzeBotPerformance(bot);
+      
+      // Merge with history
+      const existingHistory = bot.optimizationHistory || [];
+      // Prevent duplicates
+      const uniqueEvents = newEvents.filter(e => !existingHistory.some(h => h.reason === e.reason && h.status === 'pending'));
+      
+      if (uniqueEvents.length > 0) {
+          bot.optimizationHistory = [...uniqueEvents, ...existingHistory];
+          this.bots[botIndex] = { ...bot };
+          this.saveState();
+
+          // Auto-apply if configured (stub for future auto-apply logic or rely on UI)
+          // For now, we just log pending suggestions.
+      }
+  }
+
+  applyLearningEvent(botType: BotType, eventId: string) {
+      const botIndex = this.bots.findIndex(b => b.type === botType);
+      if (botIndex === -1) return;
+      const bot = this.bots[botIndex];
+
+      const event = bot.optimizationHistory?.find(e => e.id === eventId);
+      if (!event || event.status === 'applied') return;
+
+      // Apply the change
+      const rules = bot.config.rules as any;
+      const fieldPath = event.field.split('.'); // handle nested like personality.tone
+      
+      if (fieldPath.length === 2) {
+          rules[fieldPath[0]][fieldPath[1]] = event.newValue;
+      } else {
+          rules[event.field] = event.newValue;
+      }
+
+      event.status = 'applied';
+      event.appliedAt = new Date().toISOString();
+      
+      this.bots[botIndex] = { ...bot };
+      this.saveState();
+
+      emitExecutionEvent({
+          id: `learn-apply-${Date.now()}`,
+          botId: botType,
+          botType: botType,
+          timestamp: Date.now(),
+          platform: Platform.Twitter, 
+          action: ActionType.OPTIMIZE,
+          status: 'optimized',
+          reason: `Applied Learning: ${event.field} -> ${event.newValue}`,
+          riskLevel: 'low'
+      });
+  }
+
+  ignoreLearningEvent(botType: BotType, eventId: string) {
+      const botIndex = this.bots.findIndex(b => b.type === botType);
+      if (botIndex === -1) return;
+      const bot = this.bots[botIndex];
+
+      const event = bot.optimizationHistory?.find(e => e.id === eventId);
+      if (event) {
+          event.status = 'rejected';
+          this.bots[botIndex] = { ...bot };
+          this.saveState();
+      }
+  }
+
+  lockLearningField(botType: BotType, field: string) {
+      const botIndex = this.bots.findIndex(b => b.type === botType);
+      if (botIndex === -1) return;
+      const bot = this.bots[botIndex];
+
+      if (!bot.learning) return;
+      
+      if (!bot.learning.lockedFields.includes(field)) {
+          bot.learning.lockedFields.push(field);
+          this.bots[botIndex] = { ...bot };
+          this.saveState();
       }
   }
 
   // --- Phase 6: Orchestration Methods ---
   
   getGlobalPolicy(): GlobalPolicyConfig {
-      return this.globalPolicy;
+      // Construct dynamic limits based on registry
+      const dynamicLimits: any = {};
+      this.platforms.forEach(p => {
+          dynamicLimits[p.id] = p.rateLimits;
+      });
+      return { ...this.globalPolicy, platformLimits: dynamicLimits };
   }
 
   updateGlobalPolicy(config: Partial<GlobalPolicyConfig>) {
@@ -428,8 +746,32 @@ class HybridStore {
           timestamp: new Date().toISOString()
       };
 
-      // 1. Policy Check
-      const policyResult = OrchestrationPolicy.checkGlobalPolicy(this.globalPolicy, this.dailyGlobalActions, req);
+      // 0. Platform Status Check (Phase 8.5)
+      const platformConfig = this.platforms.find(p => p.id === platform);
+      if (!platformConfig) {
+          return { allowed: false, reason: `Unknown platform: ${platform}` };
+      }
+      
+      if (!platformConfig.enabled) {
+          return { allowed: false, reason: `Blocked: Platform ${platform} is currently PAUSED or disabled.` };
+      }
+
+      if (!platformConfig.connected) {
+          return { allowed: false, reason: `Blocked: Platform ${platform} is NOT CONNECTED. Check integrations.` };
+      }
+
+      if (platformConfig.outage) {
+          return { allowed: false, reason: `Blocked: Platform ${platform} reporting API OUTAGE.` };
+      }
+
+      if (!platformConfig.supports[actionType]) {
+          return { allowed: false, reason: `Blocked: Action '${actionType}' is not supported on ${platform}.` };
+      }
+
+      // 1. Policy Check (Emergency Stop, Quiet Hours, Limits)
+      // We pass the dynamic registry limits to the policy checker
+      const dynamicPolicy = this.getGlobalPolicy();
+      const policyResult = OrchestrationPolicy.checkGlobalPolicy(dynamicPolicy, this.dailyGlobalActions, req);
       if (!policyResult.allowed) {
           logOrchestrationEvent({ ...req, status: 'BLOCKED', reason: policyResult.reason || 'Blocked by Policy' });
           return { allowed: false, reason: policyResult.reason };
@@ -449,7 +791,15 @@ class HybridStore {
 
   // Call this after action execution to update counters
   incrementGlobalUsage(platform: Platform, actionType: ActionType, botType: BotType, targetId?: string) {
-      if (!this.dailyGlobalActions[platform]) this.dailyGlobalActions[platform] = { [ActionType.POST]: 0, [ActionType.LIKE]: 0, [ActionType.REPLY]: 0, [ActionType.FOLLOW]: 0, [ActionType.UNFOLLOW]: 0, [ActionType.ANALYZE]: 0 };
+      if (!this.dailyGlobalActions[platform]) this.dailyGlobalActions[platform] = { 
+          [ActionType.POST]: 0, 
+          [ActionType.LIKE]: 0, 
+          [ActionType.REPLY]: 0, 
+          [ActionType.FOLLOW]: 0, 
+          [ActionType.UNFOLLOW]: 0, 
+          [ActionType.ANALYZE]: 0,
+          [ActionType.OPTIMIZE]: 0
+      };
       
       this.dailyGlobalActions[platform][actionType] = (this.dailyGlobalActions[platform][actionType] || 0) + 1;
       
@@ -480,6 +830,8 @@ class HybridStore {
         this.dayRolloverTimer = setInterval(() => {
             console.log("[MockStore] Day Rollover - Resetting quotas.");
             this.resetDailyQuotas();
+            // Also trigger optimization on rollover
+            this.triggerOptimizationCycle();
         }, 5 * 60 * 1000); 
     }
   }
@@ -507,8 +859,15 @@ class HybridStore {
       const bot = this.bots.find(b => b.type === botType);
       if (!bot) return;
 
-      // Random interval between 10s and 30s to simulate organic behavior
-      const intervalMs = Math.floor(Math.random() * 20000) + 10000;
+      // Calculate Interval based on Strategy
+      // Base: 10-30s
+      // Aggressive: 0.5x delay (faster)
+      // Conservative: 1.5x delay (slower)
+      const profile = getStrategyProfile(this.adaptiveConfig.mode);
+      let intervalMs = Math.floor(Math.random() * 20000) + 10000;
+      
+      if (profile.mode === 'Aggressive') intervalMs = intervalMs * 0.5;
+      if (profile.mode === 'Conservative') intervalMs = intervalMs * 1.5;
 
       const timer = setInterval(() => {
           this.executeBotCycle(botType);
@@ -536,19 +895,35 @@ class HybridStore {
       let actionType = ActionType.ANALYZE;
       let platform = Platform.Twitter;
       
+      // Randomly pick a connected platform for multi-platform bots
+      const availablePlatforms = this.platforms.filter(p => p.connected && p.enabled && !p.outage);
+      if (availablePlatforms.length === 0) return; // No platforms available
+
+      const targetPlatform = availablePlatforms[Math.floor(Math.random() * availablePlatforms.length)].id;
+
       switch(botType) {
           case BotType.Creator: 
               actionType = ActionType.POST; 
-              platform = bot.config.targetPlatforms?.[0] || Platform.Twitter;
+              // Respect bot specific config if set, otherwise random available
+              const allowed = bot.config.targetPlatforms || [];
+              if (allowed.length > 0) {
+                  const intersection = allowed.filter(p => availablePlatforms.some(ap => ap.id === p));
+                  if (intersection.length > 0) platform = intersection[Math.floor(Math.random() * intersection.length)];
+              } else {
+                  platform = targetPlatform;
+              }
               break;
           case BotType.Engagement: 
               actionType = Math.random() > 0.5 ? ActionType.LIKE : ActionType.REPLY; 
+              platform = targetPlatform;
               break;
           case BotType.Growth: 
               actionType = ActionType.FOLLOW; 
+              platform = targetPlatform;
               break;
           case BotType.Finder: 
               actionType = ActionType.ANALYZE; 
+              platform = targetPlatform;
               break;
       }
 
@@ -608,6 +983,23 @@ class HybridStore {
 
       // Update Daily Quota
       this.incrementGlobalUsage(platform, actionType, botType, selectedAsset?.id);
+
+      // Phase 8: Record Learning
+      // Simulate an outcome score (random 0-100 weighted by strategy)
+      // Aggressive -> more variance, Conservative -> consistent moderate
+      let outcomeScore = 50 + Math.random() * 50;
+      if (this.adaptiveConfig.mode === 'Aggressive') outcomeScore = Math.random() * 100;
+      
+      recordLearning({
+          platform,
+          actionType,
+          context: 'General',
+          outcomeScore,
+          timestamp: Date.now()
+      });
+
+      // Phase 9: Trigger Learning Cycle (Self-Optimization)
+      this.triggerLearningCycle(botType);
 
       // 6. Emit Success Event
       emitExecutionEvent({
@@ -1200,10 +1592,6 @@ class HybridStore {
               engagement: 200 + Math.random()*50
           }))
       }; 
-  }
-  
-  async togglePlatformConnection(p: Platform): Promise<User> { 
-      return {} as User; 
   }
 }
 

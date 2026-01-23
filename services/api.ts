@@ -63,4 +63,7 @@ export const api = {
 
   // Stats (Aggregated on Backend for perf)
   getStats: () => request<DashboardStats>('/stats'),
+
+  // Integrations
+  togglePlatformConnection: (platform: Platform) => request<User>(`/integrations/${platform}/toggle`, { method: 'POST' }),
 };

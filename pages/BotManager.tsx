@@ -1,12 +1,14 @@
 
 import React, { useEffect, useState, useRef } from 'react';
-import { Bot, Power, Clock, Zap, Target, TrendingUp, Search, Activity, Pause, Play, ChevronRight, Settings, X, Save, Check, Shield, AlertTriangle, AlertOctagon, Hourglass, FileText, Download, Filter, Calendar, ExternalLink, BrainCircuit, Wand2, Plus, Minus, Info, RefreshCw, MessageCircle, ThumbsUp, UserPlus, Eye, Terminal, HelpCircle, CheckCircle, BarChart3, Lock, Sliders, History, ChevronDown, Hash, Users, Server, RotateCcw, ShieldCheck, PauseCircle, ShieldAlert, Copy, ChevronUp, FastForward, Gauge, Bug, XOctagon, Thermometer, ArrowRight, SlidersHorizontal, Sparkles } from 'lucide-react';
+import { Bot, Power, Clock, Zap, Target, TrendingUp, Search, Activity, Pause, Play, ChevronRight, Settings, X, Save, Check, Shield, AlertTriangle, AlertOctagon, Hourglass, FileText, Download, Filter, Calendar, ExternalLink, BrainCircuit, Wand2, Plus, Minus, Info, RefreshCw, MessageCircle, ThumbsUp, UserPlus, Eye, Terminal, HelpCircle, CheckCircle, BarChart3, Lock, Sliders, History, ChevronDown, Hash, Users, Server, RotateCcw, ShieldCheck, PauseCircle, ShieldAlert, Copy, ChevronUp, FastForward, Gauge, Bug, XOctagon, Thermometer, ArrowRight, SlidersHorizontal, Sparkles, Scale, Cpu, Lightbulb, MoreVertical, WifiOff, Unlock } from 'lucide-react';
 import { store } from '../services/mockStore';
-import { BotConfig, BotType, Platform, BotSpecificConfig, BotLogEntry, LogLevel, AIStrategyConfig, CalendarConfig, BotActivity, ActivityStatus, FinderBotRules, GrowthBotRules, EngagementBotRules, CreatorBotRules, ActionType, GlobalPolicyConfig, OrchestrationLogEntry, BotExecutionEvent } from '../types';
+import { BotConfig, BotType, Platform, BotSpecificConfig, BotLogEntry, LogLevel, AIStrategyConfig, CalendarConfig, BotActivity, ActivityStatus, FinderBotRules, GrowthBotRules, EngagementBotRules, CreatorBotRules, ActionType, GlobalPolicyConfig, OrchestrationLogEntry, BotExecutionEvent, AdaptiveConfig, OptimizationSuggestion, StrategyMode, PlatformConfig, LearningStrategy, OptimizationEvent } from '../types';
 import { PlatformIcon } from '../components/PlatformIcon';
 import { RuleEngine } from '../services/ruleEngine';
 import { getOrchestrationLogs } from '../services/orchestrationLogs';
 import { subscribeToTelemetry, getExecutionEvents } from '../services/executionTelemetry';
+import { getStrategyProfile } from '../services/strategyOptimizer';
+import { OptimizationInsightCard } from '../components/OptimizationInsightCard';
 
 // --- Constants ---
 
@@ -17,14 +19,11 @@ const BOT_DESCRIPTIONS: Record<BotType, string> = {
   [BotType.Growth]: "Audience builder that executes safe follow/unfollow strategies to organically grow your reach."
 };
 
-const BOT_CONTEXT_GUIDANCE: Record<string, string> = {
-  [BotType.Engagement]: "Automatically replies to mentions and comments within configured limits based on your engagement strategy.",
-  [BotType.Finder]: "Continuously tracks specified keywords and accounts to identify leads and content opportunities.",
-  [BotType.Growth]: "Manages follow/unfollow behavior and community interactions based on safe growth strategy rules.",
-  [BotType.Creator]: "Generates and publishes content based on defined topics and persona settings."
-};
-
-const STRATEGIES = ['Professional', 'Viral', 'Educational', 'Empathetic', 'Controversial', 'Witty'];
+const SIMULATION_MODES = [
+    { id: 'single', label: 'Single Cycle', icon: Play, desc: 'Execute one run immediately.' },
+    { id: 'day', label: 'Full Day Preview', icon: FastForward, desc: 'Forecast 24h activity.' },
+    { id: 'stress', label: 'Stress Test', icon: Gauge, desc: 'Test rate limit resilience.' },
+];
 
 const SAFETY_LEVELS = {
   Conservative: { 
@@ -32,7 +31,6 @@ const SAFETY_LEVELS = {
       icon: Shield, 
       label: 'Conservative',
       desc: 'Strict limits. Lowest risk.',
-      details: 'Best for new accounts. Mimics human speed with randomized long delays. Strict content filtering.',
       dailyLimit: '~50 Actions',
       speed: 'Human-like',
       riskScore: 20
@@ -42,7 +40,6 @@ const SAFETY_LEVELS = {
       icon: Shield, 
       label: 'Moderate',
       desc: 'Balanced growth and safety.',
-      details: 'Standard operation. Allows occasional bursts of activity while maintaining safe daily limits.',
       dailyLimit: '~150 Actions',
       speed: 'Fast',
       riskScore: 50
@@ -52,18 +49,11 @@ const SAFETY_LEVELS = {
       icon: AlertTriangle, 
       label: 'Aggressive',
       desc: 'High volume. Higher risk.',
-      details: 'Maximum throughput with minimal delays. Recommended only for verified, high-trust accounts.',
       dailyLimit: '~400 Actions',
       speed: 'Turbo',
       riskScore: 85
   }
 };
-
-const SIMULATION_MODES = [
-    { id: 'single', label: 'Single Cycle', icon: Play, desc: 'Execute one run immediately.' },
-    { id: 'day', label: 'Full Day Preview', icon: FastForward, desc: 'Forecast 24h activity.' },
-    { id: 'stress', label: 'Stress Test', icon: Gauge, desc: 'Test rate limit resilience.' },
-];
 
 // --- Theme System ---
 
@@ -703,6 +693,10 @@ const BotConfigModal: React.FC<BotConfigModalProps> = ({ bot, onClose, onSave })
   // Local state for Rules to allow editing before save
   const [rules, setRules] = useState<any>(config.rules || {});
 
+  // Local state for Learning Config (Phase 9)
+  const [learningConfig, setLearningConfig] = useState(bot.learning);
+  const [optimizationHistory, setOptimizationHistory] = useState<OptimizationEvent[]>(bot.optimizationHistory || []);
+
   const [simulationLogs, setSimulationLogs] = useState<BotActivity[]>([]);
   const [isSimulating, setIsSimulating] = useState(false);
   const simulationPollRef = useRef<any>(null);
@@ -721,9 +715,14 @@ const BotConfigModal: React.FC<BotConfigModalProps> = ({ bot, onClose, onSave })
   const [globalPolicy, setGlobalPolicy] = useState<GlobalPolicyConfig>(store.getGlobalPolicy());
   const [dailyActions, setDailyActions] = useState(store.getDailyGlobalActions());
   const [orchestrationLogs, setOrchestrationLogs] = useState<OrchestrationLogEntry[]>([]);
+  const [platforms, setPlatforms] = useState<PlatformConfig[]>([]);
   
   // Phase 7: Live Execution Feed State
   const [liveEvents, setLiveEvents] = useState<BotExecutionEvent[]>([]);
+
+  // Phase 8: Adaptive Strategy
+  const [adaptiveConfig, setAdaptiveConfig] = useState<AdaptiveConfig>(store['getAdaptiveConfig']());
+  const [optimizationSuggestions, setOptimizationSuggestions] = useState<OptimizationSuggestion[]>([]);
 
   // Incident Management State
   const [incidentAcknowledged, setIncidentAcknowledged] = useState(false);
@@ -736,25 +735,38 @@ const BotConfigModal: React.FC<BotConfigModalProps> = ({ bot, onClose, onSave })
       setBotInterval(bot.intervalMinutes);
       setSafetyLevel(bot.config.safetyLevel || 'Moderate');
       setRules(bot.config.rules || {});
+      setLearningConfig(bot.learning);
+      setOptimizationHistory(bot.optimizationHistory || []);
   }, [bot]);
 
   // Load Orchestration Data on tab switch
   useEffect(() => {
       if (activeTab === 'Orchestration') {
-          setGlobalPolicy(store.getGlobalPolicy());
-          setDailyActions(store.getDailyGlobalActions());
-          setOrchestrationLogs(getOrchestrationLogs());
+          const syncOrchData = () => {
+              setGlobalPolicy(store.getGlobalPolicy());
+              setDailyActions(store.getDailyGlobalActions());
+              setOrchestrationLogs(getOrchestrationLogs());
+              setPlatforms(store['getPlatforms']());
+          };
+          syncOrchData();
           setLiveEvents(getExecutionEvents());
           
           // Subscribe to live telemetry
           const unsubscribe = subscribeToTelemetry((events) => {
               setLiveEvents([...events]); // Trigger re-render with new array reference
-              setDailyActions({...store.getDailyGlobalActions()}); // Update gauges
+              syncOrchData(); // Update gauges and platform state
           });
           
           return () => unsubscribe();
       }
   }, [activeTab]);
+
+  useEffect(() => {
+      if (activeTab === 'Rules') {
+          setAdaptiveConfig(store['getAdaptiveConfig']());
+          setOptimizationSuggestions(store['getOptimizationSuggestions']().filter((s: OptimizationSuggestion) => s.botType === bot.type));
+      }
+  }, [activeTab, bot.type]);
 
   // Clean up poll on unmount
   useEffect(() => {
@@ -779,6 +791,7 @@ const BotConfigModal: React.FC<BotConfigModalProps> = ({ bot, onClose, onSave })
     onSave({
       ...bot,
       intervalMinutes: interval,
+      learning: learningConfig, // Phase 9
       config: { 
           ...config, 
           safetyLevel,
@@ -791,6 +804,44 @@ const BotConfigModal: React.FC<BotConfigModalProps> = ({ bot, onClose, onSave })
       const newState = !globalPolicy.emergencyStop;
       store.updateGlobalPolicy({ emergencyStop: newState });
       setGlobalPolicy({ ...globalPolicy, emergencyStop: newState });
+  };
+
+  const togglePlatform = (id: Platform) => {
+      store['togglePlatformEnabled'](id);
+      setPlatforms(store['getPlatforms']());
+  };
+
+  const toggleOutage = (id: Platform, currentOutage: boolean) => {
+      store['setPlatformOutage'](id, !currentOutage);
+      setPlatforms(store['getPlatforms']());
+  };
+
+  const updateStrategyMode = (mode: StrategyMode) => {
+      const newConfig = { ...adaptiveConfig, mode };
+      setAdaptiveConfig(newConfig);
+      store['setAdaptiveConfig'](newConfig);
+  };
+
+  // Phase 9 Handlers
+  const handleApplyOptimization = (id: string) => {
+      store['applyLearningEvent'](bot.type, id);
+      // Optimistic update
+      setOptimizationHistory(prev => prev.map(e => e.id === id ? { ...e, status: 'applied' } : e));
+      // Re-fetch updated config
+      store.getBots().then(bots => {
+          const updated = bots.find(b => b.type === bot.type);
+          if (updated) setRules(updated.config.rules);
+      });
+  };
+
+  const handleIgnoreOptimization = (id: string) => {
+      store['ignoreLearningEvent'](bot.type, id);
+      setOptimizationHistory(prev => prev.filter(e => e.id !== id));
+  };
+
+  const handleLockField = (field: string) => {
+      store['lockLearningField'](bot.type, field);
+      setLearningConfig(prev => prev ? { ...prev, lockedFields: [...prev.lockedFields, field] } : undefined);
   };
 
   const runSimulation = async () => {
@@ -900,11 +951,92 @@ const BotConfigModal: React.FC<BotConfigModalProps> = ({ bot, onClose, onSave })
   
   // Rules Rendering Logic
   const renderRulesTab = () => {
-      if (bot.type === BotType.Finder) return <FinderRulesPanel rules={rules} onChange={setRules} />;
-      if (bot.type === BotType.Growth) return <GrowthRulesPanel rules={rules} onChange={setRules} />;
-      if (bot.type === BotType.Engagement) return <EngagementRulesPanel rules={rules} onChange={setRules} />;
-      if (bot.type === BotType.Creator) return <CreatorRulesPanel rules={rules} onChange={setRules} />;
-      return <div className="text-slate-400 p-8 text-center">No configurable rules for this bot type.</div>;
+      // Phase 9: Sort optimization history (pending first, then newest)
+      const sortedHistory = [...(optimizationHistory || [])].sort((a, b) => {
+          if (a.status === 'pending' && b.status !== 'pending') return -1;
+          if (a.status !== 'pending' && b.status === 'pending') return 1;
+          return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+      });
+
+      return (
+          <div className="space-y-6">
+              {/* Phase 9: Self-Optimizing Neural Engine Panel */}
+              <div className="bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-100 rounded-2xl p-6 shadow-sm">
+                  <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-sm font-bold text-indigo-900 uppercase tracking-wide flex items-center gap-2">
+                          <BrainCircuit className="w-4 h-4 text-indigo-600" /> Self-Optimizing Neural Engine
+                      </h3>
+                      {learningConfig && (
+                          <div className="flex items-center gap-2">
+                              <span className="text-xs font-bold text-indigo-600">Auto-Learning</span>
+                              <button 
+                                  onClick={() => setLearningConfig({...learningConfig, enabled: !learningConfig.enabled})}
+                                  className={`relative w-10 h-6 rounded-full transition-colors duration-200 ${learningConfig.enabled ? 'bg-indigo-600' : 'bg-slate-300'}`}
+                              >
+                                  <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full shadow-sm transition-transform ${learningConfig.enabled ? 'translate-x-4' : ''}`} />
+                              </button>
+                          </div>
+                      )}
+                  </div>
+
+                  {learningConfig && (
+                      <>
+                          {/* Learning Strategy Selector */}
+                          <div className="bg-white rounded-xl p-1 flex mb-4 border border-indigo-100">
+                              {['Conservative', 'Balanced', 'Aggressive'].map((mode) => {
+                                  const isSelected = learningConfig.strategy === mode;
+                                  return (
+                                      <button
+                                          key={mode}
+                                          onClick={() => setLearningConfig({...learningConfig, strategy: mode as LearningStrategy})}
+                                          className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
+                                              isSelected 
+                                              ? 'bg-indigo-600 text-white shadow-md' 
+                                              : 'text-slate-500 hover:text-indigo-600 hover:bg-indigo-50'
+                                          }`}
+                                      >
+                                          {mode}
+                                      </button>
+                                  );
+                              })}
+                          </div>
+
+                          {/* Insights List */}
+                          {sortedHistory.length > 0 ? (
+                              <div className="space-y-3 max-h-64 overflow-y-auto custom-scrollbar pr-1">
+                                  {sortedHistory.map(event => (
+                                      <OptimizationInsightCard 
+                                          key={event.id}
+                                          event={event}
+                                          onApply={handleApplyOptimization}
+                                          onIgnore={handleIgnoreOptimization}
+                                          onLock={handleLockField}
+                                          isSimulated={event.status === 'simulated'}
+                                      />
+                                  ))}
+                              </div>
+                          ) : (
+                              <div className="text-center py-6 text-xs text-indigo-400 italic border-t border-indigo-100/50 pt-4">
+                                  Bot is analyzing patterns... No optimization suggestions yet.
+                              </div>
+                          )}
+                      </>
+                  )}
+              </div>
+
+              {/* Existing Rules */}
+              <div className="flex items-center gap-2 mb-2 px-1 pt-4 border-t border-slate-100">
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Manual Configuration</span>
+                  <span className="text-xs text-slate-300">•</span>
+                  <span className="text-xs font-bold text-slate-600">{RuleEngine.getRuleSummary(bot)}</span>
+              </div>
+              {bot.type === BotType.Finder ? <FinderRulesPanel rules={rules} onChange={setRules} /> :
+               bot.type === BotType.Growth ? <GrowthRulesPanel rules={rules} onChange={setRules} /> :
+               bot.type === BotType.Engagement ? <EngagementRulesPanel rules={rules} onChange={setRules} /> :
+               bot.type === BotType.Creator ? <CreatorRulesPanel rules={rules} onChange={setRules} /> :
+               <div className="text-slate-400 p-8 text-center">No configurable rules for this bot type.</div>}
+          </div>
+      );
   };
 
   const renderContent = () => {
@@ -1088,16 +1220,7 @@ const BotConfigModal: React.FC<BotConfigModalProps> = ({ bot, onClose, onSave })
               );
               
           case 'Rules':
-              return (
-                  <div className="space-y-6">
-                      <div className="flex items-center gap-2 mb-2 px-1">
-                          <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Configuration</span>
-                          <span className="text-xs text-slate-300">•</span>
-                          <span className="text-xs font-bold text-slate-600">{RuleEngine.getRuleSummary(bot)}</span>
-                      </div>
-                      {renderRulesTab()}
-                  </div>
-              );
+              return renderRulesTab();
 
           case 'Orchestration':
               return (
@@ -1121,33 +1244,101 @@ const BotConfigModal: React.FC<BotConfigModalProps> = ({ bot, onClose, onSave })
                           </button>
                       </div>
 
-                      {/* Daily Limits Grid */}
+                      {/* Phase 8.5: Dynamic Platform Quota Cards */}
                       <div className="grid grid-cols-2 gap-4">
-                          {Object.entries(globalPolicy.platformLimits).map(([platform, limits]) => (
-                              <div key={platform} className="bg-slate-50 border border-slate-200 rounded-xl p-4">
-                                  <div className="flex items-center gap-2 mb-3">
-                                      <PlatformIcon platform={platform} size={16} />
-                                      <span className="text-sm font-bold text-slate-700">{platform}</span>
-                                  </div>
-                                  <div className="space-y-3">
-                                      {Object.entries(limits).map(([action, limit]) => {
-                                          const current = dailyActions[platform as Platform]?.[action as ActionType] || 0;
-                                          const pct = Math.min((current / limit) * 100, 100);
-                                          return (
-                                              <div key={action}>
-                                                  <div className="flex justify-between text-xs font-bold text-slate-500 mb-1">
-                                                      <span>{action}</span>
-                                                      <span>{current}/{limit}</span>
-                                                  </div>
-                                                  <div className="h-1.5 w-full bg-slate-200 rounded-full overflow-hidden">
-                                                      <div className={`h-full rounded-full ${pct > 90 ? 'bg-rose-500' : 'bg-blue-500'}`} style={{ width: `${pct}%` }}></div>
+                          {platforms.filter(p => p.enabled || p.connected).map((platform) => { // Show if enabled or connected (even if disabled)
+                              const limits = platform.rateLimits;
+                              const supports = platform.supports;
+                              const currentUsage = dailyActions[platform.id] || {};
+                              
+                              const isPaused = !platform.enabled;
+                              const isDisconnected = !platform.connected;
+                              const isOutage = platform.outage;
+
+                              let statusLabel = 'Active';
+                              let statusColor = 'text-green-600 bg-green-50 border-green-200';
+                              
+                              if (isOutage) {
+                                  statusLabel = 'API Outage';
+                                  statusColor = 'text-red-600 bg-red-50 border-red-200';
+                              } else if (isDisconnected) {
+                                  statusLabel = 'Disconnected';
+                                  statusColor = 'text-slate-500 bg-slate-100 border-slate-200';
+                              } else if (isPaused) {
+                                  statusLabel = 'Paused';
+                                  statusColor = 'text-amber-600 bg-amber-50 border-amber-200';
+                              }
+
+                              return (
+                                  <div key={platform.id} className={`bg-white border rounded-xl p-4 shadow-sm transition-all ${isPaused || isDisconnected ? 'opacity-80 border-slate-200' : 'border-slate-200 hover:border-blue-300'}`}>
+                                      <div className="flex items-center justify-between mb-3">
+                                          <div className="flex items-center gap-2">
+                                              <PlatformIcon platform={platform.id} size={18} />
+                                              <span className="text-sm font-bold text-slate-700">{platform.name}</span>
+                                          </div>
+                                          
+                                          <div className="flex items-center gap-2">
+                                              <div className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase ${statusColor}`}>
+                                                  {statusLabel}
+                                              </div>
+                                              
+                                              {/* Platform Actions Menu */}
+                                              <div className="relative group">
+                                                  <button className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-slate-600">
+                                                      <MoreVertical className="w-4 h-4" />
+                                                  </button>
+                                                  <div className="absolute right-0 top-full mt-1 w-40 bg-white border border-slate-200 rounded-xl shadow-xl z-20 hidden group-hover:block p-1">
+                                                      <button 
+                                                          onClick={() => togglePlatform(platform.id)}
+                                                          className="w-full text-left px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 rounded-lg flex items-center gap-2"
+                                                      >
+                                                          {platform.enabled ? <PauseCircle className="w-3 h-3" /> : <Play className="w-3 h-3" />}
+                                                          {platform.enabled ? 'Pause Platform' : 'Resume Platform'}
+                                                      </button>
+                                                      <button 
+                                                          onClick={() => toggleOutage(platform.id, platform.outage)}
+                                                          className="w-full text-left px-3 py-2 text-xs font-bold text-red-600 hover:bg-red-50 rounded-lg flex items-center gap-2"
+                                                      >
+                                                          {platform.outage ? <WifiOff className="w-3 h-3" /> : <AlertTriangle className="w-3 h-3" />}
+                                                          {platform.outage ? 'Resolve Outage' : 'Simulate Outage'}
+                                                      </button>
                                                   </div>
                                               </div>
-                                          )
-                                      })}
+                                          </div>
+                                      </div>
+
+                                      <div className="space-y-3 opacity-90">
+                                          {Object.keys(supports).map((actionKey) => {
+                                              const action = actionKey as ActionType;
+                                              if (!supports[action]) return null; // Skip unsupported actions
+
+                                              const limit = limits[action] || 0;
+                                              const current = currentUsage[action] || 0;
+                                              const pct = limit > 0 ? Math.min((current / limit) * 100, 100) : 0;
+                                              
+                                              return (
+                                                  <div key={action}>
+                                                      <div className="flex justify-between text-xs font-bold text-slate-500 mb-1">
+                                                          <span>{action}</span>
+                                                          <span>{current}/{limit}</span>
+                                                      </div>
+                                                      <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                                                          <div 
+                                                              className={`h-full rounded-full transition-all duration-500 ${
+                                                                  isOutage ? 'bg-red-300' :
+                                                                  isDisconnected ? 'bg-slate-300' :
+                                                                  pct > 90 ? 'bg-rose-500' : 'bg-blue-500'
+                                                              }`} 
+                                                              style={{ width: `${pct}%` }}
+                                                          ></div>
+                                                      </div>
+                                                  </div>
+                                              )
+                                          })}
+                                      </div>
                                   </div>
-                              </div>
-                          ))}
+                              );
+                          })}
                       </div>
 
                       {/* Live Decision Feed (Updated for Phase 7) */}
@@ -1173,6 +1364,7 @@ const BotConfigModal: React.FC<BotConfigModalProps> = ({ bot, onClose, onSave })
                                           <div className={`mt-1 w-2 h-2 rounded-full shrink-0 ${
                                               event.status === 'blocked' ? 'bg-red-500' : 
                                               event.status === 'skipped' ? 'bg-amber-500' : 
+                                              event.status === 'optimized' ? 'bg-indigo-500' :
                                               'bg-green-500'
                                           }`}></div>
                                           
@@ -1187,6 +1379,7 @@ const BotConfigModal: React.FC<BotConfigModalProps> = ({ bot, onClose, onSave })
                                                   <span className={`text-xs font-bold uppercase px-1.5 py-0.5 rounded border ${
                                                       event.action === ActionType.POST ? 'bg-blue-50 text-blue-600 border-blue-100' :
                                                       event.action === ActionType.LIKE ? 'bg-pink-50 text-pink-600 border-pink-100' :
+                                                      event.action === ActionType.OPTIMIZE ? 'bg-indigo-50 text-indigo-600 border-indigo-100' :
                                                       'bg-slate-100 text-slate-600 border-slate-200'
                                                   }`}>
                                                       {event.action}
@@ -1197,8 +1390,8 @@ const BotConfigModal: React.FC<BotConfigModalProps> = ({ bot, onClose, onSave })
                                               </div>
 
                                               {(event.status !== 'executed' && event.reason) && (
-                                                  <p className="text-[10px] font-medium text-slate-500 mt-1 italic">
-                                                      Reason: {event.reason}
+                                                  <p className={`text-[10px] font-medium mt-1 italic ${event.status === 'optimized' ? 'text-indigo-600' : 'text-slate-500'}`}>
+                                                      {event.status === 'optimized' ? 'Auto-Tune: ' : 'Reason: '}{event.reason}
                                                   </p>
                                               )}
                                           </div>

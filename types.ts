@@ -29,7 +29,8 @@ export enum ActionType {
   REPLY = 'REPLY',
   FOLLOW = 'FOLLOW',
   UNFOLLOW = 'UNFOLLOW',
-  ANALYZE = 'ANALYZE'
+  ANALYZE = 'ANALYZE',
+  OPTIMIZE = 'OPTIMIZE'
 }
 
 export interface BotActivity {
@@ -81,7 +82,87 @@ export interface CreatorBotRules {
 
 export type BotRules = FinderBotRules | GrowthBotRules | EngagementBotRules | CreatorBotRules;
 
-// --- Orchestration & Policy Types (Phase 6) ---
+// --- Phase 8.5: Dynamic Platform Registry ---
+
+export interface PlatformConfig {
+  id: Platform;
+  name: string;
+  enabled: boolean;   // Admin switch to allow/disallow platform globally
+  connected: boolean; // Integration status
+  outage: boolean;    // Simulate API outage
+  supports: {
+    [key in ActionType]?: boolean;
+  };
+  rateLimits: {
+    [key in ActionType]?: number;
+  };
+}
+
+// --- Phase 8: Adaptive Strategy Types ---
+
+export type StrategyMode = 'Conservative' | 'Balanced' | 'Aggressive';
+
+export interface StrategyProfile {
+  mode: StrategyMode;
+  postFrequencyMultiplier: number;
+  engagementIntensity: number;
+  growthAggression: number;
+  riskTolerance: number; // 0-100
+}
+
+export interface AdaptiveConfig {
+  mode: StrategyMode;
+  autoOptimize: boolean;
+  lastOptimization: string;
+}
+
+export interface OptimizationSuggestion {
+  id: string;
+  botType: BotType;
+  parameter: string;
+  oldValue: string | number;
+  newValue: string | number;
+  reason: string;
+  impact: 'High' | 'Medium' | 'Low';
+  applied: boolean;
+  timestamp: string;
+}
+
+export interface LearningEntry {
+  id: string;
+  platform: Platform;
+  actionType: ActionType;
+  context: string; // e.g. "Tone: Witty" or "Topic: AI"
+  outcomeScore: number; // 0-100
+  timestamp: number;
+}
+
+// --- Phase 9: Self-Optimizing Learning Types ---
+
+export type LearningStrategy = 'Conservative' | 'Balanced' | 'Aggressive';
+
+export interface BotLearningConfig {
+  enabled: boolean;
+  strategy: LearningStrategy;
+  maxChangePerDay: number; // percentage (e.g. 10 for 10%)
+  lockedFields: string[]; // keys of config fields to ignore
+}
+
+export interface OptimizationEvent {
+  id: string;
+  timestamp: string;
+  botId: string; // BotType
+  field: string;
+  oldValue: string | number | boolean;
+  newValue: string | number | boolean;
+  reason: string;
+  confidence: number; // 0-1
+  metricsUsed: string[];
+  status: 'pending' | 'applied' | 'rejected' | 'simulated';
+  appliedAt?: string;
+}
+
+// --- Orchestration & Policy Types ---
 
 export interface GlobalPolicyConfig {
   emergencyStop: boolean;
@@ -91,17 +172,13 @@ export interface GlobalPolicyConfig {
     endTime: string;   // HH:MM (24h format)
     timezone: string;
   };
-  platformLimits: {
-    [key in Platform]?: {
-      [key in ActionType]?: number;
-    };
-  };
+  platformLimits?: any; 
 }
 
 export interface PolicyCheckResult {
   allowed: boolean;
   reason?: string;
-  type: 'POLICY' | 'CONFLICT' | 'PRIORITY' | 'OK';
+  type: 'POLICY' | 'CONFLICT' | 'PRIORITY' | 'PLATFORM' | 'OK';
 }
 
 export interface BotActionRequest {
@@ -131,7 +208,7 @@ export interface BotExecutionEvent {
   timestamp: number;
   platform: Platform;
   action: ActionType;
-  status: 'executed' | 'skipped' | 'blocked';
+  status: 'executed' | 'skipped' | 'blocked' | 'optimized';
   assetId?: string;
   assetName?: string;
   reason?: string;
@@ -294,6 +371,9 @@ export interface BotConfig {
     cooldownEndsAt?: string;
     itemsCreated?: number;
   };
+  // Phase 9: Self-Optimization
+  learning?: BotLearningConfig;
+  optimizationHistory?: OptimizationEvent[];
 }
 
 export interface DashboardStats {
