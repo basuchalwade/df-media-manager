@@ -85,7 +85,7 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
     if (params) {
       if (params.postId) {
         // Edit Mode
-        store.getPosts().then(posts => {
+        store.getPosts().then(async (posts) => {
           const post = posts.find(p => p.id === params.postId);
           if (post) {
             setOriginalPost(post); // DEEP SYNC: Store original to preserve metadata
@@ -123,23 +123,50 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
                 setTopic(post.creationContext.topic);
             }
             
-            // Media
+            // Resolve Media
+            const library = await store.getMedia();
+            
             if (post.mediaUrl) {
-               setSelectedMedia({ 
-                 id: 'loaded-media', 
-                 name: 'Current Media', 
-                 type: post.mediaType || 'image', 
-                 url: post.mediaUrl, 
-                 size: 0, 
-                 createdAt: '' 
-               });
+                // Try to find in library first by ID or URL
+                const found = (post.mediaId ? library.find(m => m.id === post.mediaId) : null) 
+                              || library.find(m => m.url === post.mediaUrl);
+                
+                if (found) {
+                    setSelectedMedia(found);
+                } else {
+                    // Fallback for legacy/external media not in library
+                    const fallback: MediaItem = {
+                        id: 'legacy-media-' + Date.now(),
+                        name: 'External Media',
+                        type: post.mediaType || 'image',
+                        url: post.mediaUrl,
+                        size: 0,
+                        createdAt: new Date().toISOString(),
+                        governance: { status: 'approved' },
+                        aiMetadata: { generated: false, disclosureRequired: false }
+                    };
+                    setSelectedMedia(fallback);
+                }
             } else {
                setSelectedMedia(null);
             }
+
             if (post.thumbnailUrl) {
-               setYoutubeThumbnail({
-                  id: 'loaded-thumb', name: 'Thumbnail', type: 'image', url: post.thumbnailUrl, size: 0, createdAt: ''
-               });
+                 const found = library.find(m => m.url === post.thumbnailUrl);
+                 if (found) {
+                     setYoutubeThumbnail(found);
+                 } else {
+                     setYoutubeThumbnail({
+                        id: 'legacy-thumb-' + Date.now(),
+                        name: 'Thumbnail',
+                        type: 'image',
+                        url: post.thumbnailUrl,
+                        size: 0,
+                        createdAt: new Date().toISOString(),
+                        governance: { status: 'approved' },
+                        aiMetadata: { generated: false, disclosureRequired: false }
+                     });
+                 }
             }
 
             // Schedule
@@ -210,6 +237,16 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
                 botWarnings.push("Engagement Bot usage is high (>80%).");
             }
         }
+    }
+
+    // Platform Compatibility Warnings
+    if (selectedMedia && selectedMedia.platformCompatibility) {
+        selectedPlatforms.forEach(p => {
+            const status = selectedMedia.platformCompatibility?.[p];
+            if (status && !status.compatible) {
+                botWarnings.push(`${p}: Incompatible media - ${status.issues?.join(', ')}`);
+            }
+        });
     }
 
     setValidationErrors(errors);
@@ -473,6 +510,7 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
       status: targetStatus,
       generatedByAi: isAiGenerated,
       mediaUrl: selectedMedia?.url,
+      mediaId: selectedMedia?.id,
       mediaType: selectedMedia?.type,
       author: forceNewId ? 'User' : postAuthor,
       // Variants Sync

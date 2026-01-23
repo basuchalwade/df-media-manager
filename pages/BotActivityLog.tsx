@@ -123,7 +123,7 @@ export const BotActivityLog: React.FC<BotActivityLogProps> = ({ botType, onBack 
                    {filtered.length === 0 ? (
                       <div className="p-8 text-center text-slate-400 text-sm">No logs found matching your criteria.</div>
                    ) : (
-                      Object.entries(groupedActivities).map(([group, groupActs]) => (
+                      Object.entries(groupedActivities).map(([group, groupActs]: [string, BotActivity[]]) => (
                           <React.Fragment key={group}>
                               {/* Date Header */}
                               <div className="px-6 py-2 bg-slate-50/80 border-y border-slate-100 text-xs font-bold text-slate-500 uppercase flex items-center gap-2 sticky top-10 z-0">

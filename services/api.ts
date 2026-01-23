@@ -1,7 +1,7 @@
 
 import { Post, BotConfig, User, UserSettings, MediaItem, DashboardStats, BotType, Platform, BotActivity } from '../types';
 
-const API_URL = import.meta.env?.VITE_API_URL || 'http://localhost:8000';
+const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:8000';
 
 const headers = {
   'Content-Type': 'application/json',

@@ -537,7 +537,7 @@ export const Calendar: React.FC<PageProps> = ({ onNavigate, params }) => {
         {viewMode === 'Agenda' && (
             <div className="flex-1 bg-white/50 backdrop-blur-md rounded-[32px] border border-white/60 shadow-sm p-0 overflow-hidden flex flex-col relative">
                 <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
-                    {Object.entries(agendaGroups).map(([groupName, groupPosts]) => {
+                    {Object.entries(agendaGroups).map(([groupName, groupPosts]: [string, Post[]]) => {
                         if (groupPosts.length === 0) return null;
                         return (
                             <div key={groupName} className="mb-8 animate-in slide-in-from-bottom-2 duration-500">

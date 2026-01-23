@@ -1,5 +1,6 @@
+
 import React, { useEffect, useState, useRef } from 'react';
-import { X, Image as ImageIcon, FileVideo, UploadCloud, Plus, Loader2 } from 'lucide-react';
+import { X, Image as ImageIcon, FileVideo, UploadCloud, Plus, Loader2, Play } from 'lucide-react';
 import { store } from '../services/mockStore';
 import { MediaItem } from '../types';
 
@@ -29,18 +30,14 @@ export const MediaPicker: React.FC<MediaPickerProps> = ({ isOpen, onClose, onSel
     if (!files || files.length === 0) return;
 
     setIsUploading(true);
-    // Batch process uploads
-    for (const file of Array.from(files)) {
+    for (const file of Array.from(files) as File[]) {
       try {
         await store.uploadMedia(file);
       } catch (err: any) {
         console.error("Upload failed for file " + file.name, err);
-        // Alert only on first failure for simplicity or log it
-        if (files.length === 1) alert(err.message || "Failed to upload file");
       }
     }
     
-    // Refresh list
     await loadMedia();
     setIsUploading(false);
     if (fileInputRef.current) {
@@ -77,7 +74,6 @@ export const MediaPicker: React.FC<MediaPickerProps> = ({ isOpen, onClose, onSel
           </div>
         </div>
         
-        {/* Hidden File Input with multiple attribute */}
         <input 
           type="file" 
           ref={fileInputRef} 
@@ -103,43 +99,41 @@ export const MediaPicker: React.FC<MediaPickerProps> = ({ isOpen, onClose, onSel
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-              {mediaItems.map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => { onSelect(item); onClose(); }}
-                  className="group relative aspect-square bg-white border border-slate-200 rounded-lg overflow-hidden hover:ring-2 hover:ring-blue-500 hover:border-transparent transition-all shadow-sm"
-                >
-                  {item.type === 'image' ? (
-                    <img src={item.url} alt={item.name} className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full bg-black">
-                      <video 
-                        src={item.url} 
-                        className="w-full h-full object-cover opacity-80 group-hover:opacity-100" 
-                        muted 
-                        loop
-                        playsInline
-                        onMouseOver={e => e.currentTarget.play().catch(() => {})} 
-                        onMouseOut={e => { e.currentTarget.pause(); e.currentTarget.currentTime = 0; }}
-                      />
-                      <div className="absolute top-1 right-1 p-0.5 bg-black/60 rounded text-white pointer-events-none">
-                        <FileVideo className="w-3 h-3" />
+              {mediaItems.map((item) => {
+                const displayUrl = item.thumbnailUrl || item.url;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => { onSelect(item); onClose(); }}
+                    className="group relative aspect-square bg-white border border-slate-200 rounded-lg overflow-hidden hover:ring-2 hover:ring-blue-500 hover:border-transparent transition-all shadow-sm"
+                  >
+                    <img src={displayUrl} alt={item.name} className="w-full h-full object-cover" />
+                    
+                    {item.type === 'video' && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/10">
+                            <div className="w-8 h-8 bg-black/40 backdrop-blur-sm rounded-full flex items-center justify-center shadow-md">
+                                <Play className="w-4 h-4 text-white ml-0.5" fill="currentColor" />
+                            </div>
+                            <div className="absolute top-1 right-1 p-0.5 bg-black/60 rounded text-white pointer-events-none">
+                                <FileVideo className="w-3 h-3" />
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors pointer-events-none" />
+                    <div className="absolute bottom-0 left-0 right-0 bg-white/95 backdrop-blur-sm border-t border-slate-100 p-2 text-left pointer-events-none">
+                       <p className="text-xs font-medium text-slate-700 truncate">{item.name}</p>
+                    </div>
+                    
+                    {/* Selection Indicator on Hover */}
+                    <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                      <div className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center shadow-md">
+                        <Plus className="w-4 h-4 text-white" />
                       </div>
                     </div>
-                  )}
-                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors pointer-events-none" />
-                  <div className="absolute bottom-0 left-0 right-0 bg-white/95 backdrop-blur-sm border-t border-slate-100 p-2 text-left pointer-events-none">
-                     <p className="text-xs font-medium text-slate-700 truncate">{item.name}</p>
-                  </div>
-                  
-                  {/* Selection Indicator on Hover */}
-                  <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                    <div className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center shadow-md">
-                      <Plus className="w-4 h-4 text-white" />
-                    </div>
-                  </div>
-                </button>
-              ))}
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>

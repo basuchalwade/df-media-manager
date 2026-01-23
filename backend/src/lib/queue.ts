@@ -71,7 +71,7 @@ class SimulationWorker {
     // Actually, in Sim mode, the "Backend" does the scheduling via setTimeout. 
     // The "Worker" service might be idle or disabled in docker-compose, 
     // but here we allow defining processors that can be called by the shim.
-    (global as any)[`SIM_PROC_${name}`] = processor;
+    (globalThis as any)[`SIM_PROC_${name}`] = processor;
   }
 }
 
@@ -81,7 +81,7 @@ export const createQueue = (name: string): any => {
   if (IS_SIMULATION) {
     const q = new SimulationQueue(name);
     // Hook up processor if it exists (simulating shared memory for simplicity in this demo structure)
-    q['processor'] = (global as any)[`SIM_PROC_${name}`];
+    q['processor'] = (globalThis as any)[`SIM_PROC_${name}`];
     return q;
   }
   return new Queue(name, { connection: REDIS_CONFIG });

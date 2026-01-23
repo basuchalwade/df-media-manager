@@ -518,7 +518,7 @@ const BotConfigModal: React.FC<BotConfigModalProps> = ({ bot, onClose, onSave })
 
   const [simulationLogs, setSimulationLogs] = useState<BotActivity[]>([]);
   const [isSimulating, setIsSimulating] = useState(false);
-  const simulationPollRef = useRef<NodeJS.Timeout | null>(null);
+  const simulationPollRef = useRef<any>(null);
 
   // Sync State for API bots
   const [isSyncing, setIsSyncing] = useState(false);

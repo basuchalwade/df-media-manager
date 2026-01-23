@@ -44,5 +44,5 @@ async function startWorker() {
 
 startWorker().catch(e => {
   console.error(e);
-  process.exit(1);
+  (process as any).exit(1);
 });

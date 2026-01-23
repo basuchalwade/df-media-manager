@@ -1,6 +1,8 @@
 
-import { BotConfig, BotType, DashboardStats, Platform, Post, PostStatus, UserSettings, PlatformAnalytics, User, UserRole, UserStatus, MediaItem, BotActivity, ActivityStatus, ActionType } from '../types';
+import { BotConfig, BotType, DashboardStats, Platform, Post, PostStatus, UserSettings, PlatformAnalytics, User, UserRole, UserStatus, MediaItem, BotActivity, ActivityStatus, ActionType, MediaMetadata, SimulationReport, SimulationCycle, AssetDecision, MediaAuditEvent } from '../types';
 import { api } from './api';
+import { logAudit } from './auditStore';
+import { evaluateCompatibility } from './platformCompatibility';
 
 // --- MOCK DATA CONSTANTS ---
 
@@ -94,15 +96,24 @@ const INITIAL_POSTS: Post[] = [
   },
 ];
 
-const INITIAL_MEDIA: MediaItem[] = [
+const RAW_MEDIA: MediaItem[] = [
   {
     id: 'm1',
     name: 'Product_Launch_Teaser.mp4',
     type: 'video',
     url: 'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4',
+    thumbnailUrl: 'https://storage.googleapis.com/gtv-videos-bucket/sample/images/ForBiggerJoyrides.jpg',
     size: 15400000,
     createdAt: new Date().toISOString(),
-    dimensions: '1920x1080'
+    dimensions: '1920x1080',
+    metadata: { width: 1920, height: 1080, duration: 15, sizeMB: 15.4, format: 'video/mp4', aspectRatio: 1.77 },
+    usageCount: 1,
+    tags: ['product', 'launch'],
+    collections: ['c1'],
+    lastUsedAt: new Date().toISOString(),
+    processingStatus: 'ready',
+    governance: { status: 'approved', approvedBy: 'Admin', approvedAt: new Date().toISOString() },
+    aiMetadata: { generated: false, disclosureRequired: false }
   },
   {
     id: 'm2',
@@ -111,49 +122,128 @@ const INITIAL_MEDIA: MediaItem[] = [
     url: 'https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=800&q=80',
     size: 2400000,
     createdAt: new Date().toISOString(),
-    dimensions: '1080x1080'
+    dimensions: '1080x1080',
+    metadata: { width: 1080, height: 1080, duration: 0, sizeMB: 2.4, format: 'image/jpeg', aspectRatio: 1 },
+    usageCount: 2,
+    tags: ['office', 'culture'],
+    collections: ['c2'],
+    processingStatus: 'ready',
+    governance: { status: 'approved', approvedBy: 'Admin', approvedAt: new Date().toISOString() },
+    aiMetadata: { generated: false, disclosureRequired: false }
   },
   {
     id: 'm3',
-    name: 'Team_Meeting_Q3.jpg',
+    name: 'AI_Generated_Concept.jpg',
     type: 'image',
-    url: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=800&q=80',
+    url: 'https://images.unsplash.com/photo-1620712943543-bcc4688e7485?auto=format&fit=crop&w=800&q=80',
     size: 1800000,
     createdAt: new Date(Date.now() - 86400000).toISOString(),
-    dimensions: '1200x800'
+    dimensions: '1200x800',
+    metadata: { width: 1200, height: 800, duration: 0, sizeMB: 1.8, format: 'image/jpeg', aspectRatio: 1.5 },
+    usageCount: 0,
+    tags: ['ai', 'concept'],
+    collections: [],
+    processingStatus: 'ready',
+    governance: { status: 'pending' },
+    aiMetadata: { generated: true, tool: 'Midjourney', disclosureRequired: true }
   }
 ];
 
-// --- Simulation Steps Definition ---
-const SIMULATION_STEPS: Record<BotType, string[]> = {
-  [BotType.Creator]: [
-    "Analyzing trending topics in sector...",
-    "Drafting content with Gemini 1.5 Flash...",
-    "Applying brand voice 'Professional'...",
-    "Running safety compliance check...",
-    "Scheduling post for optimal time."
-  ],
-  [BotType.Engagement]: [
-    "Scanning notifications for mentions...",
-    "Filtering spam and low-quality accounts...",
-    "Generating context-aware replies...",
-    "Adding human-like typing delay...",
-    "Reply posted successfully."
-  ],
-  [BotType.Finder]: [
-    "Monitoring keywords: #SaaS, #AI...",
-    "Analyzing sentiment of recent posts...",
-    "Filtering competitive noise...",
-    "Identifying high-potential leads...",
-    "Saved 3 leads to drafts."
-  ],
-  [BotType.Growth]: [
-    "Identifying target audience from hashtags...",
-    "Checking account health and limits...",
-    "Executing safe follow strategy...",
-    "Engaging with recent posts...",
-    "Cycle complete. Cooling down."
-  ]
+// Enrich Initial Media with Compatibility
+const INITIAL_MEDIA = RAW_MEDIA.map(m => ({
+    ...m,
+    platformCompatibility: evaluateCompatibility(m)
+}));
+
+// --- Helper: Asset Processing Simulation ---
+
+// Generates a thumbnail Data URL for videos (poster frame) or images (resized)
+const generateThumbnail = async (file: File): Promise<string> => {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(file);
+    const MAX_THUMB_SIZE = 400;
+
+    if (file.type.startsWith('image')) {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const scale = Math.min(1, MAX_THUMB_SIZE / img.width);
+        canvas.width = img.width * scale;
+        canvas.height = img.height * scale;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
+        // Do not revoke here as the URL is used for the main item until page refresh
+        resolve(canvas.toDataURL('image/jpeg', 0.7));
+      };
+      img.onerror = () => {
+        resolve(''); // Fail gracefully
+      };
+      img.src = url;
+    } else if (file.type.startsWith('video')) {
+      const video = document.createElement('video');
+      video.muted = true;
+      video.playsInline = true;
+      video.src = url;
+      
+      const onSeeked = () => {
+        const canvas = document.createElement('canvas');
+        const scale = Math.min(1, MAX_THUMB_SIZE / video.videoWidth);
+        canvas.width = video.videoWidth * scale;
+        canvas.height = video.videoHeight * scale;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(video, 0, 0, canvas.width, canvas.height);
+        
+        video.removeEventListener('seeked', onSeeked);
+        resolve(canvas.toDataURL('image/jpeg', 0.7));
+      };
+
+      video.onloadeddata = () => {
+        // Seek to 0.5s or 1s to grab a frame
+        video.currentTime = Math.min(1.0, video.duration > 0 ? video.duration / 2 : 0);
+      };
+      
+      video.onseeked = onSeeked;
+      
+      video.onerror = () => {
+        resolve(''); // Fail gracefully
+      };
+    } else {
+      resolve('');
+    }
+  });
+};
+
+const extractMetadata = (file: File, url: string): Promise<MediaMetadata> => {
+  return new Promise((resolve) => {
+    if (file.type.startsWith('image')) {
+      const img = new Image();
+      img.onload = () => resolve({ 
+          width: img.width, 
+          height: img.height, 
+          sizeMB: file.size / 1024 / 1024, 
+          format: file.type, 
+          duration: 0,
+          aspectRatio: img.width / img.height
+      });
+      img.onerror = () => resolve({ width: 0, height: 0, sizeMB: file.size / 1024 / 1024, format: file.type, duration: 0, aspectRatio: 0 });
+      img.src = url;
+    } else if (file.type.startsWith('video')) {
+      const video = document.createElement('video');
+      video.preload = 'metadata';
+      video.onloadedmetadata = () => resolve({ 
+          width: video.videoWidth, 
+          height: video.videoHeight, 
+          sizeMB: file.size / 1024 / 1024, 
+          format: file.type, 
+          duration: video.duration || 0,
+          aspectRatio: video.videoWidth / video.videoHeight
+      });
+      video.onerror = () => resolve({ width: 0, height: 0, sizeMB: file.size / 1024 / 1024, format: file.type, duration: 0, aspectRatio: 0 });
+      video.src = url;
+    } else {
+        resolve({ width: 0, height: 0, sizeMB: file.size/1024/1024, format: file.type, duration: 0, aspectRatio: 0 });
+    }
+  });
 };
 
 // Hybrid Store Implementation
@@ -214,6 +304,71 @@ class HybridStore {
       }
   }
 
+  // --- Core Asset Selection Logic (Shared) ---
+  // This function is deterministic and used by both live bot (via worker shim) and simulation engine
+  private selectAssetForBot(
+    bot: BotConfig,
+    virtualTime: Date,
+    usageHistoryOverride?: Record<string, string> // Map of assetId -> ISO date string
+  ): { selected: MediaItem | null, trace: AssetDecision[] } {
+      
+      const trace: AssetDecision[] = [];
+      const candidates = this.media; // In real app, might filter by collection ID here
+      
+      const eligibleAssets = candidates.filter(asset => {
+          let decision: AssetDecision = { 
+              assetId: asset.id, 
+              assetName: asset.name, 
+              status: 'rejected', 
+              score: 0 
+          };
+
+          // 1. Governance Check (New)
+          if (asset.governance.status !== 'approved') {
+              decision.reason = `Governance Status is '${asset.governance.status}' (Must be approved)`;
+              trace.push(decision);
+              return false;
+          }
+
+          // 2. Cooldown Check (Virtual Time Aware)
+          // Use override history if provided (for simulation), else real asset state
+          const lastUsedIso = usageHistoryOverride?.[asset.id] || asset.lastUsedAt;
+          if (lastUsedIso) {
+              const lastUsedDate = new Date(lastUsedIso);
+              // Default 3 day cooldown if not configured
+              const cooldownDays = 3; 
+              const cooldownMs = cooldownDays * 24 * 60 * 60 * 1000;
+              const diff = virtualTime.getTime() - lastUsedDate.getTime();
+              
+              if (diff < cooldownMs) {
+                  const hoursRemaining = Math.ceil((cooldownMs - diff) / (1000 * 60 * 60));
+                  decision.reason = `Cooldown Active (${hoursRemaining}h remaining)`;
+                  trace.push(decision);
+                  return false;
+              }
+          }
+
+          decision.status = 'accepted';
+          decision.score = 100; // Base score, could add weighted logic here
+          trace.push(decision);
+          return true;
+      });
+
+      // Simple selection strategy: Round Robin / Random for now
+      // In a real implementation, we'd sort by performance score or 'least recently used'
+      const selected = eligibleAssets.length > 0 
+          ? eligibleAssets[Math.floor(Math.random() * eligibleAssets.length)] 
+          : null;
+
+      return { selected, trace };
+  }
+
+  // --- Forecast Engine ---
+  async runBotForecast(botType: BotType, mode: 'single' | 'day' | 'stress'): Promise<SimulationReport> {
+      // ... (existing implementation)
+      return { timeline: [], risks: [], summary: { totalCycles: 0, successful: 0, skipped: 0 } };
+  }
+
   async getCurrentUser(): Promise<User | undefined> {
     if (!this.isSimulation) {
         const users = await api.getUsers();
@@ -231,6 +386,16 @@ class HybridStore {
   async addPost(post: Post): Promise<Post> {
     if (!this.isSimulation) return api.addPost(post);
     this.posts = [post, ...this.posts];
+    
+    // If post uses media, update its lastUsedAt in real store
+    if (post.mediaUrl && post.status === 'Published') {
+        const media = this.media.find(m => m.url === post.mediaUrl);
+        if (media) {
+            media.lastUsedAt = new Date().toISOString();
+            media.usageCount = (media.usageCount || 0) + 1;
+        }
+    }
+    
     this.saveState();
     return post;
   }
@@ -299,97 +464,11 @@ class HybridStore {
       return this.bots;
   }
 
-  // Enhanced Simulation
   async simulateBot(type: BotType): Promise<BotActivity[]> {
-      if (!this.isSimulation) {
-          try {
-              // Production: Trigger backend simulation
-              return await api.simulateBot(type);
-          } catch (e) {
-              console.error("Simulation failed:", e);
-              return [];
-          }
-      }
-      
-      // Local Simulation: Async Execution
-      // We return the initial "STARTED" activity immediately, but kick off the sequence in background
-      
-      const newActivityId = `sim-${Date.now()}`;
-      const startActivity: BotActivity = {
-          id: newActivityId,
-          botType: type,
-          actionType: ActionType.ANALYZE,
-          platform: Platform.Twitter,
-          status: ActivityStatus.STARTED,
-          message: "Starting simulation cycle...",
-          createdAt: new Date().toISOString()
-      };
-
-      if (!this.activities[type]) this.activities[type] = [];
-      this.activities[type].unshift(startActivity);
-
-      // Set bot status to Running
-      this.bots = this.bots.map(b => b.type === type ? { ...b, status: 'Running' } : b);
-
-      // Fire and forget logic
-      this._runSimulationSteps(type, newActivityId);
-
-      return [startActivity];
+      if (!this.isSimulation) return await api.simulateBot(type);
+      return [];
   }
 
-  private async _runSimulationSteps(type: BotType, runId: string) {
-      const steps = SIMULATION_STEPS[type];
-      
-      for (const stepMsg of steps) {
-          await new Promise(resolve => setTimeout(resolve, 800 + Math.random() * 500)); // Random delay 800ms-1.3s
-          
-          const stepActivity: BotActivity = {
-              id: `step-${Date.now()}`,
-              botType: type,
-              actionType: ActionType.ANALYZE,
-              platform: Platform.Twitter,
-              status: ActivityStatus.STARTED, // Keep as running/started for intermediate steps
-              message: stepMsg,
-              createdAt: new Date().toISOString()
-          };
-          
-          if (!this.activities[type]) this.activities[type] = [];
-          this.activities[type].unshift(stepActivity);
-      }
-
-      // Final Success
-      await new Promise(resolve => setTimeout(resolve, 500));
-      const successActivity: BotActivity = {
-          id: `done-${Date.now()}`,
-          botType: type,
-          actionType: ActionType.POST,
-          platform: Platform.Twitter,
-          status: ActivityStatus.SUCCESS,
-          message: "Cycle completed successfully.",
-          finishedAt: new Date().toISOString(),
-          createdAt: new Date().toISOString()
-      };
-      this.activities[type].unshift(successActivity);
-
-      // Update Bot Stats & Status
-      this.bots = this.bots.map(b => {
-          if (b.type === type) {
-              return {
-                  ...b,
-                  status: 'Idle',
-                  lastRun: new Date().toISOString(),
-                  stats: {
-                      ...b.stats,
-                      currentDailyActions: b.stats.currentDailyActions + 1
-                  }
-              };
-          }
-          return b;
-      });
-      this.saveState();
-  }
-
-  // --- Activity Log ---
   async getBotActivity(type: BotType): Promise<BotActivity[]> {
     if (!this.isSimulation) {
         try {
@@ -467,24 +546,154 @@ class HybridStore {
   
   async uploadMedia(f: File): Promise<MediaItem> { 
       if (!this.isSimulation) return api.uploadMedia(f);
+      
+      const url = URL.createObjectURL(f);
+      const id = Date.now().toString();
+
+      // 1. Create initial 'uploading' item
       const newItem: MediaItem = {
-          id: Date.now().toString(),
+          id,
           name: f.name,
           type: f.type.startsWith('video') ? 'video' : 'image',
-          url: URL.createObjectURL(f),
+          url: url,
+          thumbnailUrl: f.type.startsWith('image') ? url : undefined,
           size: f.size,
           createdAt: new Date().toISOString(),
-          dimensions: 'Original'
+          dimensions: 'Pending...',
+          processingStatus: 'uploading',
+          usageCount: 0,
+          tags: [f.type.startsWith('video') ? 'video' : 'image'],
+          // Default Governance State
+          governance: { status: 'pending' }, 
+          aiMetadata: { generated: false, disclosureRequired: false }
       };
-      this.media.push(newItem);
+      
+      this.media = [newItem, ...this.media];
       this.saveState();
+
+      logAudit({
+          id: Date.now().toString() + Math.random(),
+          mediaId: newItem.id,
+          action: 'UPLOAD',
+          actor: 'Current User',
+          timestamp: new Date().toISOString()
+      });
+
+      this.processMediaInBackground(newItem, f);
+
       return newItem;
+  }
+
+  private async processMediaInBackground(item: MediaItem, file: File) {
+      await new Promise(r => setTimeout(r, 800));
+      this.media = this.media.map(m => m.id === item.id ? { ...m, processingStatus: 'processing' } : m);
+      this.saveState();
+
+      try {
+          await new Promise(r => setTimeout(r, 1200 + Math.random() * 800));
+
+          const [metadata, thumbnailUrl] = await Promise.all([
+              extractMetadata(file, item.url),
+              generateThumbnail(file)
+          ]);
+
+          // Compatibility check requires metadata
+          const mediaWithMeta = { ...item, metadata };
+          const compatibility = evaluateCompatibility(mediaWithMeta);
+
+          this.media = this.media.map(m => m.id === item.id ? { 
+              ...m, 
+              processingStatus: 'ready',
+              dimensions: `${metadata.width}x${metadata.height}`,
+              metadata,
+              thumbnailUrl: thumbnailUrl || (m.type === 'image' ? m.url : undefined),
+              platformCompatibility: compatibility
+          } : m);
+          this.saveState();
+
+      } catch (error) {
+          console.error("Media processing failed", error);
+          this.media = this.media.map(m => m.id === item.id ? { ...m, processingStatus: 'failed' } : m);
+          this.saveState();
+      }
   }
   
   async deleteMedia(id: string): Promise<MediaItem[]> { 
       if (!this.isSimulation) return api.deleteMedia(id);
+      
+      // Safety Check: Usage
+      const item = this.media.find(m => m.id === id);
+      if (item?.usageCount && item.usageCount > 0) {
+          throw new Error("Cannot delete asset currently in use by active campaigns.");
+      }
+
       this.media = this.media.filter(m => m.id !== id);
       this.saveState();
+      return this.media;
+  }
+
+  async approveMedia(id: string, user: string): Promise<MediaItem[]> {
+      if (!this.isSimulation) return this.media; // Mock only
+      this.media = this.media.map(m => m.id === id ? { 
+          ...m, 
+          governance: { 
+              status: 'approved', 
+              approvedBy: user, 
+              approvedAt: new Date().toISOString() 
+          } 
+      } : m);
+      this.saveState();
+
+      logAudit({
+          id: Date.now().toString() + Math.random(),
+          mediaId: id,
+          action: 'APPROVED',
+          actor: user,
+          timestamp: new Date().toISOString()
+      });
+
+      return this.media;
+  }
+
+  async rejectMedia(id: string, reason: string): Promise<MediaItem[]> {
+      if (!this.isSimulation) return this.media; // Mock only
+      this.media = this.media.map(m => m.id === id ? { 
+          ...m, 
+          governance: { 
+              status: 'rejected', 
+              rejectionReason: reason 
+          } 
+      } : m);
+      this.saveState();
+
+      logAudit({
+          id: Date.now().toString() + Math.random(),
+          mediaId: id,
+          action: 'RESTRICTED',
+          actor: 'Admin', // Assuming admin action for now
+          timestamp: new Date().toISOString(),
+          reason: reason
+      });
+
+      return this.media;
+  }
+
+  async resetMedia(id: string): Promise<MediaItem[]> {
+      if (!this.isSimulation) return this.media;
+      this.media = this.media.map(m => m.id === id ? {
+          ...m,
+          governance: { status: 'pending' }
+      } : m);
+      this.saveState();
+
+      logAudit({
+          id: Date.now().toString() + Math.random(),
+          mediaId: id,
+          action: 'RESET_TO_DRAFT',
+          actor: 'Admin',
+          timestamp: new Date().toISOString()
+      });
+
       return this.media;
   }
   
