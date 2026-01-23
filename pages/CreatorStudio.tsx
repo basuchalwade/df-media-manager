@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Sparkles, Send, Calendar as CalendarIcon, RotateCcw, Image as ImageIcon, ChevronDown, CheckCircle, Briefcase, Smile, Rocket, GraduationCap, X, FileVideo, Clock, Save, AlertCircle, Check, Zap, Eye, Copy, Hash, MoreHorizontal, ThumbsUp, MessageSquare, Share2, Repeat, Bookmark, Globe, Heart, Layers, UploadCloud, RefreshCw, ShieldCheck, AlertTriangle, Bot, Info, Cloud, CheckSquare, Plus, Split, ExternalLink, MapPin } from 'lucide-react';
+import { Sparkles, Send, Calendar as CalendarIcon, RotateCcw, Image as ImageIcon, ChevronDown, CheckCircle, Briefcase, Smile, Rocket, GraduationCap, X, FileVideo, Clock, Save, AlertCircle, Check, Zap, Eye, Copy, Hash, MoreHorizontal, ThumbsUp, MessageSquare, Share2, Repeat, Bookmark, Globe, Heart, Layers, UploadCloud, RefreshCw, ShieldCheck, AlertTriangle, Bot, Info, Cloud, CheckSquare, Plus, Split, ExternalLink, MapPin, Wand2 } from 'lucide-react';
 import { generatePostContent, generatePostVariants, generateHashtags, validateContentSafety, refinePostContent } from '../services/geminiService';
 import { validatePost, PLATFORM_LIMITS } from '../services/validationService';
 import { store } from '../services/mockStore';
@@ -143,7 +143,8 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
                         size: 0,
                         createdAt: new Date().toISOString(),
                         governance: { status: 'approved' },
-                        aiMetadata: { generated: false, disclosureRequired: false }
+                        aiMetadata: { generated: false, disclosureRequired: false },
+                        variants: []
                     };
                     setSelectedMedia(fallback);
                 }
@@ -164,7 +165,8 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
                         size: 0,
                         createdAt: new Date().toISOString(),
                         governance: { status: 'approved' },
-                        aiMetadata: { generated: false, disclosureRequired: false }
+                        aiMetadata: { generated: false, disclosureRequired: false },
+                        variants: []
                      });
                  }
             }
@@ -243,7 +245,10 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
     if (selectedMedia && selectedMedia.platformCompatibility) {
         selectedPlatforms.forEach(p => {
             const status = selectedMedia.platformCompatibility?.[p];
-            if (status && !status.compatible) {
+            const hasVariant = selectedMedia.variants?.some(v => v.platform === p);
+            
+            // Only warn if incompatible AND no variant exists
+            if (status && !status.compatible && !hasVariant) {
                 botWarnings.push(`${p}: Incompatible media - ${status.issues?.join(', ')}`);
             }
         });
@@ -694,12 +699,23 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
 
   // Render Logic
   const renderPreviewContent = () => {
-    const commonMedia = selectedMedia && (
-        <div className="w-full bg-black flex items-center justify-center relative overflow-hidden bg-gray-100">
-           {selectedMedia.type === 'image' ? (
-              <img src={selectedMedia.url} className="w-full h-full object-cover" alt="Preview" />
+    // Platform Variant Selection Logic
+    const variant = selectedMedia?.variants?.find(v => v.platform === previewPlatform);
+    const mediaToUse = variant || selectedMedia;
+    const isUsingVariant = !!variant;
+
+    const commonMedia = mediaToUse && (
+        <div className="w-full bg-black flex items-center justify-center relative overflow-hidden bg-gray-100 group">
+           {isUsingVariant && (
+               <div className="absolute top-2 right-2 z-10 bg-purple-600/90 text-white text-[10px] font-bold px-2 py-1 rounded-full backdrop-blur-md shadow-sm flex items-center gap-1">
+                   <Wand2 className="w-3 h-3" /> Optimized
+               </div>
+           )}
+           {selectedMedia?.type === 'image' ? (
+              // Handle image or generated variant (which has image URL)
+              <img src={mediaToUse.url} className="w-full h-full object-cover" alt="Preview" />
            ) : (
-              <video src={selectedMedia.url} className="w-full h-full object-cover" controls playsInline />
+              <video src={mediaToUse.url} className="w-full h-full object-cover" controls playsInline />
            )}
         </div>
     );
@@ -748,9 +764,9 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
                <MoreHorizontal className="w-5 h-5 text-gray-600" />
             </div>
             
-            <div className="aspect-square bg-gray-100 relative">
+            <div className="aspect-square bg-gray-100 relative overflow-hidden flex items-center justify-center">
                {selectedMedia ? (
-                 selectedMedia.type === 'image' ? <img src={selectedMedia.url} className="w-full h-full object-cover" /> : <video src={selectedMedia.url} className="w-full h-full object-cover" controls playsInline />
+                 commonMedia
                ) : (
                  <div className="w-full h-full flex items-center justify-center text-gray-300 bg-gray-50">No Media</div>
                )}
@@ -809,7 +825,7 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
           <div className="bg-white h-full flex flex-col">
              <div className="aspect-video bg-black w-full flex items-center justify-center relative">
                 {selectedMedia ? (
-                   selectedMedia.type === 'image' ? <img src={selectedMedia.url} className="w-full h-full object-cover opacity-80" /> : <video src={selectedMedia.url} className="w-full h-full object-cover" controls playsInline />
+                   (selectedMedia.type === 'image') ? <img src={mediaToUse!.url} className="w-full h-full object-cover opacity-80" /> : <video src={mediaToUse!.url} className="w-full h-full object-cover" controls playsInline />
                 ) : (
                    <div className="text-gray-500">Video Player</div>
                 )}

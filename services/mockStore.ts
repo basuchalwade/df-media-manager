@@ -1,8 +1,9 @@
 
-import { BotConfig, BotType, DashboardStats, Platform, Post, PostStatus, UserSettings, PlatformAnalytics, User, UserRole, UserStatus, MediaItem, BotActivity, ActivityStatus, ActionType, MediaMetadata, SimulationReport, SimulationCycle, AssetDecision, MediaAuditEvent } from '../types';
+import { BotConfig, BotType, DashboardStats, Platform, Post, PostStatus, UserSettings, PlatformAnalytics, User, UserRole, UserStatus, MediaItem, BotActivity, ActivityStatus, ActionType, MediaMetadata, SimulationReport, SimulationCycle, AssetDecision, MediaAuditEvent, MediaVariant } from '../types';
 import { api } from './api';
 import { logAudit } from './auditStore';
 import { evaluateCompatibility } from './platformCompatibility';
+import { generateVariant } from './mediaVariantService';
 
 // --- MOCK DATA CONSTANTS ---
 
@@ -113,7 +114,8 @@ const RAW_MEDIA: MediaItem[] = [
     lastUsedAt: new Date().toISOString(),
     processingStatus: 'ready',
     governance: { status: 'approved', approvedBy: 'Admin', approvedAt: new Date().toISOString() },
-    aiMetadata: { generated: false, disclosureRequired: false }
+    aiMetadata: { generated: false, disclosureRequired: false },
+    variants: []
   },
   {
     id: 'm2',
@@ -129,7 +131,8 @@ const RAW_MEDIA: MediaItem[] = [
     collections: ['c2'],
     processingStatus: 'ready',
     governance: { status: 'approved', approvedBy: 'Admin', approvedAt: new Date().toISOString() },
-    aiMetadata: { generated: false, disclosureRequired: false }
+    aiMetadata: { generated: false, disclosureRequired: false },
+    variants: []
   },
   {
     id: 'm3',
@@ -145,7 +148,8 @@ const RAW_MEDIA: MediaItem[] = [
     collections: [],
     processingStatus: 'ready',
     governance: { status: 'pending' },
-    aiMetadata: { generated: true, tool: 'Midjourney', disclosureRequired: true }
+    aiMetadata: { generated: true, tool: 'Midjourney', disclosureRequired: true },
+    variants: []
   }
 ];
 
@@ -565,7 +569,8 @@ class HybridStore {
           tags: [f.type.startsWith('video') ? 'video' : 'image'],
           // Default Governance State
           governance: { status: 'pending' }, 
-          aiMetadata: { generated: false, disclosureRequired: false }
+          aiMetadata: { generated: false, disclosureRequired: false },
+          variants: []
       };
       
       this.media = [newItem, ...this.media];
@@ -695,6 +700,61 @@ class HybridStore {
       });
 
       return this.media;
+  }
+
+  // --- Variant Management ---
+  async createVariant(id: string, platform: string): Promise<MediaVariant> {
+      if (!this.isSimulation) return {} as MediaVariant;
+      
+      const item = this.media.find(m => m.id === id);
+      if (!item) throw new Error("Media not found");
+
+      const variant = await generateVariant(item, platform);
+      
+      // Store variant
+      this.media = this.media.map(m => {
+          if (m.id === id) {
+              const variants = m.variants || [];
+              // Remove old variant for same platform if exists
+              const filtered = variants.filter(v => v.platform !== platform);
+              return { ...m, variants: [...filtered, variant] };
+          }
+          return m;
+      });
+      
+      this.saveState();
+
+      logAudit({
+          id: Date.now().toString() + Math.random(),
+          mediaId: id,
+          action: 'VARIANT_GENERATED',
+          actor: 'AI Optimization Engine',
+          timestamp: new Date().toISOString(),
+          reason: `Auto-generated for ${platform}`
+      });
+
+      return variant;
+  }
+
+  async deleteVariant(parentId: string, variantId: string): Promise<void> {
+      if (!this.isSimulation) return;
+      
+      this.media = this.media.map(m => {
+          if (m.id === parentId && m.variants) {
+              return { ...m, variants: m.variants.filter(v => v.id !== variantId) };
+          }
+          return m;
+      });
+      
+      this.saveState();
+
+      logAudit({
+          id: Date.now().toString() + Math.random(),
+          mediaId: parentId,
+          action: 'VARIANT_DELETED',
+          actor: 'Current User',
+          timestamp: new Date().toISOString()
+      });
   }
   
   async createOptimizedCopy(id: string, v: string): Promise<MediaItem> { return {} as MediaItem; }

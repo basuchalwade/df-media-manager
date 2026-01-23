@@ -4,7 +4,7 @@ import {
   Image as ImageIcon, UploadCloud, Trash2, Download, X, Search, 
   Folder, Plus, Tag, LayoutGrid, List, Play, FileVideo, Info,
   Loader2, AlertTriangle, CheckCircle, Shield, BrainCircuit, Clock,
-  History, RotateCcw, FileText, Smartphone
+  History, RotateCcw, FileText, Smartphone, Wand2
 } from 'lucide-react';
 import { store } from '../services/mockStore';
 import { MediaItem, MediaAuditEvent } from '../types';
@@ -40,6 +40,7 @@ export const MediaLibrary: React.FC = () => {
   const [auditLogs, setAuditLogs] = useState<MediaAuditEvent[]>([]);
   const [activeTab, setActiveTab] = useState<'details' | 'audit'>('details');
   const [platformCounts, setPlatformCounts] = useState<Record<string, number>>({});
+  const [isGeneratingVariant, setIsGeneratingVariant] = useState<string | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -70,7 +71,8 @@ export const MediaLibrary: React.FC = () => {
         if (updatedSelected) {
             // Keep selected item fresh but don't override local input state if we were typing rejection reason
             if (updatedSelected.processingStatus !== selectedItem.processingStatus || 
-                updatedSelected.governance.status !== selectedItem.governance.status) {
+                updatedSelected.governance.status !== selectedItem.governance.status ||
+                updatedSelected.variants?.length !== selectedItem.variants?.length) {
                 setSelectedItem(updatedSelected);
                 // Also refresh audit logs if governance changed
                 setAuditLogs(getAuditForMedia(updatedSelected.id));
@@ -161,6 +163,28 @@ export const MediaLibrary: React.FC = () => {
       await loadMedia();
   };
 
+  const handleGenerateVariant = async (platform: string) => {
+      if (!selectedItem) return;
+      setIsGeneratingVariant(platform);
+      try {
+          await store['createVariant'](selectedItem.id, platform);
+          await loadMedia();
+      } catch (e) {
+          console.error(e);
+          alert('Failed to generate variant.');
+      } finally {
+          setIsGeneratingVariant(null);
+      }
+  };
+
+  const handleDeleteVariant = async (variantId: string) => {
+      if (!selectedItem) return;
+      if (confirm('Delete this variant?')) {
+          await store['deleteVariant'](selectedItem.id, variantId);
+          await loadMedia();
+      }
+  };
+
   const handleAssetClick = (item: MediaItem) => {
       setSelectedItem(item);
       setIsDrawerOpen(true);
@@ -176,6 +200,8 @@ export const MediaLibrary: React.FC = () => {
           case 'UPLOAD': return 'text-blue-600 bg-blue-50 border-blue-200';
           case 'AI_FLAGGED': return 'text-orange-600 bg-orange-50 border-orange-200';
           case 'RESET_TO_DRAFT': return 'text-slate-600 bg-slate-100 border-slate-200';
+          case 'VARIANT_GENERATED': return 'text-purple-600 bg-purple-50 border-purple-200';
+          case 'VARIANT_DELETED': return 'text-red-500 bg-red-50 border-red-200';
           default: return 'text-gray-600 bg-gray-50 border-gray-200';
       }
   };
@@ -439,34 +465,71 @@ export const MediaLibrary: React.FC = () => {
                                 )}
                             </div>
 
-                            {/* Platform Readiness Section - NEW */}
-                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-3">
+                            {/* Platform Readiness & Variants */}
+                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-4">
                                 <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                                    <Smartphone className="w-3.5 h-3.5" /> Platform Readiness
+                                    <Smartphone className="w-3.5 h-3.5" /> Platform Variants
                                 </h4>
-                                <div className="space-y-2">
+                                <div className="space-y-4">
                                     {Object.values(PLATFORM_RULES).map(rule => {
                                         const status = selectedItem.platformCompatibility?.[rule.id];
                                         const isReady = status?.compatible;
+                                        const existingVariant = selectedItem.variants?.find(v => v.platform === rule.id);
+                                        const isProcessing = isGeneratingVariant === rule.id;
                                         
                                         return (
-                                            <div key={rule.id} className="flex items-start justify-between text-xs">
-                                                <div className="flex items-center gap-2">
-                                                    <PlatformIcon platform={rule.id} size={14} />
-                                                    <span className="font-medium text-slate-700">{rule.label}</span>
-                                                </div>
-                                                {isReady ? (
-                                                    <span className="text-green-600 font-bold flex items-center gap-1">
-                                                        <CheckCircle className="w-3 h-3" /> Ready
-                                                    </span>
-                                                ) : (
-                                                    <div className="text-right">
-                                                        <span className="text-amber-600 font-bold flex items-center justify-end gap-1">
-                                                            <AlertTriangle className="w-3 h-3" /> Issues
+                                            <div key={rule.id} className="text-xs border-b border-slate-200 pb-3 last:border-0 last:pb-0">
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <div className="flex items-center gap-2">
+                                                        <PlatformIcon platform={rule.id} size={14} />
+                                                        <span className="font-medium text-slate-700">{rule.label}</span>
+                                                    </div>
+                                                    {isReady ? (
+                                                        <span className="text-green-600 font-bold flex items-center gap-1">
+                                                            <CheckCircle className="w-3 h-3" /> Compatible
                                                         </span>
-                                                        {status?.issues?.map((issue, idx) => (
-                                                            <div key={idx} className="text-[10px] text-slate-500 mt-0.5">{issue}</div>
-                                                        ))}
+                                                    ) : (
+                                                        <span className="text-amber-600 font-bold flex items-center gap-1">
+                                                            <AlertTriangle className="w-3 h-3" /> Optimization Needed
+                                                        </span>
+                                                    )}
+                                                </div>
+
+                                                {/* Variant UI */}
+                                                {existingVariant ? (
+                                                    <div className="flex gap-3 bg-white p-2 rounded-lg border border-slate-200">
+                                                        <div className="w-12 h-12 bg-slate-100 rounded overflow-hidden shrink-0">
+                                                            <img src={existingVariant.thumbnailUrl} className="w-full h-full object-cover" />
+                                                        </div>
+                                                        <div className="flex-1 flex flex-col justify-center">
+                                                            <span className="font-bold text-slate-700">Variant Active</span>
+                                                            <span className="text-[10px] text-slate-400">{existingVariant.width}x{existingVariant.height} • {new Date(existingVariant.createdAt).toLocaleDateString()}</span>
+                                                        </div>
+                                                        <button 
+                                                            onClick={() => handleDeleteVariant(existingVariant.id)}
+                                                            className="text-red-400 hover:text-red-600 p-1 hover:bg-red-50 rounded"
+                                                            title="Delete Variant"
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </button>
+                                                    </div>
+                                                ) : !isReady ? (
+                                                    <div className="pl-6">
+                                                        <div className="text-[10px] text-slate-500 mb-2">
+                                                            {status?.issues?.join(', ')}
+                                                        </div>
+                                                        <button 
+                                                            onClick={() => handleGenerateVariant(rule.id)}
+                                                            disabled={isProcessing}
+                                                            className="w-full py-2 bg-white border border-blue-200 text-blue-600 rounded-lg text-[11px] font-bold hover:bg-blue-50 transition-colors flex items-center justify-center gap-2 shadow-sm disabled:opacity-50"
+                                                        >
+                                                            {isProcessing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wand2 className="w-3 h-3" />}
+                                                            {isProcessing ? 'Generating...' : 'Generate Optimized Variant'}
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <div className="pl-6 text-[10px] text-slate-400 italic">
+                                                        Original asset is ready for use.
                                                     </div>
                                                 )}
                                             </div>

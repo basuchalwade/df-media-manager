@@ -299,7 +299,9 @@ export type AuditAction =
   | 'RESTRICTED'
   | 'RESET_TO_DRAFT'
   | 'AI_FLAGGED'
-  | 'AI_CLEARED';
+  | 'AI_CLEARED'
+  | 'VARIANT_GENERATED'
+  | 'VARIANT_DELETED';
 
 export interface MediaAuditEvent {
   id: string;
@@ -339,6 +341,19 @@ export interface PlatformCompatibility {
   issues: string[];
 }
 
+export interface MediaVariant {
+  id: string;
+  parentId: string;
+  platform: string;
+  url: string;
+  thumbnailUrl: string;
+  width: number;
+  height: number;
+  createdAt: string;
+  generatedBy: 'ai' | 'user';
+  status: 'ready' | 'failed';
+}
+
 export interface MediaItem {
   id: string;
   name: string;
@@ -367,6 +382,9 @@ export interface MediaItem {
   
   // Platform Readiness
   platformCompatibility?: Record<string, PlatformCompatibility>;
+  
+  // Platform Specific Variants
+  variants?: MediaVariant[];
 }
 
 export interface PageProps {
