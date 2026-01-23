@@ -5,7 +5,7 @@ import {
   Check, AlertTriangle, FileVideo, Download, X, Search, Filter, 
   Folder, Plus, MoreHorizontal, ShieldCheck, Zap, Layers, Tag,
   LayoutGrid, List, CheckCircle2, Clock, Globe, Lock, ChevronRight,
-  Bot, AlertOctagon, Calendar, Play, Pause, Volume2, VolumeX, Info
+  Bot, AlertOctagon, Calendar, Play, Pause, Volume2, VolumeX, Info, Loader2
 } from 'lucide-react';
 import { store } from '../services/mockStore';
 import { MediaItem, Platform } from '../types';
@@ -13,12 +13,10 @@ import { PlatformIcon } from '../components/PlatformIcon';
 
 // --- Extended Types for UI ---
 interface ExtendedMediaItem extends MediaItem {
-  status: 'approved' | 'draft' | 'restricted';
   tags: string[];
   collections: string[];
   usageCount: number;
   platformFit: Platform[];
-  dimensions: string;
   automationApproved: boolean;
   aiRiskScore?: number; // 0-100, higher is riskier
   expiresAt?: string;
@@ -63,6 +61,8 @@ export const MediaLibrary: React.FC = () => {
 
   useEffect(() => {
     loadMedia();
+    const interval = setInterval(loadMedia, 2000); // Poll for processing updates
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -75,7 +75,8 @@ export const MediaLibrary: React.FC = () => {
     // Enrich raw items with mock metadata for the demo
     const enriched = rawItems.map((item: any) => ({
       ...item,
-      status: item.status || (Math.random() > 0.2 ? 'approved' : 'draft'),
+      // If status is present on raw item, use it (from our new mockStore logic), else default to ready for older mocks
+      status: item.status || 'ready',
       tags: item.tags || (item.type === 'video' ? ['video', 'social'] : ['product', 'feature', 'q3']),
       collections: item.collections || (Math.random() > 0.7 ? ['c1'] : []),
       usageCount: item.usageCount || Math.floor(Math.random() * 20),
@@ -109,7 +110,11 @@ export const MediaLibrary: React.FC = () => {
     }
 
     if (filterStatus !== 'all') {
-      result = result.filter(item => item.status === filterStatus);
+      // Mapping 'status' from media lifecycle to 'approval status' logic for filtering
+      // Since we now have 'uploading/processing/ready', we map 'ready' + automationApproved logic for these filters
+      // This is a simplification for the demo UI
+      if (filterStatus === 'approved') result = result.filter(item => item.status === 'ready' && item.automationApproved);
+      if (filterStatus === 'restricted') result = result.filter(item => item.status === 'ready' && !item.automationApproved);
     }
 
     setFilteredItems(result);
@@ -121,10 +126,10 @@ export const MediaLibrary: React.FC = () => {
     setIsUploading(true);
     setUploadProgress(10);
 
-    // Simulate AI Processing Steps
+    // Simulate Network/Upload Phase
     const steps = [20, 45, 70, 90];
     for (const p of steps) {
-        await new Promise(r => setTimeout(r, 400));
+        await new Promise(r => setTimeout(r, 200));
         setUploadProgress(p);
     }
 
@@ -138,7 +143,7 @@ export const MediaLibrary: React.FC = () => {
     }
 
     setUploadProgress(100);
-    await loadMedia();
+    await loadMedia(); // Will fetch new items in 'processing' state
     setTimeout(() => {
         setIsUploading(false);
         setUploadProgress(0);
@@ -157,26 +162,17 @@ export const MediaLibrary: React.FC = () => {
   };
 
   const handleAssetClick = (item: ExtendedMediaItem) => {
+      if (item.status === 'processing' || item.status === 'uploading') return;
       setSelectedItem(item);
       setIsDrawerOpen(true);
   };
 
   const toggleAutomationApproval = (item: ExtendedMediaItem) => {
       const updated = mediaItems.map(i => 
-          i.id === item.id ? { ...i, automationApproved: !i.automationApproved, status: !i.automationApproved ? 'approved' : 'restricted' } : i
+          i.id === item.id ? { ...i, automationApproved: !i.automationApproved } : i
       ) as ExtendedMediaItem[];
       setMediaItems(updated);
-      setSelectedItem({ ...item, automationApproved: !item.automationApproved, status: !item.automationApproved ? 'approved' : 'restricted' } as ExtendedMediaItem);
-  };
-
-  // --- Render Helpers ---
-
-  const getStatusBadge = (status: string) => {
-      switch(status) {
-          case 'approved': return <span className="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-green-200 flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> Approved</span>;
-          case 'restricted': return <span className="bg-red-100 text-red-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-red-200 flex items-center gap-1"><Lock className="w-3 h-3" /> Restricted</span>;
-          default: return <span className="bg-slate-100 text-slate-600 text-[10px] font-bold px-2 py-0.5 rounded-full border border-slate-200 flex items-center gap-1"><Clock className="w-3 h-3" /> Draft</span>;
-      }
+      setSelectedItem({ ...item, automationApproved: !item.automationApproved } as ExtendedMediaItem);
   };
 
   return (
@@ -502,28 +498,32 @@ const GridItem: React.FC<{
 }> = ({ item, selected, viewMode, onClick, onDelete }) => {
     const videoRef = useRef<HTMLVideoElement>(null);
     const [isPlaying, setIsPlaying] = useState(false);
+    const isProcessing = item.status === 'processing' || item.status === 'uploading';
 
     const handleMouseEnter = () => {
-        if (item.type === 'video' && videoRef.current) {
+        if (!isProcessing && item.type === 'video' && videoRef.current) {
             videoRef.current.play().catch(() => {});
             setIsPlaying(true);
         }
     };
 
     const handleMouseLeave = () => {
-        if (item.type === 'video' && videoRef.current) {
+        if (!isProcessing && item.type === 'video' && videoRef.current) {
             videoRef.current.pause();
             videoRef.current.currentTime = 0;
             setIsPlaying(false);
         }
     };
 
-    const getStatusBadge = (status: string) => {
-        switch(status) {
-            case 'approved': return <span className="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-green-200 flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> Approved</span>;
-            case 'restricted': return <span className="bg-red-100 text-red-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-red-200 flex items-center gap-1"><Lock className="w-3 h-3" /> Restricted</span>;
-            default: return <span className="bg-slate-100 text-slate-600 text-[10px] font-bold px-2 py-0.5 rounded-full border border-slate-200 flex items-center gap-1"><Clock className="w-3 h-3" /> Draft</span>;
-        }
+    const getStatusBadge = () => {
+        // Show lifecycle status if not ready
+        if (item.status === 'processing') return <span className="bg-purple-100 text-purple-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-purple-200 flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> Processing</span>;
+        if (item.status === 'uploading') return <span className="bg-blue-100 text-blue-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-blue-200 flex items-center gap-1"><UploadCloud className="w-3 h-3 animate-bounce" /> Uploading</span>;
+        if (item.status === 'failed') return <span className="bg-red-100 text-red-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-red-200 flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> Failed</span>;
+
+        // If ready, show approval status
+        if (item.automationApproved) return <span className="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-green-200 flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> Approved</span>;
+        return <span className="bg-slate-100 text-slate-600 text-[10px] font-bold px-2 py-0.5 rounded-full border border-slate-200 flex items-center gap-1"><Lock className="w-3 h-3" /> Restricted</span>;
     };
 
     return (
@@ -535,10 +535,19 @@ const GridItem: React.FC<{
                 group relative bg-white border border-slate-200 rounded-2xl overflow-hidden cursor-pointer hover:shadow-lg transition-all duration-200
                 ${selected ? 'ring-2 ring-blue-500 border-transparent shadow-md' : 'hover:border-blue-300'}
                 ${viewMode === 'list' ? 'flex items-center h-20 p-2 gap-4' : 'aspect-square'}
+                ${isProcessing ? 'opacity-80 cursor-progress' : ''}
             `}
         >
             {/* Visual Content */}
             <div className={`relative bg-gray-50 flex items-center justify-center ${viewMode === 'list' ? 'w-16 h-16 rounded-lg overflow-hidden shrink-0' : 'w-full h-full'}`}>
+                {/* Processing Overlay */}
+                {isProcessing && (
+                    <div className="absolute inset-0 bg-white/60 backdrop-blur-sm z-20 flex flex-col items-center justify-center text-purple-600">
+                        <Loader2 className="w-8 h-8 animate-spin" />
+                        {viewMode === 'grid' && <span className="text-[10px] font-bold mt-2 uppercase tracking-wider">Processing...</span>}
+                    </div>
+                )}
+
                 {item.type === 'image' ? (
                     <img src={item.url} className="w-full h-full object-cover" alt={item.name} />
                 ) : (
@@ -552,7 +561,7 @@ const GridItem: React.FC<{
                             playsInline
                             preload="metadata"
                         />
-                        {!isPlaying && viewMode === 'grid' && (
+                        {!isPlaying && !isProcessing && viewMode === 'grid' && (
                             <div className="absolute inset-0 flex items-center justify-center bg-black/10">
                                 <div className="w-10 h-10 bg-black/40 backdrop-blur-sm rounded-full flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
                                     <Play className="w-5 h-5 text-white ml-0.5" fill="currentColor" />
@@ -560,7 +569,7 @@ const GridItem: React.FC<{
                             </div>
                         )}
                         {/* Video Badge */}
-                        {viewMode === 'grid' && (
+                        {viewMode === 'grid' && !isProcessing && (
                             <div className="absolute bottom-2 left-2 bg-black/60 text-white text-[10px] font-bold px-1.5 py-0.5 rounded backdrop-blur-md flex items-center gap-1">
                                 <FileVideo className="w-3 h-3" />
                                 <span>{item.duration || '0:15'}</span>
@@ -570,7 +579,7 @@ const GridItem: React.FC<{
                 )}
                 
                 {/* Overlay Gradient (Grid Only) */}
-                {viewMode === 'grid' && (
+                {viewMode === 'grid' && !isProcessing && (
                     <div className="absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity p-2 flex justify-end">
                         <button 
                             onClick={(e) => { e.stopPropagation(); }} 
@@ -588,8 +597,8 @@ const GridItem: React.FC<{
                     <div>
                         <h4 className="font-bold text-slate-900 text-sm truncate max-w-[200px]">{item.name}</h4>
                         <div className="flex items-center gap-2 mt-1">
-                            {getStatusBadge(item.status)}
-                            <span className="text-xs text-slate-400">• {item.dimensions}</span>
+                            {getStatusBadge()}
+                            {item.status === 'ready' && <span className="text-xs text-slate-400">• {item.dimensions}</span>}
                             {item.type === 'video' && <span className="text-xs text-slate-400">• {item.duration}</span>}
                         </div>
                     </div>
@@ -610,10 +619,8 @@ const GridItem: React.FC<{
 
             {/* Status Badges (Grid View) */}
             {viewMode === 'grid' && (
-                <div className="absolute top-2 left-2 flex gap-1">
-                    {item.status === 'approved' && <div className="bg-green-500 w-2.5 h-2.5 rounded-full ring-2 ring-white shadow-sm" title="Approved"></div>}
-                    {item.status === 'restricted' && <div className="bg-red-500 w-2.5 h-2.5 rounded-full ring-2 ring-white shadow-sm" title="Restricted"></div>}
-                    {item.automationApproved && <div className="bg-blue-500 w-2.5 h-2.5 rounded-full ring-2 ring-white shadow-sm" title="Auto-Post Enabled"></div>}
+                <div className="absolute top-2 left-2 flex gap-1 z-10">
+                    {getStatusBadge()}
                 </div>
             )}
         </div>

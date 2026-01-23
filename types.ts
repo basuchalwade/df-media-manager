@@ -261,6 +261,8 @@ export interface User {
   };
 }
 
+export type MediaStatus = 'uploading' | 'processing' | 'ready' | 'failed';
+
 export interface MediaItem {
   id: string;
   name: string;
@@ -268,6 +270,7 @@ export interface MediaItem {
   url: string;
   size: number;
   createdAt: string;
+  status: MediaStatus;
   dimensions?: string;
 }
 

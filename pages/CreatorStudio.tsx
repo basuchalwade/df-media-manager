@@ -131,14 +131,16 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
                  type: post.mediaType || 'image', 
                  url: post.mediaUrl, 
                  size: 0, 
-                 createdAt: '' 
+                 createdAt: '',
+                 status: 'ready'
                });
             } else {
                setSelectedMedia(null);
             }
             if (post.thumbnailUrl) {
                setYoutubeThumbnail({
-                  id: 'loaded-thumb', name: 'Thumbnail', type: 'image', url: post.thumbnailUrl, size: 0, createdAt: ''
+                  id: 'loaded-thumb', name: 'Thumbnail', type: 'image', url: post.thumbnailUrl, size: 0, createdAt: '',
+                  status: 'ready'
                });
             }
 
