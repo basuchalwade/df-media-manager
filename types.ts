@@ -45,6 +45,99 @@ export interface BotActivity {
   finishedAt?: string;
 }
 
+// --- Bot Specific Rules ---
+
+export interface FinderBotRules {
+  keywordSources: string[];
+  languages: string[];
+  safeSourcesOnly: boolean;
+  minRelevanceScore?: number;
+}
+
+export interface GrowthBotRules {
+  followRatePerHour: number;
+  unfollowAfterDays: number;
+  interestTags: string[];
+  ignorePrivateAccounts: boolean;
+}
+
+export interface EngagementBotRules {
+  replyTone: "formal" | "casual" | "witty" | "empathetic";
+  emojiLevel: number; // 0-100
+  maxRepliesPerHour: number;
+  skipNegativeSentiment: boolean;
+}
+
+export interface CreatorBotRules {
+  personality: {
+    proactiveness: number;
+    tone: number;
+    verbosity: number;
+  };
+  topicBlocks: string[];
+  riskLevel: "low" | "medium" | "high";
+  preferVideo?: boolean;
+}
+
+export type BotRules = FinderBotRules | GrowthBotRules | EngagementBotRules | CreatorBotRules;
+
+// --- Orchestration & Policy Types (Phase 6) ---
+
+export interface GlobalPolicyConfig {
+  emergencyStop: boolean;
+  quietHours: {
+    enabled: boolean;
+    startTime: string; // HH:MM (24h format)
+    endTime: string;   // HH:MM (24h format)
+    timezone: string;
+  };
+  platformLimits: {
+    [key in Platform]?: {
+      [key in ActionType]?: number;
+    };
+  };
+}
+
+export interface PolicyCheckResult {
+  allowed: boolean;
+  reason?: string;
+  type: 'POLICY' | 'CONFLICT' | 'PRIORITY' | 'OK';
+}
+
+export interface BotActionRequest {
+  botType: BotType;
+  platform: Platform;
+  actionType: ActionType;
+  targetId?: string; // Optional target identifier (user ID, post ID)
+  timestamp: string;
+}
+
+export interface OrchestrationLogEntry {
+  id: string;
+  timestamp: string;
+  botType: BotType;
+  actionType: ActionType;
+  platform: Platform;
+  status: 'APPROVED' | 'BLOCKED' | 'DEFERRED';
+  reason: string;
+}
+
+// --- Phase 7: Live Telemetry ---
+
+export interface BotExecutionEvent {
+  id: string;
+  botId: string; // Usually mapped to BotType
+  botType: BotType;
+  timestamp: number;
+  platform: Platform;
+  action: ActionType;
+  status: 'executed' | 'skipped' | 'blocked';
+  assetId?: string;
+  assetName?: string;
+  reason?: string;
+  riskLevel: 'low' | 'medium' | 'high';
+}
+
 // --- Simulation Types ---
 
 export interface AssetDecision {
@@ -146,6 +239,7 @@ export interface CalendarConfig {
 }
 
 export interface BotSpecificConfig {
+  // Legacy fields kept for backward compatibility during migration
   contentTopics?: string[];
   targetPlatforms?: Platform[];
   generationMode?: 'AI' | 'Drafts';
@@ -170,6 +264,9 @@ export interface BotSpecificConfig {
   stopOnConsecutiveErrors?: number;
   aiStrategy?: AIStrategyConfig;
   calendarConfig?: CalendarConfig;
+  
+  // New Typed Rules Container
+  rules?: BotRules; 
 }
 
 export type BotStatus = 'Idle' | 'Running' | 'Cooldown' | 'LimitReached' | 'Error';
@@ -256,6 +353,10 @@ export interface PlatformAnalytics {
     impressionsGrowth: number;
     engagementRate: number;
     engagementGrowth: number;
+    globalPolicyStatus?: {
+        limitReached: boolean;
+        actionsRemaining: number;
+    }
   };
   history: AnalyticsDataPoint[];
 }
@@ -301,7 +402,8 @@ export type AuditAction =
   | 'AI_FLAGGED'
   | 'AI_CLEARED'
   | 'VARIANT_GENERATED'
-  | 'VARIANT_DELETED';
+  | 'VARIANT_DELETED'
+  | 'ENHANCEMENT_APPLIED';
 
 export interface MediaAuditEvent {
   id: string;
@@ -341,6 +443,28 @@ export interface PlatformCompatibility {
   issues: string[];
 }
 
+export type EnhancementType =
+  | 'auto_brightness'
+  | 'auto_contrast'
+  | 'smart_crop'
+  | 'face_focus'
+  | 'text_safe_margin'
+  | 'brand_overlay';
+
+export interface PostPerformance {
+  id: string;
+  postId: string;
+  mediaId: string;
+  variantId?: string;
+  platform: string; 
+  impressions: number;
+  clicks: number;
+  likes: number;
+  comments: number;
+  engagementRate: number;
+  collectedAt: string;
+}
+
 export interface MediaVariant {
   id: string;
   parentId: string;
@@ -352,6 +476,10 @@ export interface MediaVariant {
   createdAt: string;
   generatedBy: 'ai' | 'user';
   status: 'ready' | 'failed';
+  enhancementType?: EnhancementType;
+  enhancementScore?: number;
+  performanceScore?: number;
+  performanceTrend?: 'up' | 'down' | 'stable';
 }
 
 export interface MediaItem {
@@ -385,6 +513,10 @@ export interface MediaItem {
   
   // Platform Specific Variants
   variants?: MediaVariant[];
+
+  // Performance Optimization
+  performanceScore?: number;
+  performanceTrend?: 'up' | 'down' | 'stable';
 }
 
 export interface PageProps {

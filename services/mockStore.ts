@@ -1,9 +1,18 @@
 
-import { BotConfig, BotType, DashboardStats, Platform, Post, PostStatus, UserSettings, PlatformAnalytics, User, UserRole, UserStatus, MediaItem, BotActivity, ActivityStatus, ActionType, MediaMetadata, SimulationReport, SimulationCycle, AssetDecision, MediaAuditEvent, MediaVariant } from '../types';
+import { BotConfig, BotType, DashboardStats, Platform, Post, PostStatus, UserSettings, PlatformAnalytics, User, UserRole, UserStatus, MediaItem, BotActivity, ActivityStatus, ActionType, MediaMetadata, SimulationReport, SimulationCycle, AssetDecision, MediaAuditEvent, MediaVariant, EnhancementType, PostPerformance, FinderBotRules, GrowthBotRules, EngagementBotRules, CreatorBotRules, GlobalPolicyConfig, BotActionRequest, OrchestrationLogEntry, BotExecutionEvent } from '../types';
 import { api } from './api';
 import { logAudit } from './auditStore';
 import { evaluateCompatibility } from './platformCompatibility';
 import { generateVariant } from './mediaVariantService';
+import { applyEnhancement } from './enhancementEngine';
+import { logPerformance, getPerformanceForMedia } from './performanceStore';
+import { calculateCreativeScore } from './performanceScoring';
+import { detectFatigue } from './fatigueDetection';
+import { RuleEngine } from './ruleEngine';
+import { OrchestrationPolicy } from './orchestrationPolicy';
+import { BotCoordinator } from './botCoordinator';
+import { logOrchestrationEvent, getOrchestrationLogs } from './orchestrationLogs';
+import { emitExecutionEvent } from './executionTelemetry';
 
 // --- MOCK DATA CONSTANTS ---
 
@@ -26,7 +35,12 @@ const DEFAULT_BOTS: BotConfig[] = [
         brandVoice: 'Professional',
         keywordsToInclude: ['Innovation', 'Growth'],
         topicsToAvoid: ['Politics', 'Religion']
-      }
+      },
+      rules: {
+        personality: { proactiveness: 50, tone: 30, verbosity: 50 },
+        topicBlocks: ['Politics', 'NSFW', 'Competitors'],
+        riskLevel: 'medium'
+      } as CreatorBotRules
     },
     stats: { currentDailyActions: 0, maxDailyActions: 10, consecutiveErrors: 0 }
   },
@@ -44,7 +58,13 @@ const DEFAULT_BOTS: BotConfig[] = [
       workHoursStart: '08:00',
       workHoursEnd: '20:00',
       minDelaySeconds: 60,
-      maxDelaySeconds: 300
+      maxDelaySeconds: 300,
+      rules: {
+        replyTone: 'casual',
+        emojiLevel: 40,
+        maxRepliesPerHour: 10,
+        skipNegativeSentiment: true
+      } as EngagementBotRules
     },
     stats: { currentDailyActions: 0, maxDailyActions: 50, consecutiveErrors: 0 }
   },
@@ -60,7 +80,13 @@ const DEFAULT_BOTS: BotConfig[] = [
       autoSaveToDrafts: true,
       safetyLevel: 'Conservative',
       workHoursStart: '00:00',
-      workHoursEnd: '23:59'
+      workHoursEnd: '23:59',
+      rules: {
+        keywordSources: ['Twitter Trends', 'LinkedIn News'],
+        languages: ['English'],
+        safeSourcesOnly: true,
+        minRelevanceScore: 70
+      } as FinderBotRules
     },
     stats: { currentDailyActions: 0, maxDailyActions: 100, consecutiveErrors: 0 }
   },
@@ -76,7 +102,13 @@ const DEFAULT_BOTS: BotConfig[] = [
       unfollowAfterDays: 7,
       safetyLevel: 'Conservative',
       workHoursStart: '10:00',
-      workHoursEnd: '18:00'
+      workHoursEnd: '18:00',
+      rules: {
+        followRatePerHour: 5,
+        unfollowAfterDays: 7,
+        interestTags: ['#Tech', '#SaaS'],
+        ignorePrivateAccounts: true
+      } as GrowthBotRules
     },
     stats: { currentDailyActions: 0, maxDailyActions: 25, consecutiveErrors: 0 }
   }
@@ -115,7 +147,9 @@ const RAW_MEDIA: MediaItem[] = [
     processingStatus: 'ready',
     governance: { status: 'approved', approvedBy: 'Admin', approvedAt: new Date().toISOString() },
     aiMetadata: { generated: false, disclosureRequired: false },
-    variants: []
+    variants: [],
+    performanceScore: 85,
+    performanceTrend: 'up'
   },
   {
     id: 'm2',
@@ -132,7 +166,9 @@ const RAW_MEDIA: MediaItem[] = [
     processingStatus: 'ready',
     governance: { status: 'approved', approvedBy: 'Admin', approvedAt: new Date().toISOString() },
     aiMetadata: { generated: false, disclosureRequired: false },
-    variants: []
+    variants: [],
+    performanceScore: 60,
+    performanceTrend: 'stable'
   },
   {
     id: 'm3',
@@ -144,12 +180,14 @@ const RAW_MEDIA: MediaItem[] = [
     dimensions: '1200x800',
     metadata: { width: 1200, height: 800, duration: 0, sizeMB: 1.8, format: 'image/jpeg', aspectRatio: 1.5 },
     usageCount: 0,
-    tags: ['ai', 'concept'],
+    tags: ['ai', 'concept', 'NSFW'], // Adding NSFW to test blocking rules
     collections: [],
     processingStatus: 'ready',
     governance: { status: 'pending' },
     aiMetadata: { generated: true, tool: 'Midjourney', disclosureRequired: true },
-    variants: []
+    variants: [],
+    performanceScore: 0,
+    performanceTrend: 'stable'
   }
 ];
 
@@ -159,8 +197,7 @@ const INITIAL_MEDIA = RAW_MEDIA.map(m => ({
     platformCompatibility: evaluateCompatibility(m)
 }));
 
-// --- Helper: Asset Processing Simulation ---
-
+// ... (Thumbnail and Metadata helpers remain unchanged) ...
 // Generates a thumbnail Data URL for videos (poster frame) or images (resized)
 const generateThumbnail = async (file: File): Promise<string> => {
   return new Promise((resolve) => {
@@ -250,6 +287,27 @@ const extractMetadata = (file: File, url: string): Promise<MediaMetadata> => {
   });
 };
 
+const generateMockMetrics = (postId: string, mediaId: string, platform: string): PostPerformance => {
+    const impressions = Math.floor(Math.random() * 49000) + 1000;
+    const clicks = Math.floor(Math.random() * impressions * 0.04);
+    const likes = Math.floor(Math.random() * impressions * 0.08);
+    const comments = Math.floor(Math.random() * impressions * 0.02);
+    const engagementRate = (likes + comments + clicks) / impressions;
+
+    return {
+        id: `perf-${Date.now()}`,
+        postId,
+        mediaId,
+        platform,
+        impressions,
+        clicks,
+        likes,
+        comments,
+        engagementRate,
+        collectedAt: new Date().toISOString()
+    };
+}
+
 // Hybrid Store Implementation
 class HybridStore {
   private posts: Post[] = [];
@@ -258,6 +316,31 @@ class HybridStore {
   private users: User[] = [];
   private media: MediaItem[] = [];
   private activities: Record<string, BotActivity[]> = {};
+  
+  // Phase 6: Orchestration State
+  private globalPolicy: GlobalPolicyConfig = {
+      emergencyStop: false,
+      quietHours: { enabled: true, startTime: '22:00', endTime: '06:00', timezone: 'UTC' },
+      platformLimits: {
+          [Platform.Twitter]: { [ActionType.POST]: 50, [ActionType.LIKE]: 100, [ActionType.FOLLOW]: 20 },
+          [Platform.LinkedIn]: { [ActionType.POST]: 10, [ActionType.LIKE]: 50 },
+          [Platform.Instagram]: { [ActionType.POST]: 15, [ActionType.LIKE]: 100 },
+      }
+  };
+  private dailyGlobalActions: Record<Platform, Record<ActionType, number>> = {
+      [Platform.Twitter]: { [ActionType.POST]: 0, [ActionType.LIKE]: 0, [ActionType.REPLY]: 0, [ActionType.FOLLOW]: 0, [ActionType.UNFOLLOW]: 0, [ActionType.ANALYZE]: 0 },
+      [Platform.LinkedIn]: { [ActionType.POST]: 0, [ActionType.LIKE]: 0, [ActionType.REPLY]: 0, [ActionType.FOLLOW]: 0, [ActionType.UNFOLLOW]: 0, [ActionType.ANALYZE]: 0 },
+      [Platform.Instagram]: { [ActionType.POST]: 0, [ActionType.LIKE]: 0, [ActionType.REPLY]: 0, [ActionType.FOLLOW]: 0, [ActionType.UNFOLLOW]: 0, [ActionType.ANALYZE]: 0 },
+      [Platform.Facebook]: { [ActionType.POST]: 0, [ActionType.LIKE]: 0, [ActionType.REPLY]: 0, [ActionType.FOLLOW]: 0, [ActionType.UNFOLLOW]: 0, [ActionType.ANALYZE]: 0 },
+      [Platform.YouTube]: { [ActionType.POST]: 0, [ActionType.LIKE]: 0, [ActionType.REPLY]: 0, [ActionType.FOLLOW]: 0, [ActionType.UNFOLLOW]: 0, [ActionType.ANALYZE]: 0 },
+      [Platform.GoogleBusiness]: { [ActionType.POST]: 0, [ActionType.LIKE]: 0, [ActionType.REPLY]: 0, [ActionType.FOLLOW]: 0, [ActionType.UNFOLLOW]: 0, [ActionType.ANALYZE]: 0 },
+      [Platform.Threads]: { [ActionType.POST]: 0, [ActionType.LIKE]: 0, [ActionType.REPLY]: 0, [ActionType.FOLLOW]: 0, [ActionType.UNFOLLOW]: 0, [ActionType.ANALYZE]: 0 },
+  };
+  private actionHistory: BotActionRequest[] = []; // Simple in-memory history for conflict check
+  
+  // Phase 7: Live Execution State
+  private botTimers: Map<string, NodeJS.Timeout> = new Map();
+  private dayRolloverTimer: NodeJS.Timeout | null = null;
 
   constructor() {
     // Initialize Mock Data
@@ -292,8 +375,13 @@ class HybridStore {
 
     const savedMedia = localStorage.getItem('postmaster_media');
     this.media = savedMedia ? JSON.parse(savedMedia) : INITIAL_MEDIA;
+
+    if (this.isSimulation) {
+      this.startAutomation();
+    }
   }
 
+  // ... (existing private/helper methods) ...
   private get isSimulation(): boolean {
     return this.settings.demoMode;
   }
@@ -308,6 +396,234 @@ class HybridStore {
       }
   }
 
+  // --- Phase 6: Orchestration Methods ---
+  
+  getGlobalPolicy(): GlobalPolicyConfig {
+      return this.globalPolicy;
+  }
+
+  updateGlobalPolicy(config: Partial<GlobalPolicyConfig>) {
+      this.globalPolicy = { ...this.globalPolicy, ...config };
+      
+      // Phase 7: Emergency Stop Logic
+      if (this.globalPolicy.emergencyStop) {
+          this.stopAutomation();
+      } else if (config.emergencyStop === false) {
+          // Restart automation if emergency stop is cleared
+          this.startAutomation();
+      }
+  }
+
+  getDailyGlobalActions() {
+      return this.dailyGlobalActions;
+  }
+
+  // Central Orchestration Check
+  checkGlobalPermissions(botType: BotType, platform: Platform, actionType: ActionType, targetId?: string): { allowed: boolean, reason?: string } {
+      const req: BotActionRequest = {
+          botType,
+          platform,
+          actionType,
+          targetId,
+          timestamp: new Date().toISOString()
+      };
+
+      // 1. Policy Check
+      const policyResult = OrchestrationPolicy.checkGlobalPolicy(this.globalPolicy, this.dailyGlobalActions, req);
+      if (!policyResult.allowed) {
+          logOrchestrationEvent({ ...req, status: 'BLOCKED', reason: policyResult.reason || 'Blocked by Policy' });
+          return { allowed: false, reason: policyResult.reason };
+      }
+
+      // 2. Conflict Check
+      const conflictResult = BotCoordinator.checkConflicts(this.actionHistory, req);
+      if (!conflictResult.allowed) {
+          logOrchestrationEvent({ ...req, status: 'DEFERRED', reason: conflictResult.reason || 'Deferred by Conflict' });
+          return { allowed: false, reason: conflictResult.reason };
+      }
+
+      // 3. Approved
+      logOrchestrationEvent({ ...req, status: 'APPROVED', reason: 'Passed all checks' });
+      return { allowed: true };
+  }
+
+  // Call this after action execution to update counters
+  incrementGlobalUsage(platform: Platform, actionType: ActionType, botType: BotType, targetId?: string) {
+      if (!this.dailyGlobalActions[platform]) this.dailyGlobalActions[platform] = { [ActionType.POST]: 0, [ActionType.LIKE]: 0, [ActionType.REPLY]: 0, [ActionType.FOLLOW]: 0, [ActionType.UNFOLLOW]: 0, [ActionType.ANALYZE]: 0 };
+      
+      this.dailyGlobalActions[platform][actionType] = (this.dailyGlobalActions[platform][actionType] || 0) + 1;
+      
+      this.actionHistory.push({
+          botType,
+          platform,
+          actionType,
+          targetId,
+          timestamp: new Date().toISOString()
+      });
+      // Keep history manageable
+      if (this.actionHistory.length > 500) this.actionHistory.shift();
+  }
+
+  // --- Phase 7: Live Execution Logic ---
+
+  private startAutomation() {
+    console.log("[MockStore] Starting automation loop...");
+    // Start bot loops
+    this.bots.forEach(bot => {
+      if (bot.enabled && !this.globalPolicy.emergencyStop) {
+        this.startBotExecution(bot.type);
+      }
+    });
+
+    // Start Day Rollover Timer (every 5 minutes for demo)
+    if (!this.dayRolloverTimer) {
+        this.dayRolloverTimer = setInterval(() => {
+            console.log("[MockStore] Day Rollover - Resetting quotas.");
+            this.resetDailyQuotas();
+        }, 5 * 60 * 1000); 
+    }
+  }
+
+  private stopAutomation() {
+    console.log("[MockStore] Stopping automation loop...");
+    this.bots.forEach(bot => this.stopBotExecution(bot.type));
+    if (this.dayRolloverTimer) {
+        clearInterval(this.dayRolloverTimer);
+        this.dayRolloverTimer = null;
+    }
+  }
+
+  private resetDailyQuotas() {
+      Object.keys(this.dailyGlobalActions).forEach(p => {
+          Object.keys(this.dailyGlobalActions[p as Platform]!).forEach(a => {
+              this.dailyGlobalActions[p as Platform]![a as ActionType] = 0;
+          });
+      });
+  }
+
+  private startBotExecution(botType: BotType) {
+      if (this.botTimers.has(botType)) return; // Already running
+
+      const bot = this.bots.find(b => b.type === botType);
+      if (!bot) return;
+
+      // Random interval between 10s and 30s to simulate organic behavior
+      const intervalMs = Math.floor(Math.random() * 20000) + 10000;
+
+      const timer = setInterval(() => {
+          this.executeBotCycle(botType);
+      }, intervalMs);
+
+      this.botTimers.set(botType, timer);
+  }
+
+  private stopBotExecution(botType: BotType) {
+      const timer = this.botTimers.get(botType);
+      if (timer) {
+          clearInterval(timer);
+          this.botTimers.delete(botType);
+      }
+  }
+
+  private async executeBotCycle(botType: BotType) {
+      // 1. Safety Check (Redundant but safe)
+      if (this.globalPolicy.emergencyStop) return;
+
+      const bot = this.bots.find(b => b.type === botType);
+      if (!bot || !bot.enabled) return;
+
+      // 2. Determine Probable Action
+      let actionType = ActionType.ANALYZE;
+      let platform = Platform.Twitter;
+      
+      switch(botType) {
+          case BotType.Creator: 
+              actionType = ActionType.POST; 
+              platform = bot.config.targetPlatforms?.[0] || Platform.Twitter;
+              break;
+          case BotType.Engagement: 
+              actionType = Math.random() > 0.5 ? ActionType.LIKE : ActionType.REPLY; 
+              break;
+          case BotType.Growth: 
+              actionType = ActionType.FOLLOW; 
+              break;
+          case BotType.Finder: 
+              actionType = ActionType.ANALYZE; 
+              break;
+      }
+
+      // 3. Asset Selection (if applicable)
+      let selectedAsset: MediaItem | null = null;
+      if (botType === BotType.Creator) {
+          const selection = this.selectAssetForBot(bot, new Date());
+          if (selection.selected) {
+              selectedAsset = selection.selected;
+          } else {
+              // Emit Skip Event
+              const reason = selection.trace.find(t => t.status === 'rejected')?.reason || 'No eligible assets';
+              emitExecutionEvent({
+                  id: `exec-${Date.now()}`,
+                  botId: botType,
+                  botType: botType,
+                  timestamp: Date.now(),
+                  platform,
+                  action: actionType,
+                  status: 'skipped',
+                  reason: reason,
+                  riskLevel: 'low'
+              });
+              return;
+          }
+      }
+
+      // 4. Global Policy Check
+      const check = this.checkGlobalPermissions(botType, platform, actionType, selectedAsset?.id || 'sim-target');
+      
+      if (!check.allowed) {
+          emitExecutionEvent({
+              id: `exec-${Date.now()}`,
+              botId: botType,
+              botType: botType,
+              timestamp: Date.now(),
+              platform,
+              action: actionType,
+              status: 'blocked',
+              assetId: selectedAsset?.id,
+              assetName: selectedAsset?.name,
+              reason: check.reason,
+              riskLevel: 'medium'
+          });
+          return;
+      }
+
+      // 5. Execute Action (Simulation)
+      // For Creator bot, we don't actually create a post record here to avoid cluttering the feed endlessly, 
+      // but we simulate the "Action" taking place.
+      
+      // Update Asset Last Used
+      if (selectedAsset) {
+          selectedAsset.lastUsedAt = new Date().toISOString();
+          selectedAsset.usageCount = (selectedAsset.usageCount || 0) + 1;
+      }
+
+      // Update Daily Quota
+      this.incrementGlobalUsage(platform, actionType, botType, selectedAsset?.id);
+
+      // 6. Emit Success Event
+      emitExecutionEvent({
+          id: `exec-${Date.now()}`,
+          botId: botType,
+          botType: botType,
+          timestamp: Date.now(),
+          platform,
+          action: actionType,
+          status: 'executed',
+          assetId: selectedAsset?.id,
+          assetName: selectedAsset?.name,
+          riskLevel: botType === BotType.Growth ? 'medium' : 'low'
+      });
+  }
+
   // --- Core Asset Selection Logic (Shared) ---
   // This function is deterministic and used by both live bot (via worker shim) and simulation engine
   private selectAssetForBot(
@@ -316,8 +632,17 @@ class HybridStore {
     usageHistoryOverride?: Record<string, string> // Map of assetId -> ISO date string
   ): { selected: MediaItem | null, trace: AssetDecision[] } {
       
+      // Phase 6: Inject Global Policy Check into selection logic (Early abort)
+      const policyCheck = this.checkGlobalPermissions(bot.type, Platform.Twitter, ActionType.POST); // Assume generic POST for selection
+      if (!policyCheck.allowed) {
+          return { selected: null, trace: [{ assetId: 'GLOBAL', assetName: 'Orchestrator', status: 'rejected', reason: policyCheck.reason }] };
+      }
+
       const trace: AssetDecision[] = [];
-      const candidates = this.media; // In real app, might filter by collection ID here
+      
+      // 1. RULES FILTERING (NEW PHASE 5B Integration)
+      // Apply strict rules *before* performance scoring
+      const candidates = RuleEngine.filterAssetsByRules(this.media, bot);
       
       const eligibleAssets = candidates.filter(asset => {
           let decision: AssetDecision = { 
@@ -327,19 +652,17 @@ class HybridStore {
               score: 0 
           };
 
-          // 1. Governance Check (New)
+          // 2. Governance Check
           if (asset.governance.status !== 'approved') {
               decision.reason = `Governance Status is '${asset.governance.status}' (Must be approved)`;
               trace.push(decision);
               return false;
           }
 
-          // 2. Cooldown Check (Virtual Time Aware)
-          // Use override history if provided (for simulation), else real asset state
+          // 3. Cooldown Check
           const lastUsedIso = usageHistoryOverride?.[asset.id] || asset.lastUsedAt;
           if (lastUsedIso) {
               const lastUsedDate = new Date(lastUsedIso);
-              // Default 3 day cooldown if not configured
               const cooldownDays = 3; 
               const cooldownMs = cooldownDays * 24 * 60 * 60 * 1000;
               const diff = virtualTime.getTime() - lastUsedDate.getTime();
@@ -352,16 +675,32 @@ class HybridStore {
               }
           }
 
+          // 4. Fatigue Check
+          const perfEvents = getPerformanceForMedia(asset.id);
+          const { isFatigued, reason } = detectFatigue(asset, perfEvents);
+          
+          if (isFatigued) {
+             decision.status = 'rejected';
+             decision.reason = `Fatigue: ${reason}`;
+             trace.push(decision);
+             return false;
+          }
+
+          // 5. Scoring
+          const perfScore = asset.performanceScore !== undefined ? asset.performanceScore : 50;
+          decision.score = perfScore;
           decision.status = 'accepted';
-          decision.score = 100; // Base score, could add weighted logic here
           trace.push(decision);
           return true;
       });
 
-      // Simple selection strategy: Round Robin / Random for now
-      // In a real implementation, we'd sort by performance score or 'least recently used'
-      const selected = eligibleAssets.length > 0 
-          ? eligibleAssets[Math.floor(Math.random() * eligibleAssets.length)] 
+      // Sort by score descending (Performance-based selection)
+      eligibleAssets.sort((a, b) => (b.performanceScore || 50) - (a.performanceScore || 50));
+
+      // Select top candidate
+      const topCandidates = eligibleAssets.slice(0, 3);
+      const selected = topCandidates.length > 0 
+          ? topCandidates[Math.floor(Math.random() * topCandidates.length)] 
           : null;
 
       return { selected, trace };
@@ -369,7 +708,7 @@ class HybridStore {
 
   // --- Forecast Engine ---
   async runBotForecast(botType: BotType, mode: 'single' | 'day' | 'stress'): Promise<SimulationReport> {
-      // ... (existing implementation)
+      // Stub implementation for compilation - logic is mostly in BotManager UI simulation logic for now
       return { timeline: [], risks: [], summary: { totalCycles: 0, successful: 0, skipped: 0 } };
   }
 
@@ -389,6 +728,16 @@ class HybridStore {
 
   async addPost(post: Post): Promise<Post> {
     if (!this.isSimulation) return api.addPost(post);
+    
+    // Check Global Policy before allowing post creation if it's immediate
+    if (post.status === PostStatus.Published) {
+        const check = this.checkGlobalPermissions(BotType.Creator, post.platforms[0] || Platform.Twitter, ActionType.POST);
+        if (!check.allowed) {
+            throw new Error(check.reason);
+        }
+        this.incrementGlobalUsage(post.platforms[0] || Platform.Twitter, ActionType.POST, BotType.Creator);
+    }
+
     this.posts = [post, ...this.posts];
     
     // If post uses media, update its lastUsedAt in real store
@@ -397,6 +746,13 @@ class HybridStore {
         if (media) {
             media.lastUsedAt = new Date().toISOString();
             media.usageCount = (media.usageCount || 0) + 1;
+            
+            // Generate Mock Performance Data Immediately for Demo
+            if (post.mediaId) {
+                const perf = generateMockMetrics(post.id, post.mediaId, post.platforms[0] || 'Twitter');
+                logPerformance(perf);
+                this.updateMediaScore(post.mediaId);
+            }
         }
     }
     
@@ -406,9 +762,40 @@ class HybridStore {
 
   async updatePost(post: Post): Promise<Post> {
     if (!this.isSimulation) return api.updatePost(post);
+    
+    // Detect publish event for performance simulation
+    const oldPost = this.posts.find(p => p.id === post.id);
+    if (oldPost && oldPost.status !== 'Published' && post.status === 'Published') {
+        // Orchestration Check
+        const check = this.checkGlobalPermissions(BotType.Creator, post.platforms[0] || Platform.Twitter, ActionType.POST);
+        if (!check.allowed) {
+            throw new Error(`Orchestration Block: ${check.reason}`);
+        }
+        this.incrementGlobalUsage(post.platforms[0] || Platform.Twitter, ActionType.POST, BotType.Creator);
+
+        if (post.mediaId) {
+            const perf = generateMockMetrics(post.id, post.mediaId, post.platforms[0] || 'Twitter');
+            logPerformance(perf);
+            this.updateMediaScore(post.mediaId);
+        }
+    }
+
     this.posts = this.posts.map(p => p.id === post.id ? post : p);
     this.saveState();
     return post;
+  }
+
+  private updateMediaScore(mediaId: string) {
+      const events = getPerformanceForMedia(mediaId);
+      const { score, trend } = calculateCreativeScore(events);
+      
+      this.media = this.media.map(m => {
+          if (m.id === mediaId) {
+              return { ...m, performanceScore: score, performanceTrend: trend };
+          }
+          return m;
+      });
+      this.saveState();
   }
 
   async deletePost(id: string): Promise<void> {
@@ -449,6 +836,14 @@ class HybridStore {
      }
      
      this.bots = this.bots.map(b => b.type === type ? { ...b, enabled: !b.enabled, status: !b.enabled ? 'Running' : 'Idle' } : b);
+     
+     // Trigger start/stop execution based on new state
+     const updatedBot = this.bots.find(b => b.type === type);
+     if (updatedBot) {
+         if (updatedBot.enabled) this.startBotExecution(type);
+         else this.stopBotExecution(type);
+     }
+
      this.saveState();
      return this.bots;
   }
@@ -469,8 +864,10 @@ class HybridStore {
   }
 
   async simulateBot(type: BotType): Promise<BotActivity[]> {
-      if (!this.isSimulation) return await api.simulateBot(type);
-      return [];
+      // Phase 7: Simulation should just trigger a cycle but also feed telemetry
+      // For the UI 'Run Simulation' button, we want immediate feedback
+      this.executeBotCycle(type);
+      return this.activities[type] || [];
   }
 
   async getBotActivity(type: BotType): Promise<BotActivity[]> {
@@ -570,7 +967,9 @@ class HybridStore {
           // Default Governance State
           governance: { status: 'pending' }, 
           aiMetadata: { generated: false, disclosureRequired: false },
-          variants: []
+          variants: [],
+          performanceScore: 50, // Start neutral
+          performanceTrend: 'stable'
       };
       
       this.media = [newItem, ...this.media];
@@ -715,7 +1114,6 @@ class HybridStore {
       this.media = this.media.map(m => {
           if (m.id === id) {
               const variants = m.variants || [];
-              // Remove old variant for same platform if exists
               const filtered = variants.filter(v => v.platform !== platform);
               return { ...m, variants: [...filtered, variant] };
           }
@@ -731,6 +1129,38 @@ class HybridStore {
           actor: 'AI Optimization Engine',
           timestamp: new Date().toISOString(),
           reason: `Auto-generated for ${platform}`
+      });
+
+      return variant;
+  }
+
+  // --- AI Enhancement Management ---
+  async createEnhancedVariant(id: string, type: EnhancementType): Promise<MediaVariant> {
+      if (!this.isSimulation) return {} as MediaVariant;
+
+      const item = this.media.find(m => m.id === id);
+      if (!item) throw new Error("Media not found");
+
+      const variant = await applyEnhancement(item, type);
+
+      // Store variant
+      this.media = this.media.map(m => {
+          if (m.id === id) {
+              const variants = m.variants || [];
+              return { ...m, variants: [variant, ...variants] };
+          }
+          return m;
+      });
+
+      this.saveState();
+
+      logAudit({
+          id: Date.now().toString() + Math.random(),
+          mediaId: id,
+          action: 'ENHANCEMENT_APPLIED',
+          actor: 'AI Enhancement Engine',
+          timestamp: new Date().toISOString(),
+          reason: `Applied ${type.replace('_', ' ')}`
       });
 
       return variant;

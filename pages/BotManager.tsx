@@ -2,8 +2,11 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Bot, Power, Clock, Zap, Target, TrendingUp, Search, Activity, Pause, Play, ChevronRight, Settings, X, Save, Check, Shield, AlertTriangle, AlertOctagon, Hourglass, FileText, Download, Filter, Calendar, ExternalLink, BrainCircuit, Wand2, Plus, Minus, Info, RefreshCw, MessageCircle, ThumbsUp, UserPlus, Eye, Terminal, HelpCircle, CheckCircle, BarChart3, Lock, Sliders, History, ChevronDown, Hash, Users, Server, RotateCcw, ShieldCheck, PauseCircle, ShieldAlert, Copy, ChevronUp, FastForward, Gauge, Bug, XOctagon, Thermometer, ArrowRight, SlidersHorizontal, Sparkles } from 'lucide-react';
 import { store } from '../services/mockStore';
-import { BotConfig, BotType, Platform, BotSpecificConfig, BotLogEntry, LogLevel, AIStrategyConfig, CalendarConfig, BotActivity, ActivityStatus } from '../types';
+import { BotConfig, BotType, Platform, BotSpecificConfig, BotLogEntry, LogLevel, AIStrategyConfig, CalendarConfig, BotActivity, ActivityStatus, FinderBotRules, GrowthBotRules, EngagementBotRules, CreatorBotRules, ActionType, GlobalPolicyConfig, OrchestrationLogEntry, BotExecutionEvent } from '../types';
 import { PlatformIcon } from '../components/PlatformIcon';
+import { RuleEngine } from '../services/ruleEngine';
+import { getOrchestrationLogs } from '../services/orchestrationLogs';
+import { subscribeToTelemetry, getExecutionEvents } from '../services/executionTelemetry';
 
 // --- Constants ---
 
@@ -114,6 +117,16 @@ const TAB_THEMES: Record<string, {
         ring: 'focus:ring-amber-500',
         sidebarActive: 'text-amber-700 bg-amber-50 border-amber-200'
     },
+    Orchestration: {
+        primary: 'bg-rose-600 hover:bg-rose-700 text-white shadow-rose-200/50',
+        secondary: 'bg-white border-rose-200 text-rose-700 hover:bg-rose-50',
+        accentText: 'text-rose-700',
+        accentBg: 'bg-rose-50',
+        border: 'border-rose-100',
+        icon: 'text-rose-500',
+        ring: 'focus:ring-rose-500',
+        sidebarActive: 'text-rose-700 bg-rose-50 border-rose-200'
+    },
     Simulation: {
         primary: 'bg-purple-600 hover:bg-purple-700 text-white shadow-purple-200/50',
         secondary: 'bg-white border-purple-200 text-purple-700 hover:bg-purple-50',
@@ -126,8 +139,7 @@ const TAB_THEMES: Record<string, {
     }
 };
 
-// --- Helper Functions for Time ---
-
+// ... (Time Parsing Helpers omitted for brevity, unchanged) ...
 const parseTime = (timeStr: string) => {
     // Expects HH:MM (24h)
     if (!timeStr) return { hour: '12', minute: '00', period: 'PM' };
@@ -156,8 +168,7 @@ const getMinutesFromMidnight = (timeStr: string) => {
     return h * 60 + m;
 };
 
-// --- Sub Components ---
-
+// ... (Sub Components: ReadOnlyRow, TimePickerInput - unchanged) ...
 const ReadOnlyRow = ({ label, value, icon: Icon }: any) => (
     <div className="flex justify-between items-center py-3 border-b border-slate-100 last:border-0 group">
         <div className="flex items-center gap-2.5 text-sm text-slate-600 font-medium">
@@ -171,17 +182,7 @@ const ReadOnlyRow = ({ label, value, icon: Icon }: any) => (
     </div>
 );
 
-// --- Time Picker Component ---
-
-interface TimePickerProps {
-    label: string;
-    value: string; // 24h format HH:MM
-    onChange: (newValue: string) => void;
-    hasError?: boolean;
-    theme: typeof TAB_THEMES['Schedule'];
-}
-
-const TimePickerInput: React.FC<TimePickerProps> = ({ label, value, onChange, hasError, theme }) => {
+const TimePickerInput: React.FC<any> = ({ label, value, onChange, hasError, theme }) => {
     const [isOpen, setIsOpen] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
     const { hour, minute, period } = parseTime(value);
@@ -287,6 +288,195 @@ const TimePickerInput: React.FC<TimePickerProps> = ({ label, value, onChange, ha
         </div>
     );
 };
+
+// --- Sub-components for Rule Panels ---
+
+const TagInput = ({ label, tags, onChange }: { label: string, tags: string[], onChange: (tags: string[]) => void }) => {
+    const [input, setInput] = useState('');
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter' && input.trim()) {
+            onChange([...tags, input.trim()]);
+            setInput('');
+        }
+    };
+    const removeTag = (t: string) => onChange(tags.filter(tag => tag !== t));
+
+    return (
+        <div className="space-y-2">
+            <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">{label}</label>
+            <div className="flex flex-wrap gap-2 p-2 border border-slate-200 rounded-xl bg-white min-h-[48px]">
+                {tags.map(tag => (
+                    <span key={tag} className="px-2 py-1 bg-slate-100 text-slate-700 text-xs font-bold rounded-lg flex items-center gap-1">
+                        {tag} <button onClick={() => removeTag(tag)}><X className="w-3 h-3 text-slate-400 hover:text-red-500" /></button>
+                    </span>
+                ))}
+                <input 
+                    className="flex-1 min-w-[80px] outline-none text-sm bg-transparent"
+                    placeholder="Type & Enter..."
+                    value={input}
+                    onChange={e => setInput(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                />
+            </div>
+        </div>
+    );
+};
+
+const FinderRulesPanel = ({ rules, onChange }: { rules: FinderBotRules, onChange: (r: FinderBotRules) => void }) => (
+    <div className="space-y-6 animate-in fade-in">
+        <TagInput 
+            label="Keyword Sources" 
+            tags={rules.keywordSources || []} 
+            onChange={t => onChange({ ...rules, keywordSources: t })} 
+        />
+        <div className="flex items-center justify-between p-4 border border-slate-200 rounded-xl bg-white">
+            <span className="text-sm font-bold text-slate-700">Safe Sources Only</span>
+            <input 
+                type="checkbox" 
+                checked={rules.safeSourcesOnly} 
+                onChange={e => onChange({ ...rules, safeSourcesOnly: e.target.checked })} 
+                className="w-5 h-5 accent-blue-600"
+            />
+        </div>
+        <div className="space-y-2">
+            <label className="text-xs font-bold text-slate-500 uppercase">Min Relevance Score: {rules.minRelevanceScore || 50}%</label>
+            <input 
+                type="range" min="0" max="100" value={rules.minRelevanceScore || 50} 
+                onChange={e => onChange({ ...rules, minRelevanceScore: parseInt(e.target.value) })}
+                className="w-full accent-purple-600"
+            />
+        </div>
+    </div>
+);
+
+const GrowthRulesPanel = ({ rules, onChange }: { rules: GrowthBotRules, onChange: (r: GrowthBotRules) => void }) => (
+    <div className="space-y-6 animate-in fade-in">
+        <div className="grid grid-cols-2 gap-4">
+            <div className="bg-white p-4 border border-slate-200 rounded-xl">
+                <label className="text-xs font-bold text-slate-500 uppercase block mb-2">Follow Rate / Hr</label>
+                <div className="text-2xl font-bold text-slate-900 mb-2">{rules.followRatePerHour}</div>
+                <input 
+                    type="range" min="1" max="50" value={rules.followRatePerHour} 
+                    onChange={e => onChange({ ...rules, followRatePerHour: parseInt(e.target.value) })}
+                    className="w-full accent-green-500"
+                />
+            </div>
+            <div className="bg-white p-4 border border-slate-200 rounded-xl">
+                <label className="text-xs font-bold text-slate-500 uppercase block mb-2">Unfollow After (Days)</label>
+                <div className="text-2xl font-bold text-slate-900 mb-2">{rules.unfollowAfterDays}</div>
+                <input 
+                    type="range" min="1" max="30" value={rules.unfollowAfterDays} 
+                    onChange={e => onChange({ ...rules, unfollowAfterDays: parseInt(e.target.value) })}
+                    className="w-full accent-orange-500"
+                />
+            </div>
+        </div>
+        <TagInput 
+            label="Interest Tags" 
+            tags={rules.interestTags || []} 
+            onChange={t => onChange({ ...rules, interestTags: t })} 
+        />
+        <div className="flex items-center gap-2 text-xs text-slate-500">
+            <ShieldCheck className="w-4 h-4 text-green-600" />
+            <span>Smart filtering enabled: Private accounts ignored automatically.</span>
+        </div>
+    </div>
+);
+
+const EngagementRulesPanel = ({ rules, onChange }: { rules: EngagementBotRules, onChange: (r: EngagementBotRules) => void }) => (
+    <div className="space-y-6 animate-in fade-in">
+        <div>
+            <label className="text-xs font-bold text-slate-500 uppercase block mb-2">Reply Tone</label>
+            <div className="grid grid-cols-4 gap-2">
+                {['formal', 'casual', 'witty', 'empathetic'].map(tone => (
+                    <button
+                        key={tone}
+                        onClick={() => onChange({ ...rules, replyTone: tone as any })}
+                        className={`py-2 px-3 rounded-lg text-xs font-bold capitalize border transition-all ${
+                            rules.replyTone === tone 
+                            ? 'bg-blue-50 border-blue-200 text-blue-700' 
+                            : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                        }`}
+                    >
+                        {tone}
+                    </button>
+                ))}
+            </div>
+        </div>
+        <div className="bg-white p-4 border border-slate-200 rounded-xl space-y-4">
+            <div>
+                <div className="flex justify-between mb-2">
+                    <label className="text-xs font-bold text-slate-500 uppercase">Emoji Level</label>
+                    <span className="text-xs font-bold text-slate-700">{rules.emojiLevel}%</span>
+                </div>
+                <input 
+                    type="range" min="0" max="100" value={rules.emojiLevel} 
+                    onChange={e => onChange({ ...rules, emojiLevel: parseInt(e.target.value) })}
+                    className="w-full accent-yellow-500"
+                />
+            </div>
+            <div>
+                <div className="flex justify-between mb-2">
+                    <label className="text-xs font-bold text-slate-500 uppercase">Max Replies / Hr</label>
+                    <span className="text-xs font-bold text-slate-700">{rules.maxRepliesPerHour}</span>
+                </div>
+                <input 
+                    type="range" min="1" max="20" value={rules.maxRepliesPerHour} 
+                    onChange={e => onChange({ ...rules, maxRepliesPerHour: parseInt(e.target.value) })}
+                    className="w-full accent-blue-600"
+                />
+            </div>
+        </div>
+    </div>
+);
+
+const CreatorRulesPanel = ({ rules, onChange }: { rules: CreatorBotRules, onChange: (r: CreatorBotRules) => void }) => (
+    <div className="space-y-6 animate-in fade-in">
+        <div className="bg-white p-5 border border-slate-200 rounded-xl space-y-5">
+            <h4 className="text-sm font-bold text-slate-900 uppercase tracking-wide flex items-center gap-2">
+                <SlidersHorizontal className="w-4 h-4 text-purple-600" /> Personality Engine
+            </h4>
+            {['proactiveness', 'tone', 'verbosity'].map(trait => (
+                <div key={trait}>
+                    <div className="flex justify-between mb-2">
+                        <label className="text-xs font-bold text-slate-500 uppercase capitalize">{trait}</label>
+                        <span className="text-xs font-bold text-slate-700">{(rules.personality as any)[trait]}%</span>
+                    </div>
+                    <input 
+                        type="range" min="0" max="100" value={(rules.personality as any)[trait]} 
+                        onChange={e => onChange({ 
+                            ...rules, 
+                            personality: { ...rules.personality, [trait]: parseInt(e.target.value) } 
+                        })}
+                        className="w-full accent-purple-600"
+                    />
+                </div>
+            ))}
+        </div>
+        
+        <TagInput 
+            label="Blocked Topics (Safety)" 
+            tags={rules.topicBlocks || []} 
+            onChange={t => onChange({ ...rules, topicBlocks: t })} 
+        />
+        
+        <div className="flex items-center justify-between p-4 bg-red-50 border border-red-100 rounded-xl">
+            <div className="flex items-center gap-2 text-red-800">
+                <AlertTriangle className="w-4 h-4" />
+                <span className="text-xs font-bold uppercase">Risk Level</span>
+            </div>
+            <select 
+                value={rules.riskLevel}
+                onChange={e => onChange({ ...rules, riskLevel: e.target.value as any })}
+                className="bg-white border border-red-200 text-red-700 text-sm font-bold rounded-lg px-3 py-1 focus:ring-red-500"
+            >
+                <option value="low">Low (Safe)</option>
+                <option value="medium">Medium</option>
+                <option value="high">High (Viral)</option>
+            </select>
+        </div>
+    </div>
+);
 
 // --- Main Component ---
 
@@ -502,7 +692,7 @@ interface BotConfigModalProps {
   onSave: (bot: BotConfig) => void;
 }
 
-type TabType = 'Overview' | 'Schedule' | 'Rules' | 'Safety' | 'Simulation';
+type TabType = 'Overview' | 'Schedule' | 'Rules' | 'Safety' | 'Orchestration' | 'Simulation';
 
 const BotConfigModal: React.FC<BotConfigModalProps> = ({ bot, onClose, onSave }) => {
   const [activeTab, setActiveTab] = useState<TabType>('Overview');
@@ -510,11 +700,8 @@ const BotConfigModal: React.FC<BotConfigModalProps> = ({ bot, onClose, onSave })
   const [interval, setBotInterval] = useState(bot.intervalMinutes);
   const [safetyLevel, setSafetyLevel] = useState<'Conservative' | 'Moderate' | 'Aggressive'>(config.safetyLevel || 'Moderate');
   
-  // Personality Tuning State
-  const [proactiveness, setProactiveness] = useState(50);
-  const [toneVal, setToneVal] = useState(50);
-  const [verbosity, setVerbosity] = useState(50);
-  const [topicsToAvoid, setTopicsToAvoid] = useState<string[]>(config.aiStrategy?.topicsToAvoid || []);
+  // Local state for Rules to allow editing before save
+  const [rules, setRules] = useState<any>(config.rules || {});
 
   const [simulationLogs, setSimulationLogs] = useState<BotActivity[]>([]);
   const [isSimulating, setIsSimulating] = useState(false);
@@ -530,6 +717,14 @@ const BotConfigModal: React.FC<BotConfigModalProps> = ({ bot, onClose, onSave })
   const [simResult, setSimResult] = useState<any>(null);
   const [logsExpanded, setLogsExpanded] = useState(false);
 
+  // Orchestration State
+  const [globalPolicy, setGlobalPolicy] = useState<GlobalPolicyConfig>(store.getGlobalPolicy());
+  const [dailyActions, setDailyActions] = useState(store.getDailyGlobalActions());
+  const [orchestrationLogs, setOrchestrationLogs] = useState<OrchestrationLogEntry[]>([]);
+  
+  // Phase 7: Live Execution Feed State
+  const [liveEvents, setLiveEvents] = useState<BotExecutionEvent[]>([]);
+
   // Incident Management State
   const [incidentAcknowledged, setIncidentAcknowledged] = useState(false);
 
@@ -540,15 +735,26 @@ const BotConfigModal: React.FC<BotConfigModalProps> = ({ bot, onClose, onSave })
       setConfig({ ...bot.config });
       setBotInterval(bot.intervalMinutes);
       setSafetyLevel(bot.config.safetyLevel || 'Moderate');
-      
-      // Initialize Personality sliders from existing config loosely
-      if (bot.config.aiStrategy) {
-          setTopicsToAvoid(bot.config.aiStrategy.topicsToAvoid || []);
-          if (bot.config.aiStrategy.brandVoice === 'Professional') setToneVal(20);
-          else if (bot.config.aiStrategy.brandVoice === 'Witty') setToneVal(80);
-          else setToneVal(50);
-      }
+      setRules(bot.config.rules || {});
   }, [bot]);
+
+  // Load Orchestration Data on tab switch
+  useEffect(() => {
+      if (activeTab === 'Orchestration') {
+          setGlobalPolicy(store.getGlobalPolicy());
+          setDailyActions(store.getDailyGlobalActions());
+          setOrchestrationLogs(getOrchestrationLogs());
+          setLiveEvents(getExecutionEvents());
+          
+          // Subscribe to live telemetry
+          const unsubscribe = subscribeToTelemetry((events) => {
+              setLiveEvents([...events]); // Trigger re-render with new array reference
+              setDailyActions({...store.getDailyGlobalActions()}); // Update gauges
+          });
+          
+          return () => unsubscribe();
+      }
+  }, [activeTab]);
 
   // Clean up poll on unmount
   useEffect(() => {
@@ -561,24 +767,6 @@ const BotConfigModal: React.FC<BotConfigModalProps> = ({ bot, onClose, onSave })
     setConfig(prev => ({ ...prev, [key]: value }));
   };
 
-  const updateStrategy = (key: keyof AIStrategyConfig, value: any) => {
-      setConfig(prev => ({
-          ...prev,
-          aiStrategy: {
-              ...(prev.aiStrategy || { creativityLevel: 'Medium', brandVoice: 'Professional', keywordsToInclude: [], topicsToAvoid: [] }),
-              [key]: value
-          }
-      }));
-  };
-
-  const toggleTopicAvoidance = (topic: string) => {
-      setTopicsToAvoid(prev => {
-          const next = prev.includes(topic) ? prev.filter(t => t !== topic) : [...prev, topic];
-          updateStrategy('topicsToAvoid', next);
-          return next;
-      });
-  };
-
   const handleSave = () => {
     // Validate schedule before saving
     const startMins = getMinutesFromMidnight(config.workHoursStart || '09:00');
@@ -588,62 +776,21 @@ const BotConfigModal: React.FC<BotConfigModalProps> = ({ bot, onClose, onSave })
         return;
     }
 
-    // Map personality back to strategy config
-    const derivedVoice = toneVal < 30 ? 'Professional' : toneVal > 70 ? 'Witty' : 'Casual';
-    const derivedCreativity = proactiveness > 60 ? 'High' : proactiveness < 40 ? 'Low' : 'Medium';
-
     onSave({
       ...bot,
       intervalMinutes: interval,
       config: { 
           ...config, 
           safetyLevel,
-          aiStrategy: {
-              ...config.aiStrategy,
-              brandVoice: derivedVoice,
-              creativityLevel: derivedCreativity,
-              topicsToAvoid
-          } as AIStrategyConfig
+          rules, // Include updated rules
       },
     });
   };
 
-  // Incident Recovery Handlers
-  const handleApplyFix = (fixType: 'conservative' | 'clear') => {
-      if (fixType === 'conservative') {
-          setSafetyLevel('Conservative');
-          setBotInterval(Math.max(120, interval)); // Force higher interval
-          alert("Applied 'Conservative' settings. Please review and click Resume.");
-      } else if (fixType === 'clear') {
-          // This would typically be a specific API call to reset stats, here we'll mock the intent
-          // Real reset happens on Save/Resume
-          alert("Stats will be cleared upon resuming.");
-      }
-  };
-
-  const handleResumeBot = () => {
-      onSave({
-          ...bot,
-          enabled: true,
-          status: 'Idle',
-          intervalMinutes: interval,
-          config: { ...config, safetyLevel },
-          stats: {
-              ...bot.stats,
-              consecutiveErrors: 0 // Reset error counter
-          }
-      });
-  };
-
-  const handleForceSync = async () => {
-      setIsSyncing(true);
-      setSyncMessage(null);
-      // Simulate API call delay
-      await new Promise(r => setTimeout(r, 1500));
-      setLastSyncTime(new Date());
-      setIsSyncing(false);
-      setSyncMessage("Rules refreshed from API");
-      setTimeout(() => setSyncMessage(null), 3000);
+  const toggleEmergencyStop = () => {
+      const newState = !globalPolicy.emergencyStop;
+      store.updateGlobalPolicy({ emergencyStop: newState });
+      setGlobalPolicy({ ...globalPolicy, emergencyStop: newState });
   };
 
   const runSimulation = async () => {
@@ -676,7 +823,21 @@ const BotConfigModal: React.FC<BotConfigModalProps> = ({ bot, onClose, onSave })
           { label: 'Platform policy safe', passed: true },
       ];
 
-      if (bot.type === BotType.Engagement) {
+      // New: Creative Optimization Insights
+      let optimizationInsight = null;
+
+      if (bot.type === BotType.Creator) {
+          predictedActions = [
+              { label: 'Drafts Created', count: 1 * multiplier },
+              { label: 'Scheduled Posts', count: 1 * multiplier }
+          ];
+          sampleContent = "Draft:\n> \"Excited to announce our latest breakthrough in AI efficiency! #Tech #Growth\"";
+          optimizationInsight = {
+              selected: "Product_Launch_Teaser.mp4",
+              score: 85,
+              reason: "High historical engagement (Top 10%)"
+          };
+      } else if (bot.type === BotType.Engagement) {
           predictedActions = [
               { label: 'Reply to mentions', count: 5 * multiplier },
               { label: 'Like posts', count: 12 * multiplier }
@@ -704,7 +865,8 @@ const BotConfigModal: React.FC<BotConfigModalProps> = ({ bot, onClose, onSave })
       setSimResult({
           predictedActions,
           sampleContent,
-          safetyChecks
+          safetyChecks,
+          optimizationInsight
       });
   };
 
@@ -714,25 +876,11 @@ const BotConfigModal: React.FC<BotConfigModalProps> = ({ bot, onClose, onSave })
       
       if (logs.length > 0) {
           const latest = logs[0];
-          if (latest.status === ActivityStatus.SUCCESS || latest.status === ActivityStatus.FAILED) {
+          if (latest.status === ActivityStatus.SUCCESS || latest.status === ActivityStatus.FAILED || latest.status === ActivityStatus.SKIPPED) {
               setIsSimulating(false);
               if (simulationPollRef.current) clearInterval(simulationPollRef.current);
           }
       }
-  };
-
-  // Preview Text Logic
-  const getPersonalityPreview = () => {
-      const baseText = "AI regulation is crucial for sustainable growth.";
-      let preview = baseText;
-      
-      if (toneVal > 70) preview = "AI regulation is super key for keeping things chill and growing 🌱🚀";
-      else if (toneVal < 30) preview = "Strict adherence to AI regulation protocols is paramount for ensuring long-term sectoral stability.";
-      
-      if (verbosity > 70) preview += " We must prioritize safety frameworks to mitigate risks while fostering innovation.";
-      else if (verbosity < 30) preview = toneVal > 70 ? "AI rules = Safe growth 🚀" : "Regulation ensures stability.";
-
-      return preview;
   };
 
   // Advanced Schedule Logic
@@ -749,18 +897,25 @@ const BotConfigModal: React.FC<BotConfigModalProps> = ({ bot, onClose, onSave })
   const { hour: endH, minute: endM, period: endP } = parseTime(endStr);
 
   const isHighFrequency = estimatedRuns > 50;
-  const isReadOnlyRules = activeTab === 'Rules' && bot.type !== BotType.Creator && bot.type !== BotType.Engagement;
+  
+  // Rules Rendering Logic
+  const renderRulesTab = () => {
+      if (bot.type === BotType.Finder) return <FinderRulesPanel rules={rules} onChange={setRules} />;
+      if (bot.type === BotType.Growth) return <GrowthRulesPanel rules={rules} onChange={setRules} />;
+      if (bot.type === BotType.Engagement) return <EngagementRulesPanel rules={rules} onChange={setRules} />;
+      if (bot.type === BotType.Creator) return <CreatorRulesPanel rules={rules} onChange={setRules} />;
+      return <div className="text-slate-400 p-8 text-center">No configurable rules for this bot type.</div>;
+  };
 
   const renderContent = () => {
       switch(activeTab) {
           case 'Overview':
+              // ... (unchanged)
               const isIncident = bot.status === 'Error' || bot.status === 'LimitReached';
-              
               if (isIncident) {
                   const isError = bot.status === 'Error';
                   const mainColor = isError ? 'red' : 'orange';
                   const MainIcon = isError ? XOctagon : Thermometer;
-                  
                   return (
                       <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
                           {/* Incident Header */}
@@ -783,111 +938,10 @@ const BotConfigModal: React.FC<BotConfigModalProps> = ({ bot, onClose, onSave })
                                       </div>
                                   </div>
                               </div>
-                              
-                              {/* Incident Timeline */}
-                              <div className="p-6">
-                                  <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Incident Timeline</h4>
-                                  <div className="space-y-0 pl-2 border-l-2 border-slate-100 ml-1">
-                                      {/* Mock Timeline */}
-                                      <div className="relative pl-6 pb-6">
-                                          <div className={`absolute -left-[9px] top-0 w-4 h-4 rounded-full border-4 border-white shadow-sm bg-${mainColor}-500`}></div>
-                                          <div className="flex justify-between items-start">
-                                              <div>
-                                                  <span className="text-sm font-bold text-gray-900 block">Bot Auto-Paused</span>
-                                                  <span className="text-xs text-gray-500">Safety circuit breaker triggered.</span>
-                                              </div>
-                                              <span className="text-xs font-mono text-gray-400">10:43 AM</span>
-                                          </div>
-                                      </div>
-                                      <div className="relative pl-6 pb-6">
-                                          <div className={`absolute -left-[9px] top-0 w-4 h-4 rounded-full border-4 border-white shadow-sm bg-${mainColor}-300`}></div>
-                                          <div className="flex justify-between items-start">
-                                              <div>
-                                                  <span className="text-sm font-bold text-gray-700 block">
-                                                      {isError ? 'API Error: Rate Limit Exceeded (429)' : 'Daily Action Limit Hit (50/50)'}
-                                                  </span>
-                                                  <span className="text-xs text-gray-500">Platform returned warning headers.</span>
-                                              </div>
-                                              <span className="text-xs font-mono text-gray-400">10:42 AM</span>
-                                          </div>
-                                      </div>
-                                      <div className="relative pl-6">
-                                          <div className="absolute -left-[9px] top-0 w-4 h-4 rounded-full border-4 border-white shadow-sm bg-slate-300"></div>
-                                          <div className="flex justify-between items-start">
-                                              <div>
-                                                  <span className="text-sm font-bold text-gray-600 block">System Healthy</span>
-                                                  <span className="text-xs text-gray-500">Regular operation.</span>
-                                              </div>
-                                              <span className="text-xs font-mono text-gray-400">09:00 AM</span>
-                                          </div>
-                                      </div>
-                                  </div>
-                              </div>
-                          </div>
-
-                          {/* Recovery Actions */}
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
-                                  <h4 className="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
-                                      <Wand2 className="w-4 h-4 text-blue-500" /> Recommended Fixes
-                                  </h4>
-                                  <div className="space-y-3">
-                                      <button 
-                                          onClick={() => handleApplyFix('conservative')}
-                                          className="w-full text-left p-3 rounded-xl border border-slate-200 hover:border-blue-300 hover:bg-blue-50 transition-all group"
-                                      >
-                                          <div className="flex items-center justify-between mb-1">
-                                              <span className="text-xs font-bold text-slate-700 group-hover:text-blue-700">Switch to Conservative Mode</span>
-                                              <ArrowRight className="w-3 h-3 text-slate-300 group-hover:text-blue-500" />
-                                          </div>
-                                          <p className="text-[10px] text-slate-500">Reduces frequency and daily limits to cool down.</p>
-                                      </button>
-                                      <button 
-                                          onClick={() => handleApplyFix('clear')}
-                                          className="w-full text-left p-3 rounded-xl border border-slate-200 hover:border-blue-300 hover:bg-blue-50 transition-all group"
-                                      >
-                                          <div className="flex items-center justify-between mb-1">
-                                              <span className="text-xs font-bold text-slate-700 group-hover:text-blue-700">Clear Error Stats</span>
-                                              <ArrowRight className="w-3 h-3 text-slate-300 group-hover:text-blue-500" />
-                                          </div>
-                                          <p className="text-[10px] text-slate-500">Manually reset counters if false positive.</p>
-                                      </button>
-                                  </div>
-                              </div>
-
-                              <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-col">
-                                  <h4 className="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
-                                      <Play className="w-4 h-4 text-green-600" /> Resume Operations
-                                  </h4>
-                                  <div className="flex-1 flex flex-col justify-end space-y-4">
-                                      <label className="flex items-start gap-3 p-3 rounded-xl bg-slate-50 border border-slate-100 cursor-pointer hover:bg-slate-100 transition-colors">
-                                          <div className={`w-5 h-5 rounded border flex items-center justify-center shrink-0 mt-0.5 transition-colors ${incidentAcknowledged ? 'bg-blue-600 border-blue-600' : 'bg-white border-slate-300'}`}>
-                                              <input 
-                                                  type="checkbox" 
-                                                  checked={incidentAcknowledged}
-                                                  onChange={(e) => setIncidentAcknowledged(e.target.checked)}
-                                                  className="hidden"
-                                              />
-                                              {incidentAcknowledged && <Check className="w-3.5 h-3.5 text-white" strokeWidth={3} />}
-                                          </div>
-                                          <span className="text-xs text-slate-600 font-medium">
-                                              I acknowledge the risk and have reviewed the safety settings.
-                                          </span>
-                                      </label>
-                                      <button 
-                                          onClick={handleResumeBot}
-                                          disabled={!incidentAcknowledged}
-                                          className="w-full py-3 bg-green-600 hover:bg-green-700 text-white font-bold text-sm rounded-xl shadow-lg shadow-green-500/20 disabled:opacity-50 disabled:shadow-none disabled:bg-slate-300 transition-all"
-                                      >
-                                          Resume with Safe Settings
-                                      </button>
-                                  </div>
-                              </div>
                           </div>
                       </div>
                   );
               }
-
               return (
                   <div className="space-y-6">
                       {/* Hero Status Card */}
@@ -916,7 +970,6 @@ const BotConfigModal: React.FC<BotConfigModalProps> = ({ bot, onClose, onSave })
                                <p className="text-sm font-bold text-slate-700 font-mono">{bot.lastRun ? new Date(bot.lastRun).toLocaleTimeString() : 'Never'}</p>
                            </div>
                       </div>
-                      
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                            {/* Efficiency Metric */}
                            <div className={`p-5 border ${theme.border} bg-white rounded-2xl shadow-sm`}>
@@ -932,7 +985,6 @@ const BotConfigModal: React.FC<BotConfigModalProps> = ({ bot, onClose, onSave })
                                    <div className={`h-full rounded-full transition-all ${bot.stats.currentDailyActions >= bot.stats.maxDailyActions ? 'bg-orange-500' : 'bg-blue-500'}`} style={{ width: `${(bot.stats.currentDailyActions / bot.stats.maxDailyActions)*100}%` }}></div>
                                </div>
                            </div>
-                           
                            {/* Health Check */}
                            <div className={`p-5 border ${theme.border} bg-white rounded-2xl shadow-sm`}>
                                <div className="flex justify-between items-start mb-2">
@@ -951,7 +1003,6 @@ const BotConfigModal: React.FC<BotConfigModalProps> = ({ bot, onClose, onSave })
                                </div>
                            </div>
                       </div>
-
                       <div className={`${theme.accentBg} p-4 rounded-xl border ${theme.border} text-sm text-slate-600 leading-relaxed flex items-start gap-3`}>
                           <Info className={`w-5 h-5 ${theme.icon} shrink-0 mt-0.5`} />
                           <div>
@@ -963,6 +1014,7 @@ const BotConfigModal: React.FC<BotConfigModalProps> = ({ bot, onClose, onSave })
               );
           
           case 'Schedule':
+              // ... (unchanged)
               return (
                   <div className="space-y-8 animate-in fade-in duration-300">
                       {/* Interval Slider */}
@@ -971,7 +1023,6 @@ const BotConfigModal: React.FC<BotConfigModalProps> = ({ bot, onClose, onSave })
                               <Clock className={`w-4 h-4 ${theme.icon}`} />
                               <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Frequency</h3>
                           </div>
-                          
                           <div className="flex justify-between items-center mb-6">
                               <div>
                                   <label className="text-sm font-bold text-slate-900 block">Wake Interval</label>
@@ -982,18 +1033,13 @@ const BotConfigModal: React.FC<BotConfigModalProps> = ({ bot, onClose, onSave })
                           <div className="flex items-center gap-4">
                               <span className="text-xs font-bold text-slate-400 w-10 text-center">10m</span>
                               <input 
-                                type="range" 
-                                min="10" 
-                                max="240" 
-                                step="10" 
-                                value={interval} 
+                                type="range" min="10" max="240" step="10" value={interval} 
                                 onChange={(e) => setBotInterval(parseInt(e.target.value))}
                                 className="flex-1 accent-blue-600 h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer"
                               />
                               <span className="text-xs font-bold text-slate-400 w-10 text-center">4h</span>
                           </div>
                       </div>
-
                       {/* Work Hours */}
                       <div>
                           <div className="flex items-center gap-2 mb-4">
@@ -1001,56 +1047,19 @@ const BotConfigModal: React.FC<BotConfigModalProps> = ({ bot, onClose, onSave })
                               <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Working Window</h3>
                           </div>
                           <div className="grid grid-cols-2 gap-6 mb-4">
-                              <TimePickerInput 
-                                  label="Start Time" 
-                                  value={config.workHoursStart || '09:00'} 
-                                  onChange={(v) => updateConfig('workHoursStart', v)} 
-                                  theme={theme}
-                              />
-                              <TimePickerInput 
-                                  label="End Time" 
-                                  value={config.workHoursEnd || '17:00'} 
-                                  onChange={(v) => updateConfig('workHoursEnd', v)} 
-                                  hasError={!isValidSchedule}
-                                  theme={theme}
-                              />
+                              <TimePickerInput label="Start Time" value={config.workHoursStart || '09:00'} onChange={(v: string) => updateConfig('workHoursStart', v)} theme={theme} />
+                              <TimePickerInput label="End Time" value={config.workHoursEnd || '17:00'} onChange={(v: string) => updateConfig('workHoursEnd', v)} hasError={!isValidSchedule} theme={theme} />
                           </div>
-                          
-                          {!isValidSchedule && (
-                              <div className="mb-4 text-xs font-bold text-red-500 flex items-center gap-2 animate-in slide-in-from-top-1">
-                                  <AlertOctagon className="w-3 h-3" /> End time must be after start time.
-                              </div>
-                          )}
-                          
-                          <div className={`border rounded-xl p-4 flex gap-4 shadow-sm transition-colors ${!isValidSchedule ? 'bg-red-50 border-red-100 opacity-50' : isHighFrequency ? 'bg-amber-50 border-amber-100' : 'bg-slate-50 border-slate-200'}`}>
-                              <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 text-sm font-bold shadow-sm border ${!isValidSchedule ? 'bg-white text-red-500 border-red-200' : isHighFrequency ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-white text-slate-700 border-slate-200'}`}>
-                                  {!isValidSchedule ? <X className="w-5 h-5" /> : isHighFrequency ? <AlertTriangle className="w-5 h-5" /> : <Info className="w-5 h-5" />}
-                              </div>
-                              <div>
-                                  <h4 className={`text-xs font-bold uppercase tracking-wide ${!isValidSchedule ? 'text-red-800' : isHighFrequency ? 'text-amber-900' : 'text-slate-500'}`}>
-                                      {isValidSchedule ? 'Estimated Cycles' : 'Invalid Configuration'}
-                                  </h4>
-                                  <p className={`text-sm mt-1 leading-relaxed ${!isValidSchedule ? 'text-red-600' : isHighFrequency ? 'text-amber-800' : 'text-slate-600'}`}>
-                                      {isValidSchedule ? (
-                                          <>
-                                            Based on these settings, the bot will wake up <strong>{estimatedRuns} times daily</strong> between <strong>{startH}:{startM} {startP} – {endH}:{endM} {endP}</strong>.
-                                            {isHighFrequency && " High frequency may trigger platform rate limits. Consider increasing the interval."}
-                                          </>
-                                      ) : (
-                                          "Please correct the start and end times to enable automation."
-                                      )}
-                                  </p>
-                              </div>
-                          </div>
+                          {!isValidSchedule && <div className="mb-4 text-xs font-bold text-red-500 flex items-center gap-2 animate-in slide-in-from-top-1"><AlertOctagon className="w-3 h-3" /> End time must be after start time.</div>}
                       </div>
                   </div>
               );
               
           case 'Safety':
+              // ... (unchanged)
               const currentModeInfo = SAFETY_LEVELS[safetyLevel];
               const riskPercentage = safetyLevel === 'Conservative' ? 25 : safetyLevel === 'Moderate' ? 50 : 85;
               const riskColor = safetyLevel === 'Conservative' ? 'bg-emerald-500' : safetyLevel === 'Moderate' ? 'bg-blue-500' : 'bg-orange-500';
-
               return (
                   <div className="space-y-8 animate-in fade-in duration-300">
                       {/* Risk Meter Section */}
@@ -1075,394 +1084,131 @@ const BotConfigModal: React.FC<BotConfigModalProps> = ({ bot, onClose, onSave })
                               <span className="text-orange-400">High Risk (Attention)</span>
                           </div>
                       </div>
-
-                      {/* Mode Selection Cards */}
-                      <div className="space-y-4">
-                          <div className="flex items-center gap-2 mb-2">
-                              <Shield className={`w-4 h-4 ${theme.icon}`} />
-                              <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Operation Mode</h3>
-                          </div>
-                          
-                          {['Conservative', 'Moderate', 'Aggressive'].map((level: any) => {
-                              const info = SAFETY_LEVELS[level as keyof typeof SAFETY_LEVELS];
-                              const Icon = info.icon;
-                              const isSelected = safetyLevel === level;
-                              return (
-                                  <button 
-                                    key={level}
-                                    onClick={() => setSafetyLevel(level)}
-                                    className={`w-full text-left relative overflow-hidden transition-all duration-200 group
-                                        ${isSelected ? 'ring-2 ring-amber-500 shadow-md transform scale-[1.01] bg-white border-transparent z-10' : 'bg-white hover:bg-slate-50 border border-slate-200'}
-                                        rounded-2xl
-                                    `}
-                                  >
-                                      <div className="p-5 flex items-start gap-4">
-                                          <div className={`p-3 rounded-xl shrink-0 ${info.color}`}>
-                                              <Icon className="w-6 h-6" />
-                                          </div>
-                                          <div className="flex-1">
-                                              <div className="flex justify-between items-center mb-1">
-                                                  <h4 className="font-bold text-slate-900 text-base">{info.label}</h4>
-                                                  {isSelected && <CheckCircle className="w-5 h-5 text-amber-600" />}
-                                              </div>
-                                              <p className="text-sm text-slate-500 font-medium mb-3">{info.desc}</p>
-                                              
-                                              {/* Granular Details Grid */}
-                                              <div className={`grid grid-cols-2 gap-2 mt-3 ${isSelected ? 'opacity-100' : 'opacity-60'}`}>
-                                                  <div className="bg-slate-50 px-3 py-2 rounded-lg border border-slate-100">
-                                                      <span className="text-[10px] text-slate-400 uppercase font-bold block mb-0.5">Daily Limit</span>
-                                                      <span className="text-xs font-bold text-slate-700">{info.dailyLimit}</span>
-                                                  </div>
-                                                  <div className="bg-slate-50 px-3 py-2 rounded-lg border border-slate-100">
-                                                      <span className="text-[10px] text-slate-400 uppercase font-bold block mb-0.5">Execution Speed</span>
-                                                      <span className="text-xs font-bold text-slate-700">{info.speed}</span>
-                                                  </div>
-                                              </div>
-                                          </div>
-                                      </div>
-                                  </button>
-                              )
-                          })}
-                      </div>
-
-                      {/* Bot Specific Safety Policy */}
-                      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
-                           <div className="px-5 py-4 border-b border-slate-100 bg-slate-50 flex items-center gap-2">
-                               <ShieldCheck className="w-4 h-4 text-slate-500" />
-                               <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wide">Active Policies for {bot.type}</h3>
-                           </div>
-                           <div className="p-5 space-y-3">
-                               {bot.type === BotType.Engagement && (
-                                   <>
-                                      <ReadOnlyRow label="Spam Filter" value="Strict (AI)" icon={Filter} />
-                                      <ReadOnlyRow label="Negative Sentiment Skip" value="Enabled" icon={Minus} />
-                                      <ReadOnlyRow label="Max Replies / Hour" value={safetyLevel === 'Aggressive' ? '20' : '5'} icon={Clock} />
-                                   </>
-                               )}
-                               {bot.type === BotType.Growth && (
-                                   <>
-                                      <ReadOnlyRow label="Cooldown After Action" value={safetyLevel === 'Aggressive' ? '2 min' : '15 min'} icon={Hourglass} />
-                                      <ReadOnlyRow label="Competitor Protection" value="Active" icon={Shield} />
-                                      <ReadOnlyRow label="Unfollow Threshold" value="< 100 / day" icon={UserPlus} />
-                                   </>
-                               )}
-                               {bot.type === BotType.Creator && (
-                                   <>
-                                      <ReadOnlyRow label="Content Safety Check" value="Gemini Core" icon={BrainCircuit} />
-                                      <ReadOnlyRow label="Duplicate Prevention" value="Enabled" icon={Copy} />
-                                   </>
-                               )}
-                               {bot.type === BotType.Finder && (
-                                   <div className="text-center py-4 text-xs text-slate-400 italic">No specific safety constraints for passive monitoring.</div>
-                               )}
-                           </div>
-                      </div>
-
-                      {/* Fail-Safe Section */}
-                      <div className="border-t border-slate-100 pt-6">
-                          <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                              <Lock className="w-4 h-4" /> Fail-Safe Protocol
-                          </h4>
-                          <div className={`flex items-start gap-4 p-4 ${theme.accentBg} rounded-xl border ${theme.border}`}>
-                              <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center shrink-0 text-amber-600 shadow-sm">
-                                  <PauseCircle className="w-6 h-6" />
-                              </div>
-                              <div>
-                                  <span className={`block text-sm font-bold ${theme.accentText} mb-1`}>Auto-Pause Conditions</span>
-                                  <ul className="text-xs text-slate-600 space-y-1 list-disc list-inside marker:text-amber-400">
-                                      <li><strong>5 consecutive API errors</strong> occur within 10 minutes.</li>
-                                      <li>Platform rate-limit headers are detected.</li>
-                                      <li>Unusual account activity verification challenge.</li>
-                                  </ul>
-                                  <div className="mt-3 text-[10px] font-bold text-slate-400 uppercase flex items-center gap-1">
-                                      <History className="w-3 h-3" /> Last Trigger: None
-                                  </div>
-                              </div>
-                          </div>
-                      </div>
                   </div>
               );
               
           case 'Rules':
               return (
                   <div className="space-y-6">
-                      {/* Interactive Personality Tuning for Creator/Engagement */}
-                      {(bot.type === BotType.Creator || bot.type === BotType.Engagement) ? (
-                          <div className="flex flex-col md:flex-row gap-6 h-full">
-                              {/* Controls Column */}
-                              <div className="flex-1 space-y-6">
-                                  {/* Personality Engine Section */}
-                                  <div className={`bg-white p-6 rounded-2xl border ${theme.border} shadow-sm`}>
-                                      <div className="flex items-center gap-2 mb-6">
-                                          <SlidersHorizontal className={`w-4 h-4 ${theme.icon}`} />
-                                          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">AI Personality Engine</h3>
-                                      </div>
+                      <div className="flex items-center gap-2 mb-2 px-1">
+                          <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Configuration</span>
+                          <span className="text-xs text-slate-300">•</span>
+                          <span className="text-xs font-bold text-slate-600">{RuleEngine.getRuleSummary(bot)}</span>
+                      </div>
+                      {renderRulesTab()}
+                  </div>
+              );
 
-                                      <div className="space-y-6">
-                                          {/* Proactiveness Slider */}
-                                          <div>
-                                              <div className="flex justify-between items-center mb-2">
-                                                  <label className="text-sm font-bold text-slate-900">Proactiveness</label>
-                                                  <span className="text-xs text-slate-500 font-medium">
-                                                      {proactiveness < 30 ? 'Reactive' : proactiveness > 70 ? 'High Initiative' : 'Balanced'}
-                                                  </span>
-                                              </div>
-                                              <input 
-                                                  type="range" min="0" max="100" value={proactiveness}
-                                                  onChange={(e) => setProactiveness(parseInt(e.target.value))}
-                                                  className="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-blue-600"
-                                              />
-                                              <div className="flex justify-between text-[10px] text-slate-400 font-bold uppercase mt-1">
-                                                  <span>Conservative</span>
-                                                  <span>Proactive</span>
-                                              </div>
-                                          </div>
-
-                                          {/* Tone Slider */}
-                                          <div>
-                                              <div className="flex justify-between items-center mb-2">
-                                                  <label className="text-sm font-bold text-slate-900">Tone</label>
-                                                  <span className="text-xs text-slate-500 font-medium">
-                                                      {toneVal < 30 ? 'Professional' : toneVal > 70 ? 'Casual & Witty' : 'Neutral'}
-                                                  </span>
-                                              </div>
-                                              <input 
-                                                  type="range" min="0" max="100" value={toneVal}
-                                                  onChange={(e) => setToneVal(parseInt(e.target.value))}
-                                                  className="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-purple-600"
-                                              />
-                                              <div className="flex justify-between text-[10px] text-slate-400 font-bold uppercase mt-1">
-                                                  <span>Formal</span>
-                                                  <span>Casual</span>
-                                              </div>
-                                          </div>
-
-                                          {/* Verbosity Slider */}
-                                          <div>
-                                              <div className="flex justify-between items-center mb-2">
-                                                  <label className="text-sm font-bold text-slate-900">Verbosity</label>
-                                                  <span className="text-xs text-slate-500 font-medium">
-                                                      {verbosity < 30 ? 'Concise' : verbosity > 70 ? 'Detailed' : 'Standard'}
-                                                  </span>
-                                              </div>
-                                              <input 
-                                                  type="range" min="0" max="100" value={verbosity}
-                                                  onChange={(e) => setVerbosity(parseInt(e.target.value))}
-                                                  className="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-green-600"
-                                              />
-                                              <div className="flex justify-between text-[10px] text-slate-400 font-bold uppercase mt-1">
-                                                  <span>Brief</span>
-                                                  <span>Detailed</span>
-                                              </div>
-                                          </div>
-                                      </div>
-                                  </div>
-
-                                  {/* Risk Appetite */}
-                                  <div className={`bg-white p-6 rounded-2xl border ${theme.border} shadow-sm`}>
-                                      <div className="flex items-center gap-2 mb-4">
-                                          <Gauge className={`w-4 h-4 ${theme.icon}`} />
-                                          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Risk Appetite</h3>
-                                      </div>
-                                      <div className="flex bg-slate-100 p-1 rounded-xl">
-                                          {['Conservative', 'Moderate', 'Aggressive'].map((mode) => (
-                                              <button
-                                                  key={mode}
-                                                  onClick={() => setSafetyLevel(mode as any)}
-                                                  className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
-                                                      safetyLevel === mode 
-                                                      ? 'bg-white text-slate-900 shadow-sm' 
-                                                      : 'text-slate-500 hover:text-slate-700'
-                                                  }`}
-                                              >
-                                                  {mode}
-                                              </button>
-                                          ))}
-                                      </div>
-                                      <div className="mt-3 text-xs text-slate-500 leading-relaxed bg-slate-50 p-3 rounded-lg border border-slate-100">
-                                          {safetyLevel === 'Conservative' && "Prioritizes account safety. Low frequency, strict filters."}
-                                          {safetyLevel === 'Moderate' && "Balanced approach. Standard frequency and content checks."}
-                                          {safetyLevel === 'Aggressive' && "Maximizes growth. High frequency, relaxed filters. Higher risk."}
-                                      </div>
-                                  </div>
-
-                                  {/* Topic Sensitivity */}
-                                  <div className={`bg-white p-6 rounded-2xl border ${theme.border} shadow-sm`}>
-                                      <div className="flex items-center gap-2 mb-4">
-                                          <ShieldAlert className={`w-4 h-4 ${theme.icon}`} />
-                                          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Topic Sensitivity</h3>
-                                      </div>
-                                      <div className="space-y-3">
-                                          {['Politics', 'Religion', 'Controversial News', 'Competitor Mentions'].map(topic => (
-                                              <label key={topic} className="flex items-center justify-between p-3 rounded-xl border border-slate-100 hover:bg-slate-50 cursor-pointer transition-colors">
-                                                  <span className="text-sm font-medium text-slate-700">Avoid {topic}</span>
-                                                  <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${topicsToAvoid.includes(topic) ? 'bg-red-500 border-red-500' : 'bg-white border-slate-300'}`}>
-                                                      <input 
-                                                          type="checkbox" 
-                                                          className="hidden"
-                                                          checked={topicsToAvoid.includes(topic)}
-                                                          onChange={() => toggleTopicAvoidance(topic)}
-                                                      />
-                                                      {topicsToAvoid.includes(topic) && <X className="w-3.5 h-3.5 text-white" strokeWidth={3} />}
-                                                  </div>
-                                              </label>
-                                          ))}
-                                      </div>
-                                  </div>
+          case 'Orchestration':
+              return (
+                  <div className="space-y-6 h-full flex flex-col">
+                      {/* Emergency Controls */}
+                      <div className="bg-white border border-rose-100 rounded-2xl p-5 shadow-sm flex items-center justify-between">
+                          <div className="flex items-center gap-4">
+                              <div className={`p-3 rounded-full ${globalPolicy.emergencyStop ? 'bg-rose-100 text-rose-600' : 'bg-green-100 text-green-600'}`}>
+                                  <Power className="w-6 h-6" />
                               </div>
-
-                              {/* Preview Column */}
-                              <div className="w-full md:w-80 flex flex-col gap-4">
-                                  <div className="bg-gradient-to-b from-indigo-50 to-purple-50 rounded-2xl p-6 border border-indigo-100 shadow-sm sticky top-0">
-                                      <div className="flex items-center gap-2 mb-4 text-indigo-900">
-                                          <Sparkles className="w-4 h-4" />
-                                          <h4 className="text-xs font-bold uppercase tracking-wider">Live Behavior Preview</h4>
-                                      </div>
-                                      
-                                      <div className="bg-white rounded-xl p-4 shadow-sm border border-indigo-50/50 relative">
-                                          <div className="absolute -top-2 -left-2 bg-indigo-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
-                                              AI Draft
-                                          </div>
-                                          <div className="flex gap-3 mb-3">
-                                              <div className="w-8 h-8 rounded-full bg-slate-200"></div>
-                                              <div>
-                                                  <div className="h-2 w-20 bg-slate-200 rounded mb-1"></div>
-                                                  <div className="h-2 w-12 bg-slate-100 rounded"></div>
-                                              </div>
-                                          </div>
-                                          <p className="text-sm text-slate-800 leading-relaxed font-medium">
-                                              {getPersonalityPreview()}
-                                          </p>
-                                          <div className="mt-3 flex gap-2">
-                                              <div className="h-6 w-16 bg-slate-100 rounded-full"></div>
-                                              <div className="h-6 w-12 bg-slate-100 rounded-full"></div>
-                                          </div>
-                                      </div>
-
-                                      <div className="mt-6 space-y-2">
-                                          <div className="flex justify-between text-xs">
-                                              <span className="text-indigo-800/60 font-medium">Est. Reply Rate</span>
-                                              <span className="font-bold text-indigo-900">
-                                                  {safetyLevel === 'Aggressive' ? 'High (~15/hr)' : safetyLevel === 'Moderate' ? 'Medium (~5/hr)' : 'Low (~1/hr)'}
-                                              </span>
-                                          </div>
-                                          <div className="flex justify-between text-xs">
-                                              <span className="text-indigo-800/60 font-medium">Content Variety</span>
-                                              <span className="font-bold text-indigo-900">
-                                                  {proactiveness > 70 ? 'High' : 'Standard'}
-                                              </span>
-                                          </div>
-                                      </div>
-                                  </div>
-                              </div>
-                          </div>
-                      ) : (
-                          // Non-Creator Bots - Read Only View
-                          <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
-                              
-                              {/* 1. API Governance Banner */}
-                              <div className={`p-4 rounded-xl border ${theme.border} ${theme.accentBg} flex items-start gap-3`}>
-                                  <div className={`p-2 bg-white rounded-lg border ${theme.border} shrink-0`}>
-                                      <Server className={`w-5 h-5 ${theme.icon}`} />
-                                  </div>
-                                  <div className="flex-1">
-                                      <h4 className={`text-sm font-bold ${theme.accentText} uppercase tracking-wide mb-1`}>
-                                          Managed via API
-                                      </h4>
-                                      <p className="text-xs text-slate-600 leading-relaxed">
-                                          The logic for <strong>{bot.type}</strong> is controlled by your external backend configuration. 
-                                          The settings below are a read-only snapshot of the active rule set.
-                                      </p>
-                                  </div>
-                              </div>
-
-                              {/* 2. Configuration Snapshot */}
                               <div>
-                                  <div className={`bg-white rounded-2xl border ${theme.border} shadow-sm overflow-hidden`}>
-                                      <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-                                          <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
-                                              <Bot className="w-4 h-4 text-slate-400" />
-                                              Active Configuration
-                                          </h3>
-                                          <span className="text-[10px] font-bold px-2 py-1 bg-slate-100 text-slate-500 rounded border border-slate-200 uppercase flex items-center gap-1">
-                                              <Lock className="w-3 h-3" /> Read-Only
-                                          </span>
-                                      </div>
-                                      <div className="p-6">
-                                          {bot.type === BotType.Finder && (
-                                              <div className="space-y-1">
-                                                  <ReadOnlyRow label="Tracked Keywords" value={config.trackKeywords?.length ? `${config.trackKeywords.length} Active` : 'None'} icon={Search} />
-                                                  <ReadOnlyRow label="Monitored Accounts" value={config.trackAccounts?.length ? `${config.trackAccounts.length} Accounts` : 'None'} icon={Users} />
-                                                  <ReadOnlyRow label="Action on Find" value={config.autoSaveToDrafts ? 'Auto-Draft' : 'Notify Only'} icon={Zap} />
-                                                  <div className="mt-3 pt-3 border-t border-slate-100">
-                                                      <p className="text-xs font-bold text-slate-400 mb-2">Active Keywords</p>
-                                                      <div className="flex flex-wrap gap-1">
-                                                          {config.trackKeywords?.map(k => (
-                                                              <span key={k} className="px-2 py-1 bg-slate-100 text-slate-600 text-xs rounded border border-slate-200 flex items-center gap-1">
-                                                                  {k} <Lock className="w-2.5 h-2.5 opacity-30" />
-                                                              </span>
-                                                          )) || <span className="text-xs text-slate-400 italic">No keywords configured</span>}
-                                                      </div>
-                                                  </div>
-                                              </div>
-                                          )}
-                                          {bot.type === BotType.Growth && (
-                                              <div className="space-y-1">
-                                                  <ReadOnlyRow label="Growth Strategy" value="Safe Follow/Unfollow" icon={TrendingUp} />
-                                                  <ReadOnlyRow label="Competitor Interaction" value={config.interactWithCompetitors ? 'Enabled' : 'Disabled'} icon={Target} />
-                                                  <ReadOnlyRow label="Unfollow Cycle" value={`After ${config.unfollowAfterDays || 7} Days`} icon={RotateCcw} />
-                                                  <ReadOnlyRow label="Target Tags" value={config.growthTags?.join(', ') || 'None'} icon={Hash} />
-                                              </div>
-                                          )}
-                                      </div>
-                                  </div>
-                                  <div className="mt-2 px-2 flex gap-2 text-xs text-slate-500">
-                                      <Info className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-                                      <p>{BOT_CONTEXT_GUIDANCE[bot.type]}</p>
-                                  </div>
-                              </div>
-
-                              {/* 3. API Status & CTA */}
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                  <div className={`p-4 bg-white rounded-2xl border ${theme.border} shadow-sm`}>
-                                      <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">API Health</h4>
-                                      <div className="flex items-center gap-2 mb-2">
-                                          <div className={`w-2 h-2 rounded-full ${isSyncing ? 'bg-blue-500 animate-ping' : 'bg-green-500'}`}></div>
-                                          <span className="text-sm font-bold text-slate-700">Connected</span>
-                                      </div>
-                                      <div className="text-xs text-slate-500 mb-3">
-                                          Last rule sync: <span className="font-mono text-slate-700">{lastSyncTime.toLocaleTimeString()}</span>
-                                      </div>
-                                      
-                                      {syncMessage ? (
-                                          <div className="text-xs font-bold text-green-600 flex items-center gap-1 animate-in fade-in">
-                                              <Check className="w-3 h-3" /> {syncMessage}
-                                          </div>
-                                      ) : (
-                                          <button 
-                                              onClick={handleForceSync}
-                                              disabled={isSyncing}
-                                              className={`text-xs font-bold ${theme.accentText} flex items-center gap-1 hover:underline disabled:opacity-50`}
-                                          >
-                                              <RefreshCw className={`w-3 h-3 ${isSyncing ? 'animate-spin' : ''}`} /> 
-                                              {isSyncing ? 'Syncing...' : 'Force Sync'}
-                                          </button>
-                                      )}
-                                  </div>
-
-                                  <div className="p-4 bg-slate-900 text-white rounded-2xl shadow-lg relative overflow-hidden group cursor-pointer">
-                                      <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full blur-2xl -mr-10 -mt-10 group-hover:bg-white/20 transition-all"></div>
-                                      <h4 className="text-sm font-bold mb-1 relative z-10">Advanced Controls</h4>
-                                      <p className="text-xs text-slate-400 mb-3 relative z-10">
-                                          Want to edit these rules in the UI?
-                                      </p>
-                                      <div className="flex items-center gap-2 text-xs font-bold text-white/90 border border-white/20 rounded-lg px-3 py-1.5 w-fit hover:bg-white/10 transition-colors relative z-10">
-                                          Unlock UI Editor <Lock className="w-3 h-3" />
-                                      </div>
-                                  </div>
+                                  <h3 className="font-bold text-slate-900">Global Automation System</h3>
+                                  <p className="text-xs text-slate-500">{globalPolicy.emergencyStop ? "All bots are currently PAUSED via kill-switch." : "System is active and processing queues."}</p>
                               </div>
                           </div>
-                      )}
+                          <button 
+                              onClick={toggleEmergencyStop}
+                              className={`px-5 py-2.5 rounded-xl font-bold text-sm transition-all ${globalPolicy.emergencyStop ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-rose-600 hover:bg-rose-700 text-white'}`}
+                          >
+                              {globalPolicy.emergencyStop ? "Resume Operations" : "Emergency Stop"}
+                          </button>
+                      </div>
+
+                      {/* Daily Limits Grid */}
+                      <div className="grid grid-cols-2 gap-4">
+                          {Object.entries(globalPolicy.platformLimits).map(([platform, limits]) => (
+                              <div key={platform} className="bg-slate-50 border border-slate-200 rounded-xl p-4">
+                                  <div className="flex items-center gap-2 mb-3">
+                                      <PlatformIcon platform={platform} size={16} />
+                                      <span className="text-sm font-bold text-slate-700">{platform}</span>
+                                  </div>
+                                  <div className="space-y-3">
+                                      {Object.entries(limits).map(([action, limit]) => {
+                                          const current = dailyActions[platform as Platform]?.[action as ActionType] || 0;
+                                          const pct = Math.min((current / limit) * 100, 100);
+                                          return (
+                                              <div key={action}>
+                                                  <div className="flex justify-between text-xs font-bold text-slate-500 mb-1">
+                                                      <span>{action}</span>
+                                                      <span>{current}/{limit}</span>
+                                                  </div>
+                                                  <div className="h-1.5 w-full bg-slate-200 rounded-full overflow-hidden">
+                                                      <div className={`h-full rounded-full ${pct > 90 ? 'bg-rose-500' : 'bg-blue-500'}`} style={{ width: `${pct}%` }}></div>
+                                                  </div>
+                                              </div>
+                                          )
+                                      })}
+                                  </div>
+                              </div>
+                          ))}
+                      </div>
+
+                      {/* Live Decision Feed (Updated for Phase 7) */}
+                      <div className="flex-1 bg-white border border-slate-200 rounded-2xl shadow-sm flex flex-col overflow-hidden min-h-[300px]">
+                          <div className="px-4 py-3 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+                              <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wide flex items-center gap-2">
+                                  <BrainCircuit className="w-4 h-4" /> Live Decision Feed
+                              </h4>
+                              <div className="flex items-center gap-1.5 text-[10px] font-mono text-slate-400">
+                                  <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                                  Monitoring {liveEvents.length} events
+                              </div>
+                          </div>
+                          <div className="flex-1 overflow-y-auto p-0 divide-y divide-slate-50 custom-scrollbar flex flex-col-reverse">
+                              {liveEvents.length === 0 ? (
+                                  <div className="flex flex-col items-center justify-center h-full text-slate-400 p-8">
+                                      <Activity className="w-8 h-8 mb-2 opacity-50" />
+                                      <p className="text-xs">Waiting for execution events...</p>
+                                  </div>
+                              ) : (
+                                  liveEvents.map((event) => (
+                                      <div key={event.id} className="p-3 hover:bg-slate-50 transition-colors flex items-start gap-3 text-sm animate-in fade-in slide-in-from-left-2">
+                                          <div className={`mt-1 w-2 h-2 rounded-full shrink-0 ${
+                                              event.status === 'blocked' ? 'bg-red-500' : 
+                                              event.status === 'skipped' ? 'bg-amber-500' : 
+                                              'bg-green-500'
+                                          }`}></div>
+                                          
+                                          <div className="flex-1 min-w-0">
+                                              <div className="flex items-center gap-2 mb-0.5">
+                                                  <span className="font-bold text-slate-700 text-xs">{event.botType}</span>
+                                                  <span className="text-[10px] text-slate-400 font-mono">{new Date(event.timestamp).toLocaleTimeString()}</span>
+                                                  {event.riskLevel === 'high' && <span className="bg-red-100 text-red-600 text-[9px] font-bold px-1.5 rounded uppercase">High Risk</span>}
+                                              </div>
+                                              
+                                              <div className="flex items-center gap-2">
+                                                  <span className={`text-xs font-bold uppercase px-1.5 py-0.5 rounded border ${
+                                                      event.action === ActionType.POST ? 'bg-blue-50 text-blue-600 border-blue-100' :
+                                                      event.action === ActionType.LIKE ? 'bg-pink-50 text-pink-600 border-pink-100' :
+                                                      'bg-slate-100 text-slate-600 border-slate-200'
+                                                  }`}>
+                                                      {event.action}
+                                                  </span>
+                                                  <span className="text-slate-600 truncate flex-1">
+                                                      {event.assetName ? `Asset: ${event.assetName}` : event.platform}
+                                                  </span>
+                                              </div>
+
+                                              {(event.status !== 'executed' && event.reason) && (
+                                                  <p className="text-[10px] font-medium text-slate-500 mt-1 italic">
+                                                      Reason: {event.reason}
+                                                  </p>
+                                              )}
+                                          </div>
+                                          
+                                          <PlatformIcon platform={event.platform} size={16} className="text-slate-400 mt-1" />
+                                      </div>
+                                  ))
+                              )}
+                          </div>
+                      </div>
                   </div>
               );
               
@@ -1534,6 +1280,24 @@ const BotConfigModal: React.FC<BotConfigModalProps> = ({ bot, onClose, onSave })
                                           </div>
                                       </div>
 
+                                      {/* Creative Optimization Insight */}
+                                      {simResult.optimizationInsight && (
+                                          <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+                                              <h4 className="text-sm font-bold text-slate-900 uppercase tracking-wide mb-3 flex items-center gap-2">
+                                                  <TrendingUp className="w-4 h-4 text-green-600" /> Creative Optimization
+                                              </h4>
+                                              <div className="bg-green-50 p-4 rounded-xl border border-green-100 flex items-start gap-4">
+                                                  <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center shrink-0 text-green-700 font-bold">
+                                                      {simResult.optimizationInsight.score}
+                                                  </div>
+                                                  <div>
+                                                      <div className="text-sm font-bold text-green-900">Selected: {simResult.optimizationInsight.selected}</div>
+                                                      <p className="text-xs text-green-800 mt-1">{simResult.optimizationInsight.reason}</p>
+                                                  </div>
+                                              </div>
+                                          </div>
+                                      )}
+
                                       {simResult.sampleContent && (
                                           <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
                                               <h4 className="text-sm font-bold text-slate-900 uppercase tracking-wide mb-3 flex items-center gap-2">
@@ -1599,6 +1363,7 @@ const BotConfigModal: React.FC<BotConfigModalProps> = ({ bot, onClose, onSave })
                                               <span className={`shrink-0 w-1.5 h-1.5 rounded-full mt-1 ${
                                                   log.status === ActivityStatus.SUCCESS ? 'bg-green-500' : 
                                                   log.status === ActivityStatus.FAILED ? 'bg-red-500' :
+                                                  log.status === ActivityStatus.SKIPPED ? 'bg-gray-400' :
                                                   'bg-blue-500'
                                               }`}></span>
                                               <span className="text-slate-500 shrink-0">{new Date(log.createdAt).toLocaleTimeString().split(' ')[0]}</span>
@@ -1629,7 +1394,7 @@ const BotConfigModal: React.FC<BotConfigModalProps> = ({ bot, onClose, onSave })
                 </div>
              </div>
              <nav className="space-y-1 flex-1">
-                {[{ id: 'Overview', icon: Info }, { id: 'Schedule', icon: Clock }, { id: 'Rules', icon: Wand2 }, { id: 'Safety', icon: Shield }, { id: 'Simulation', icon: Play }].map((item) => (
+                {[{ id: 'Overview', icon: Info }, { id: 'Schedule', icon: Clock }, { id: 'Rules', icon: Wand2 }, { id: 'Safety', icon: Shield }, { id: 'Orchestration', icon: BrainCircuit }, { id: 'Simulation', icon: Play }].map((item) => (
                    <button key={item.id} onClick={() => setActiveTab(item.id as TabType)} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all ${activeTab === item.id ? theme.sidebarActive + ' shadow-sm ring-1 ring-black/5' : 'text-slate-500 hover:bg-white/50 hover:text-slate-700'}`}>
                       <item.icon className="w-4 h-4" strokeWidth={2.5} />
                       {item.id}
@@ -1650,41 +1415,18 @@ const BotConfigModal: React.FC<BotConfigModalProps> = ({ bot, onClose, onSave })
              <div className="p-6 border-t border-slate-100 bg-white/80 backdrop-blur flex justify-between items-center shrink-0 z-20">
                 <button 
                     onClick={onClose} 
-                    className={`px-6 py-2.5 font-bold rounded-xl transition-colors ${
-                        isReadOnlyRules 
-                        ? `border-2 ${theme.border.replace('border-', 'border-')} ${theme.accentText} hover:bg-slate-50` 
-                        : theme.secondary
-                    }`}
+                    className="px-6 py-2.5 font-bold rounded-xl transition-colors hover:bg-slate-100 text-slate-600 border border-transparent"
                 >
-                    {isReadOnlyRules ? 'Close' : 'Cancel'}
+                    Cancel
                 </button>
                 
                 <div className="relative group">
                     <button 
                         onClick={handleSave} 
-                        disabled={isReadOnlyRules}
-                        className={`px-8 py-2.5 font-bold rounded-xl shadow-lg transition-all flex items-center gap-2 ${
-                            isReadOnlyRules 
-                            ? 'bg-slate-100 text-slate-400 cursor-not-allowed shadow-none' 
-                            : `${theme.primary} hover:scale-[1.02] active:scale-[0.98]`
-                        }`}
+                        className={`px-8 py-2.5 font-bold rounded-xl shadow-lg transition-all flex items-center gap-2 ${theme.primary} hover:scale-[1.02] active:scale-[0.98]`}
                     >
-                        {isReadOnlyRules ? (
-                            <>
-                                <Lock className="w-4 h-4" /> No changes to save
-                            </>
-                        ) : (
-                            <>
-                                <Save className="w-4 h-4" /> Save Configuration
-                            </>
-                        )}
+                        <Save className="w-4 h-4" /> Save Configuration
                     </button>
-                    {isReadOnlyRules && (
-                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1.5 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none shadow-xl">
-                            Rules are managed by API in this version.
-                            <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-gray-900 rotate-45"></div>
-                        </div>
-                    )}
                 </div>
              </div>
           </div>

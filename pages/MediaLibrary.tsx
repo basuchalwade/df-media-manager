@@ -4,12 +4,13 @@ import {
   Image as ImageIcon, UploadCloud, Trash2, Download, X, Search, 
   Folder, Plus, Tag, LayoutGrid, List, Play, FileVideo, Info,
   Loader2, AlertTriangle, CheckCircle, Shield, BrainCircuit, Clock,
-  History, RotateCcw, FileText, Smartphone, Wand2
+  History, RotateCcw, FileText, Smartphone, Wand2, Sparkles, TrendingUp, TrendingDown, Moon
 } from 'lucide-react';
 import { store } from '../services/mockStore';
-import { MediaItem, MediaAuditEvent } from '../types';
+import { MediaItem, MediaAuditEvent, EnhancementType } from '../types';
 import { getAuditForMedia } from '../services/auditStore';
 import { PLATFORM_RULES } from '../services/platformRules';
+import { getEnhancementSuggestions } from '../services/enhancementSuggestions';
 import { PlatformIcon } from '../components/PlatformIcon';
 
 interface Collection {
@@ -41,6 +42,8 @@ export const MediaLibrary: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'details' | 'audit'>('details');
   const [platformCounts, setPlatformCounts] = useState<Record<string, number>>({});
   const [isGeneratingVariant, setIsGeneratingVariant] = useState<string | null>(null);
+  const [isEnhancing, setIsEnhancing] = useState<string | null>(null);
+  const [suggestions, setSuggestions] = useState<EnhancementType[]>([]);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -59,6 +62,7 @@ export const MediaLibrary: React.FC = () => {
     if (selectedItem && isDrawerOpen) {
       // Refresh audit logs when selection changes or drawer opens
       setAuditLogs(getAuditForMedia(selectedItem.id));
+      setSuggestions(getEnhancementSuggestions(selectedItem));
     }
   }, [selectedItem, isDrawerOpen]);
 
@@ -72,7 +76,8 @@ export const MediaLibrary: React.FC = () => {
             // Keep selected item fresh but don't override local input state if we were typing rejection reason
             if (updatedSelected.processingStatus !== selectedItem.processingStatus || 
                 updatedSelected.governance.status !== selectedItem.governance.status ||
-                updatedSelected.variants?.length !== selectedItem.variants?.length) {
+                updatedSelected.variants?.length !== selectedItem.variants?.length ||
+                updatedSelected.performanceScore !== selectedItem.performanceScore) {
                 setSelectedItem(updatedSelected);
                 // Also refresh audit logs if governance changed
                 setAuditLogs(getAuditForMedia(updatedSelected.id));
@@ -177,6 +182,20 @@ export const MediaLibrary: React.FC = () => {
       }
   };
 
+  const handleEnhance = async (type: EnhancementType) => {
+      if (!selectedItem) return;
+      setIsEnhancing(type);
+      try {
+          await store['createEnhancedVariant'](selectedItem.id, type);
+          await loadMedia();
+      } catch (e) {
+          console.error(e);
+          alert('Enhancement failed.');
+      } finally {
+          setIsEnhancing(null);
+      }
+  };
+
   const handleDeleteVariant = async (variantId: string) => {
       if (!selectedItem) return;
       if (confirm('Delete this variant?')) {
@@ -191,6 +210,7 @@ export const MediaLibrary: React.FC = () => {
       setRejectionReason('');
       setActiveTab('details');
       setAuditLogs(getAuditForMedia(item.id));
+      setSuggestions(getEnhancementSuggestions(item));
   };
 
   const getActionColor = (action: string) => {
@@ -202,9 +222,12 @@ export const MediaLibrary: React.FC = () => {
           case 'RESET_TO_DRAFT': return 'text-slate-600 bg-slate-100 border-slate-200';
           case 'VARIANT_GENERATED': return 'text-purple-600 bg-purple-50 border-purple-200';
           case 'VARIANT_DELETED': return 'text-red-500 bg-red-50 border-red-200';
+          case 'ENHANCEMENT_APPLIED': return 'text-indigo-600 bg-indigo-50 border-indigo-200';
           default: return 'text-gray-600 bg-gray-50 border-gray-200';
       }
   };
+
+  const enhancedVariants = selectedItem?.variants?.filter(v => v.enhancementType);
 
   return (
     <div className="flex h-full animate-in fade-in duration-500 overflow-hidden">
@@ -388,6 +411,32 @@ export const MediaLibrary: React.FC = () => {
                                 </div>
                             </div>
 
+                            {/* Performance Stats (NEW) */}
+                            {selectedItem.performanceScore !== undefined && (
+                                <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                        <TrendingUp className="w-3.5 h-3.5" /> Performance Insight
+                                    </h4>
+                                    <div className="flex items-center gap-4">
+                                        <div className="relative w-12 h-12 flex items-center justify-center">
+                                            <svg className="w-full h-full" viewBox="0 0 36 36">
+                                                <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="#e2e8f0" strokeWidth="3" />
+                                                <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke={selectedItem.performanceScore > 70 ? '#10b981' : selectedItem.performanceScore > 40 ? '#3b82f6' : '#f59e0b'} strokeWidth="3" strokeDasharray={`${selectedItem.performanceScore}, 100`} />
+                                            </svg>
+                                            <span className="absolute text-xs font-bold text-slate-700">{selectedItem.performanceScore}</span>
+                                        </div>
+                                        <div>
+                                            <span className="block text-sm font-bold text-slate-900">Creative Score</span>
+                                            <div className="flex items-center gap-1 text-xs font-medium">
+                                                {selectedItem.performanceTrend === 'up' && <span className="text-green-600 flex items-center gap-0.5"><TrendingUp className="w-3 h-3" /> Trending Up</span>}
+                                                {selectedItem.performanceTrend === 'down' && <span className="text-red-500 flex items-center gap-0.5"><TrendingDown className="w-3 h-3" /> Declining</span>}
+                                                {selectedItem.performanceTrend === 'stable' && <span className="text-slate-500 flex items-center gap-0.5"><Moon className="w-3 h-3" /> Dormant</span>}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
                             {/* Governance Section */}
                             <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-3">
                                 <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
@@ -465,6 +514,58 @@ export const MediaLibrary: React.FC = () => {
                                 )}
                             </div>
 
+                            {/* AI Visual Enhancements */}
+                            <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 space-y-4">
+                                <h4 className="text-xs font-bold text-indigo-800 uppercase tracking-widest flex items-center gap-2">
+                                    <Sparkles className="w-3.5 h-3.5" /> AI Visual Enhancements
+                                </h4>
+                                
+                                {suggestions.length > 0 && (
+                                    <div className="space-y-2">
+                                        <p className="text-[10px] text-indigo-500 font-bold uppercase tracking-wider">Suggested Actions</p>
+                                        <div className="flex flex-wrap gap-2">
+                                            {suggestions.map(s => (
+                                                <button
+                                                    key={s}
+                                                    onClick={() => handleEnhance(s)}
+                                                    disabled={isEnhancing === s}
+                                                    className="px-3 py-2 bg-white text-indigo-600 text-[11px] font-bold rounded-lg shadow-sm border border-indigo-200 hover:bg-indigo-50 transition-colors flex items-center gap-1.5 disabled:opacity-50"
+                                                >
+                                                    {isEnhancing === s ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wand2 className="w-3 h-3" />}
+                                                    {s.replace('_', ' ')}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {enhancedVariants && enhancedVariants.length > 0 && (
+                                    <div className="space-y-2 pt-2 border-t border-indigo-100">
+                                        <p className="text-[10px] text-indigo-500 font-bold uppercase tracking-wider">Enhanced Variants</p>
+                                        <div className="space-y-2">
+                                            {enhancedVariants.map(v => (
+                                                <div key={v.id} className="flex gap-3 bg-white p-2 rounded-lg border border-indigo-100 shadow-sm">
+                                                    <div className="w-12 h-12 bg-slate-100 rounded overflow-hidden shrink-0">
+                                                        <img src={v.thumbnailUrl} className="w-full h-full object-cover" />
+                                                    </div>
+                                                    <div className="flex-1 flex flex-col justify-center">
+                                                        <span className="font-bold text-indigo-900 text-xs">{v.enhancementType?.replace('_', ' ')}</span>
+                                                        <span className="text-[10px] text-indigo-400">Created {new Date(v.createdAt).toLocaleDateString()}</span>
+                                                    </div>
+                                                    <button 
+                                                        onClick={() => handleDeleteVariant(v.id)}
+                                                        className="text-red-400 hover:text-red-600 p-1 hover:bg-red-50 rounded"
+                                                        title="Delete Variant"
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
                             {/* Platform Readiness & Variants */}
                             <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-4">
                                 <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
@@ -474,7 +575,7 @@ export const MediaLibrary: React.FC = () => {
                                     {Object.values(PLATFORM_RULES).map(rule => {
                                         const status = selectedItem.platformCompatibility?.[rule.id];
                                         const isReady = status?.compatible;
-                                        const existingVariant = selectedItem.variants?.find(v => v.platform === rule.id);
+                                        const existingVariant = selectedItem.variants?.find(v => v.platform === rule.id && !v.enhancementType);
                                         const isProcessing = isGeneratingVariant === rule.id;
                                         
                                         return (
@@ -662,6 +763,22 @@ const GridItem: React.FC<{
                     />
                 )}
 
+                {/* Performance Badge (New) */}
+                {!processing && !failed && item.performanceTrend && (
+                    <div className="absolute bottom-2 right-2 z-10">
+                        {item.performanceTrend === 'up' && (
+                            <div className="flex items-center gap-1 bg-white/90 backdrop-blur-sm px-1.5 py-0.5 rounded text-[10px] font-bold text-green-600 shadow-sm border border-green-100">
+                                <TrendingUp className="w-3 h-3" /> Trending
+                            </div>
+                        )}
+                        {item.performanceTrend === 'down' && (
+                            <div className="flex items-center gap-1 bg-white/90 backdrop-blur-sm px-1.5 py-0.5 rounded text-[10px] font-bold text-red-500 shadow-sm border border-red-100">
+                                <TrendingDown className="w-3 h-3" /> Declining
+                            </div>
+                        )}
+                    </div>
+                )}
+
                 {/* Governance Status Dot */}
                 {!processing && !failed && (
                     <div className="absolute top-2 right-2 z-10">
@@ -714,7 +831,11 @@ const GridItem: React.FC<{
                             {governanceStatus === 'pending' && <span className="text-[10px] text-yellow-600 bg-yellow-50 px-1.5 py-0.5 rounded font-bold uppercase">Pending</span>}
                         </div>
                     </div>
-                    {processing && <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />}
+                    <div className="flex items-center gap-3">
+                        {item.performanceTrend === 'up' && <TrendingUp className="w-4 h-4 text-green-500" />}
+                        {item.performanceTrend === 'down' && <TrendingDown className="w-4 h-4 text-red-500" />}
+                        {processing && <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />}
+                    </div>
                 </div>
             )}
         </div>

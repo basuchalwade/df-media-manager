@@ -245,7 +245,8 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
     if (selectedMedia && selectedMedia.platformCompatibility) {
         selectedPlatforms.forEach(p => {
             const status = selectedMedia.platformCompatibility?.[p];
-            const hasVariant = selectedMedia.variants?.some(v => v.platform === p);
+            // Check if any variant exists (either platform-specific OR enhanced)
+            const hasVariant = selectedMedia.variants?.some(v => v.platform === p || v.enhancementType);
             
             // Only warn if incompatible AND no variant exists
             if (status && !status.compatible && !hasVariant) {
@@ -700,15 +701,41 @@ export const CreatorStudio: React.FC<PageProps> = ({ onNavigate, params }) => {
   // Render Logic
   const renderPreviewContent = () => {
     // Platform Variant Selection Logic
-    const variant = selectedMedia?.variants?.find(v => v.platform === previewPlatform);
-    const mediaToUse = variant || selectedMedia;
-    const isUsingVariant = !!variant;
+    // 1. Try to find Enhanced Variant for platform (or generic Enhanced)
+    // 2. Try to find Platform Variant
+    // 3. Fallback to Original
+    
+    let mediaToUse = selectedMedia;
+    let isUsingVariant = false;
+    let isEnhanced = false;
+
+    if (selectedMedia?.variants) {
+        // Priority 1: Platform-specific Enhanced
+        let variant = selectedMedia.variants.find(v => v.platform === previewPlatform && v.enhancementType);
+        
+        // Priority 2: Generic Enhanced (platform === 'All')
+        if (!variant) {
+            variant = selectedMedia.variants.find(v => v.platform === 'All' && v.enhancementType);
+        }
+
+        // Priority 3: Platform specific (no enhancement)
+        if (!variant) {
+            variant = selectedMedia.variants.find(v => v.platform === previewPlatform);
+        }
+
+        if (variant) {
+            mediaToUse = variant as any; // Cast to satisfy type check (variant has url, type etc)
+            isUsingVariant = true;
+            isEnhanced = !!variant.enhancementType;
+        }
+    }
 
     const commonMedia = mediaToUse && (
         <div className="w-full bg-black flex items-center justify-center relative overflow-hidden bg-gray-100 group">
            {isUsingVariant && (
-               <div className="absolute top-2 right-2 z-10 bg-purple-600/90 text-white text-[10px] font-bold px-2 py-1 rounded-full backdrop-blur-md shadow-sm flex items-center gap-1">
-                   <Wand2 className="w-3 h-3" /> Optimized
+               <div className={`absolute top-2 right-2 z-10 text-white text-[10px] font-bold px-2 py-1 rounded-full backdrop-blur-md shadow-sm flex items-center gap-1 ${isEnhanced ? 'bg-indigo-600/90' : 'bg-purple-600/90'}`}>
+                   {isEnhanced ? <Sparkles className="w-3 h-3" /> : <Wand2 className="w-3 h-3" />}
+                   {isEnhanced ? 'AI Enhanced' : 'Optimized'}
                </div>
            )}
            {selectedMedia?.type === 'image' ? (
