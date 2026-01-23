@@ -94,6 +94,36 @@ const INITIAL_POSTS: Post[] = [
   },
 ];
 
+const INITIAL_MEDIA: MediaItem[] = [
+  {
+    id: 'm1',
+    name: 'Product_Launch_Teaser.mp4',
+    type: 'video',
+    url: 'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4',
+    size: 15400000,
+    createdAt: new Date().toISOString(),
+    dimensions: '1920x1080'
+  },
+  {
+    id: 'm2',
+    name: 'Office_Tour.jpg',
+    type: 'image',
+    url: 'https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=800&q=80',
+    size: 2400000,
+    createdAt: new Date().toISOString(),
+    dimensions: '1080x1080'
+  },
+  {
+    id: 'm3',
+    name: 'Team_Meeting_Q3.jpg',
+    type: 'image',
+    url: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=800&q=80',
+    size: 1800000,
+    createdAt: new Date(Date.now() - 86400000).toISOString(),
+    dimensions: '1200x800'
+  }
+];
+
 // --- Simulation Steps Definition ---
 const SIMULATION_STEPS: Record<BotType, string[]> = {
   [BotType.Creator]: [
@@ -165,6 +195,9 @@ class HybridStore {
     if (this.bots.length === 0) {
         this.bots = DEFAULT_BOTS;
     }
+
+    const savedMedia = localStorage.getItem('postmaster_media');
+    this.media = savedMedia ? JSON.parse(savedMedia) : INITIAL_MEDIA;
   }
 
   private get isSimulation(): boolean {
@@ -177,6 +210,7 @@ class HybridStore {
           localStorage.setItem('postmaster_bots', JSON.stringify(this.bots));
           localStorage.setItem('postmaster_settings', JSON.stringify(this.settings));
           localStorage.setItem('postmaster_users', JSON.stringify(this.users));
+          localStorage.setItem('postmaster_media', JSON.stringify(this.media));
       }
   }
 
@@ -439,15 +473,18 @@ class HybridStore {
           type: f.type.startsWith('video') ? 'video' : 'image',
           url: URL.createObjectURL(f),
           size: f.size,
-          createdAt: new Date().toISOString()
+          createdAt: new Date().toISOString(),
+          dimensions: 'Original'
       };
       this.media.push(newItem);
+      this.saveState();
       return newItem;
   }
   
   async deleteMedia(id: string): Promise<MediaItem[]> { 
       if (!this.isSimulation) return api.deleteMedia(id);
       this.media = this.media.filter(m => m.id !== id);
+      this.saveState();
       return this.media;
   }
   
