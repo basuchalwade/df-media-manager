@@ -102,7 +102,6 @@ const INITIAL_MEDIA: MediaItem[] = [
     url: 'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4',
     size: 15400000,
     createdAt: new Date().toISOString(),
-    status: 'ready',
     dimensions: '1920x1080'
   },
   {
@@ -112,7 +111,6 @@ const INITIAL_MEDIA: MediaItem[] = [
     url: 'https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=800&q=80',
     size: 2400000,
     createdAt: new Date().toISOString(),
-    status: 'ready',
     dimensions: '1080x1080'
   },
   {
@@ -122,7 +120,6 @@ const INITIAL_MEDIA: MediaItem[] = [
     url: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=800&q=80',
     size: 1800000,
     createdAt: new Date(Date.now() - 86400000).toISOString(),
-    status: 'ready',
     dimensions: '1200x800'
   }
 ];
@@ -470,7 +467,6 @@ class HybridStore {
   
   async uploadMedia(f: File): Promise<MediaItem> { 
       if (!this.isSimulation) return api.uploadMedia(f);
-      
       const newItem: MediaItem = {
           id: Date.now().toString(),
           name: f.name,
@@ -478,29 +474,10 @@ class HybridStore {
           url: URL.createObjectURL(f),
           size: f.size,
           createdAt: new Date().toISOString(),
-          status: 'processing', // Start as processing
-          dimensions: 'Pending'
+          dimensions: 'Original'
       };
-      
       this.media.push(newItem);
       this.saveState();
-
-      // Simulate Background Processing Worker
-      // In production, this is done by the backend/worker logic described in ARCHITECTURE.md
-      setTimeout(() => {
-          this.media = this.media.map(m => {
-              if (m.id === newItem.id) {
-                  return { 
-                      ...m, 
-                      status: 'ready', 
-                      dimensions: m.type === 'video' ? '1920x1080' : '1080x1080'
-                  };
-              }
-              return m;
-          });
-          this.saveState();
-      }, 4000); // 4 seconds simulated delay
-
       return newItem;
   }
   

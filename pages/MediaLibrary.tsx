@@ -5,7 +5,8 @@ import {
   Check, AlertTriangle, FileVideo, Download, X, Search, Filter, 
   Folder, Plus, MoreHorizontal, ShieldCheck, Zap, Layers, Tag,
   LayoutGrid, List, CheckCircle2, Clock, Globe, Lock, ChevronRight,
-  Bot, AlertOctagon, Calendar, Play, Pause, Volume2, VolumeX, Info, Loader2
+  Bot, AlertOctagon, Calendar, Play, Pause, Volume2, VolumeX, Info,
+  History, UserCheck
 } from 'lucide-react';
 import { store } from '../services/mockStore';
 import { MediaItem, Platform } from '../types';
@@ -13,14 +14,18 @@ import { PlatformIcon } from '../components/PlatformIcon';
 
 // --- Extended Types for UI ---
 interface ExtendedMediaItem extends MediaItem {
+  status: 'approved' | 'draft' | 'restricted';
   tags: string[];
   collections: string[];
   usageCount: number;
   platformFit: Platform[];
+  dimensions: string;
   automationApproved: boolean;
   aiRiskScore?: number; // 0-100, higher is riskier
   expiresAt?: string;
   duration?: string; // 0:15
+  approvedBy?: string;
+  approvedAt?: string;
 }
 
 interface Collection {
@@ -61,8 +66,6 @@ export const MediaLibrary: React.FC = () => {
 
   useEffect(() => {
     loadMedia();
-    const interval = setInterval(loadMedia, 2000); // Poll for processing updates
-    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -73,19 +76,23 @@ export const MediaLibrary: React.FC = () => {
     const rawItems = await store.getMedia();
     
     // Enrich raw items with mock metadata for the demo
-    const enriched = rawItems.map((item: any) => ({
-      ...item,
-      // If status is present on raw item, use it (from our new mockStore logic), else default to ready for older mocks
-      status: item.status || 'ready',
-      tags: item.tags || (item.type === 'video' ? ['video', 'social'] : ['product', 'feature', 'q3']),
-      collections: item.collections || (Math.random() > 0.7 ? ['c1'] : []),
-      usageCount: item.usageCount || Math.floor(Math.random() * 20),
-      platformFit: item.platformFit || [Platform.LinkedIn, Platform.Twitter, Platform.Instagram],
-      dimensions: item.dimensions || (item.type === 'video' ? '1920x1080' : '1080x1080'),
-      automationApproved: item.automationApproved ?? (Math.random() > 0.3),
-      aiRiskScore: item.aiRiskScore || Math.floor(Math.random() * 10),
-      duration: item.duration || (item.type === 'video' ? '0:15' : undefined)
-    }));
+    const enriched = rawItems.map((item: any) => {
+      const status = item.status || (Math.random() > 0.4 ? 'approved' : 'draft');
+      return {
+        ...item,
+        status: status,
+        tags: item.tags || (item.type === 'video' ? ['video', 'social'] : ['product', 'feature', 'q3']),
+        collections: item.collections || (Math.random() > 0.7 ? ['c1'] : []),
+        usageCount: item.usageCount || Math.floor(Math.random() * 5),
+        platformFit: item.platformFit || [Platform.LinkedIn, Platform.Twitter, Platform.Instagram],
+        dimensions: item.dimensions || (item.type === 'video' ? '1920x1080' : '1080x1080'),
+        automationApproved: status === 'approved', // Sync initial automation status
+        aiRiskScore: item.aiRiskScore || Math.floor(Math.random() * 10),
+        duration: item.duration || (item.type === 'video' ? '0:15' : undefined),
+        approvedBy: status === 'approved' ? 'Admin User' : undefined,
+        approvedAt: status === 'approved' ? new Date(Date.now() - Math.random() * 1000000000).toISOString() : undefined
+      };
+    });
     
     setMediaItems(enriched);
   };
@@ -110,11 +117,7 @@ export const MediaLibrary: React.FC = () => {
     }
 
     if (filterStatus !== 'all') {
-      // Mapping 'status' from media lifecycle to 'approval status' logic for filtering
-      // Since we now have 'uploading/processing/ready', we map 'ready' + automationApproved logic for these filters
-      // This is a simplification for the demo UI
-      if (filterStatus === 'approved') result = result.filter(item => item.status === 'ready' && item.automationApproved);
-      if (filterStatus === 'restricted') result = result.filter(item => item.status === 'ready' && !item.automationApproved);
+      result = result.filter(item => item.status === filterStatus);
     }
 
     setFilteredItems(result);
@@ -126,10 +129,10 @@ export const MediaLibrary: React.FC = () => {
     setIsUploading(true);
     setUploadProgress(10);
 
-    // Simulate Network/Upload Phase
+    // Simulate AI Processing Steps
     const steps = [20, 45, 70, 90];
     for (const p of steps) {
-        await new Promise(r => setTimeout(r, 200));
+        await new Promise(r => setTimeout(r, 400));
         setUploadProgress(p);
     }
 
@@ -143,7 +146,7 @@ export const MediaLibrary: React.FC = () => {
     }
 
     setUploadProgress(100);
-    await loadMedia(); // Will fetch new items in 'processing' state
+    await loadMedia();
     setTimeout(() => {
         setIsUploading(false);
         setUploadProgress(0);
@@ -153,6 +156,15 @@ export const MediaLibrary: React.FC = () => {
   };
 
   const handleDelete = async (id: string) => {
+    const item = mediaItems.find(i => i.id === id);
+    if (!item) return;
+
+    // Protection Check
+    if (item.usageCount > 0) {
+        alert(`🚫 Cannot delete "${item.name}"\n\nThis asset is currently used in ${item.usageCount} scheduled posts or bot pools.\nPlease remove usage references before deleting.`);
+        return;
+    }
+
     if (confirm('Delete this asset permanently?')) {
         await store.deleteMedia(id);
         setSelectedItem(null);
@@ -161,19 +173,26 @@ export const MediaLibrary: React.FC = () => {
     }
   };
 
+  const handleStatusChange = (item: ExtendedMediaItem, newStatus: 'approved' | 'restricted' | 'draft') => {
+      const updatedItem = {
+          ...item,
+          status: newStatus,
+          automationApproved: newStatus === 'approved',
+          approvedBy: newStatus === 'approved' ? 'Current User' : undefined,
+          approvedAt: newStatus === 'approved' ? new Date().toISOString() : undefined
+      };
+      
+      const updatedList = mediaItems.map(i => i.id === item.id ? updatedItem : i);
+      setMediaItems(updatedList as ExtendedMediaItem[]);
+      setSelectedItem(updatedItem as ExtendedMediaItem);
+  };
+
   const handleAssetClick = (item: ExtendedMediaItem) => {
-      if (item.status === 'processing' || item.status === 'uploading') return;
       setSelectedItem(item);
       setIsDrawerOpen(true);
   };
 
-  const toggleAutomationApproval = (item: ExtendedMediaItem) => {
-      const updated = mediaItems.map(i => 
-          i.id === item.id ? { ...i, automationApproved: !i.automationApproved } : i
-      ) as ExtendedMediaItem[];
-      setMediaItems(updated);
-      setSelectedItem({ ...item, automationApproved: !item.automationApproved } as ExtendedMediaItem);
-  };
+  // --- Render Helpers ---
 
   return (
     <div className="flex h-full animate-in fade-in duration-500 overflow-hidden">
@@ -288,6 +307,7 @@ export const MediaLibrary: React.FC = () => {
                             <option value="all">All Status</option>
                             <option value="approved">Approved</option>
                             <option value="restricted">Restricted</option>
+                            <option value="draft">Draft</option>
                         </select>
                     </div>
                 </div>
@@ -340,7 +360,7 @@ export const MediaLibrary: React.FC = () => {
                 
                 {/* Header */}
                 <div className="h-16 flex items-center justify-between px-5 border-b border-slate-100">
-                    <h3 className="font-bold text-slate-900 truncate pr-4">Asset Details</h3>
+                    <h3 className="font-bold text-slate-900 truncate pr-4">Asset Governance</h3>
                     <button onClick={() => setIsDrawerOpen(false)} className="text-slate-400 hover:text-slate-600 hover:bg-slate-100 p-1.5 rounded-full transition-colors">
                         <X className="w-5 h-5" />
                     </button>
@@ -381,38 +401,79 @@ export const MediaLibrary: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* Automation Controls */}
-                    <div className="border border-indigo-100 bg-indigo-50/50 rounded-xl p-4">
-                        <div className="flex items-center gap-2 mb-3">
-                            <Bot className="w-4 h-4 text-indigo-600" />
-                            <h4 className="text-xs font-bold text-indigo-900 uppercase tracking-wider">Automation Governance</h4>
-                        </div>
-                        
-                        <div className="flex items-center justify-between bg-white p-3 rounded-lg border border-indigo-100 shadow-sm mb-3">
-                            <div>
-                                <span className="text-sm font-bold text-slate-800 block">Bot Usage</span>
-                                <span className="text-xs text-slate-500">{selectedItem.automationApproved ? 'Allowed for auto-posting' : 'Manual approval required'}</span>
-                            </div>
-                            <button 
-                                onClick={() => toggleAutomationApproval(selectedItem)}
-                                className={`relative w-10 h-6 rounded-full transition-colors ${selectedItem.automationApproved ? 'bg-green-500' : 'bg-slate-200'}`}
-                            >
-                                <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full shadow-sm transition-transform ${selectedItem.automationApproved ? 'translate-x-4' : ''}`}></div>
-                            </button>
+                    {/* Approval & Governance Controls */}
+                    <div className="border border-slate-200 bg-slate-50 rounded-xl p-4 space-y-4">
+                        <div className="flex items-center justify-between">
+                            <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                                <ShieldCheck className="w-4 h-4 text-slate-500" />
+                                Governance
+                            </h4>
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border flex items-center gap-1 ${
+                                selectedItem.status === 'approved' ? 'bg-green-100 text-green-700 border-green-200' :
+                                selectedItem.status === 'restricted' ? 'bg-red-100 text-red-700 border-red-200' :
+                                'bg-amber-100 text-amber-700 border-amber-200'
+                            }`}>
+                                {selectedItem.status === 'approved' ? <CheckCircle2 className="w-3 h-3" /> : 
+                                 selectedItem.status === 'restricted' ? <Lock className="w-3 h-3" /> : 
+                                 <Clock className="w-3 h-3" />}
+                                {selectedItem.status.charAt(0).toUpperCase() + selectedItem.status.slice(1)}
+                            </span>
                         </div>
 
-                        {selectedItem.aiRiskScore && selectedItem.aiRiskScore > 5 && (
-                            <div className="flex items-start gap-2 text-xs text-amber-700 bg-amber-50 p-2 rounded border border-amber-100">
-                                <AlertOctagon className="w-4 h-4 shrink-0" />
-                                <span>AI Flag: Potential brand conflict detected. Score: {selectedItem.aiRiskScore}/10</span>
+                        {/* Approval Info */}
+                        {selectedItem.status === 'approved' && (
+                            <div className="text-[10px] text-slate-500 bg-white p-2.5 rounded-lg border border-slate-200 flex items-start gap-2">
+                                <UserCheck className="w-3.5 h-3.5 mt-0.5 text-slate-400" />
+                                <div>
+                                    Approved by <span className="font-bold text-slate-700">{selectedItem.approvedBy || 'Admin'}</span>
+                                    <br />
+                                    <span className="text-slate-400">{selectedItem.approvedAt ? new Date(selectedItem.approvedAt).toLocaleDateString() : 'Recently'}</span>
+                                </div>
                             </div>
                         )}
+
+                        {/* Controls */}
+                        <div className="flex gap-2">
+                            {selectedItem.status !== 'approved' && (
+                                <button 
+                                    onClick={() => handleStatusChange(selectedItem, 'approved')}
+                                    className="flex-1 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-bold shadow-sm transition-colors flex items-center justify-center gap-2"
+                                >
+                                    <CheckCircle2 className="w-3.5 h-3.5" /> Approve
+                                </button>
+                            )}
+                            {selectedItem.status !== 'restricted' && (
+                                <button 
+                                    onClick={() => handleStatusChange(selectedItem, 'restricted')}
+                                    className="flex-1 py-2 bg-white border border-red-200 text-red-600 hover:bg-red-50 rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-2"
+                                >
+                                    <Lock className="w-3.5 h-3.5" /> Restrict
+                                </button>
+                            )}
+                            {selectedItem.status !== 'draft' && (
+                                 <button 
+                                    onClick={() => handleStatusChange(selectedItem, 'draft')}
+                                    className="px-3 py-2 bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-lg text-xs font-bold transition-colors"
+                                    title="Reset to Draft"
+                                >
+                                    Draft
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Bot Usage Indicator */}
+                        <div className={`flex items-center gap-2 text-xs p-2 rounded border ${selectedItem.automationApproved ? 'bg-blue-50 text-blue-700 border-blue-100' : 'bg-slate-100 text-slate-500 border-slate-200 opacity-60'}`}>
+                            <Bot className="w-4 h-4" />
+                            <span className="font-medium">
+                                {selectedItem.automationApproved ? 'Available for Automation' : 'Automation Disabled'}
+                            </span>
+                        </div>
                     </div>
 
                     {/* Tags */}
                     <div>
                         <h4 className="text-xs font-bold text-slate-900 mb-2 flex items-center justify-between">
-                            <span>Tags</span>
+                            <span>Smart Tags</span>
                             <span className="text-[10px] bg-slate-100 px-1.5 rounded text-slate-500">AI Suggested</span>
                         </h4>
                         <div className="flex flex-wrap gap-2">
@@ -435,6 +496,7 @@ export const MediaLibrary: React.FC = () => {
                                     <div key={cid} className="flex items-center gap-2 p-2 bg-slate-50 rounded-lg border border-slate-100">
                                         <Folder className="w-3.5 h-3.5 text-slate-400" />
                                         <span className="text-xs font-medium text-slate-700">{col.name}</span>
+                                        <span className="text-[10px] bg-white border px-1.5 rounded text-slate-400 ml-auto uppercase">{col.type}</span>
                                     </div>
                                 ) : null;
                             })}
@@ -449,8 +511,8 @@ export const MediaLibrary: React.FC = () => {
                         <h4 className="text-xs font-bold text-slate-900 mb-2">Usage Intelligence</h4>
                         <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 space-y-2">
                             <div className="flex justify-between text-xs">
-                                <span className="text-slate-500">Total Posts</span>
-                                <span className="font-bold text-slate-900">{selectedItem.usageCount}</span>
+                                <span className="text-slate-500">Total Usage</span>
+                                <span className="font-bold text-slate-900">{selectedItem.usageCount} Posts</span>
                             </div>
                             <div className="flex justify-between text-xs">
                                 <span className="text-slate-500">Avg Engagement</span>
@@ -498,32 +560,20 @@ const GridItem: React.FC<{
 }> = ({ item, selected, viewMode, onClick, onDelete }) => {
     const videoRef = useRef<HTMLVideoElement>(null);
     const [isPlaying, setIsPlaying] = useState(false);
-    const isProcessing = item.status === 'processing' || item.status === 'uploading';
 
     const handleMouseEnter = () => {
-        if (!isProcessing && item.type === 'video' && videoRef.current) {
+        if (item.type === 'video' && videoRef.current) {
             videoRef.current.play().catch(() => {});
             setIsPlaying(true);
         }
     };
 
     const handleMouseLeave = () => {
-        if (!isProcessing && item.type === 'video' && videoRef.current) {
+        if (item.type === 'video' && videoRef.current) {
             videoRef.current.pause();
             videoRef.current.currentTime = 0;
             setIsPlaying(false);
         }
-    };
-
-    const getStatusBadge = () => {
-        // Show lifecycle status if not ready
-        if (item.status === 'processing') return <span className="bg-purple-100 text-purple-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-purple-200 flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> Processing</span>;
-        if (item.status === 'uploading') return <span className="bg-blue-100 text-blue-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-blue-200 flex items-center gap-1"><UploadCloud className="w-3 h-3 animate-bounce" /> Uploading</span>;
-        if (item.status === 'failed') return <span className="bg-red-100 text-red-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-red-200 flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> Failed</span>;
-
-        // If ready, show approval status
-        if (item.automationApproved) return <span className="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-green-200 flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> Approved</span>;
-        return <span className="bg-slate-100 text-slate-600 text-[10px] font-bold px-2 py-0.5 rounded-full border border-slate-200 flex items-center gap-1"><Lock className="w-3 h-3" /> Restricted</span>;
     };
 
     return (
@@ -535,19 +585,10 @@ const GridItem: React.FC<{
                 group relative bg-white border border-slate-200 rounded-2xl overflow-hidden cursor-pointer hover:shadow-lg transition-all duration-200
                 ${selected ? 'ring-2 ring-blue-500 border-transparent shadow-md' : 'hover:border-blue-300'}
                 ${viewMode === 'list' ? 'flex items-center h-20 p-2 gap-4' : 'aspect-square'}
-                ${isProcessing ? 'opacity-80 cursor-progress' : ''}
             `}
         >
             {/* Visual Content */}
             <div className={`relative bg-gray-50 flex items-center justify-center ${viewMode === 'list' ? 'w-16 h-16 rounded-lg overflow-hidden shrink-0' : 'w-full h-full'}`}>
-                {/* Processing Overlay */}
-                {isProcessing && (
-                    <div className="absolute inset-0 bg-white/60 backdrop-blur-sm z-20 flex flex-col items-center justify-center text-purple-600">
-                        <Loader2 className="w-8 h-8 animate-spin" />
-                        {viewMode === 'grid' && <span className="text-[10px] font-bold mt-2 uppercase tracking-wider">Processing...</span>}
-                    </div>
-                )}
-
                 {item.type === 'image' ? (
                     <img src={item.url} className="w-full h-full object-cover" alt={item.name} />
                 ) : (
@@ -561,7 +602,7 @@ const GridItem: React.FC<{
                             playsInline
                             preload="metadata"
                         />
-                        {!isPlaying && !isProcessing && viewMode === 'grid' && (
+                        {!isPlaying && viewMode === 'grid' && (
                             <div className="absolute inset-0 flex items-center justify-center bg-black/10">
                                 <div className="w-10 h-10 bg-black/40 backdrop-blur-sm rounded-full flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
                                     <Play className="w-5 h-5 text-white ml-0.5" fill="currentColor" />
@@ -569,7 +610,7 @@ const GridItem: React.FC<{
                             </div>
                         )}
                         {/* Video Badge */}
-                        {viewMode === 'grid' && !isProcessing && (
+                        {viewMode === 'grid' && (
                             <div className="absolute bottom-2 left-2 bg-black/60 text-white text-[10px] font-bold px-1.5 py-0.5 rounded backdrop-blur-md flex items-center gap-1">
                                 <FileVideo className="w-3 h-3" />
                                 <span>{item.duration || '0:15'}</span>
@@ -579,7 +620,7 @@ const GridItem: React.FC<{
                 )}
                 
                 {/* Overlay Gradient (Grid Only) */}
-                {viewMode === 'grid' && !isProcessing && (
+                {viewMode === 'grid' && (
                     <div className="absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity p-2 flex justify-end">
                         <button 
                             onClick={(e) => { e.stopPropagation(); }} 
@@ -597,8 +638,14 @@ const GridItem: React.FC<{
                     <div>
                         <h4 className="font-bold text-slate-900 text-sm truncate max-w-[200px]">{item.name}</h4>
                         <div className="flex items-center gap-2 mt-1">
-                            {getStatusBadge()}
-                            {item.status === 'ready' && <span className="text-xs text-slate-400">• {item.dimensions}</span>}
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border flex items-center gap-1 ${
+                                item.status === 'approved' ? 'bg-green-100 text-green-700 border-green-200' :
+                                item.status === 'restricted' ? 'bg-red-100 text-red-700 border-red-200' :
+                                'bg-slate-100 text-slate-600 border-slate-200'
+                            }`}>
+                                {item.status === 'approved' ? 'Approved' : item.status === 'restricted' ? 'Restricted' : 'Draft'}
+                            </span>
+                            <span className="text-xs text-slate-400">• {item.dimensions}</span>
                             {item.type === 'video' && <span className="text-xs text-slate-400">• {item.duration}</span>}
                         </div>
                     </div>
@@ -619,8 +666,10 @@ const GridItem: React.FC<{
 
             {/* Status Badges (Grid View) */}
             {viewMode === 'grid' && (
-                <div className="absolute top-2 left-2 flex gap-1 z-10">
-                    {getStatusBadge()}
+                <div className="absolute top-2 left-2 flex gap-1">
+                    {item.status === 'approved' && <div className="bg-green-500 w-2.5 h-2.5 rounded-full ring-2 ring-white shadow-sm" title="Approved"></div>}
+                    {item.status === 'restricted' && <div className="bg-red-500 w-2.5 h-2.5 rounded-full ring-2 ring-white shadow-sm" title="Restricted"></div>}
+                    {item.status === 'draft' && <div className="bg-amber-400 w-2.5 h-2.5 rounded-full ring-2 ring-white shadow-sm" title="Draft"></div>}
                 </div>
             )}
         </div>
