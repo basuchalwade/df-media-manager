@@ -21,7 +21,11 @@
     "cors": "^2.8.6",
     "express": "^5.2.1",
     "bullmq": "^5.66.6",
-    "uuid": "^13.0.0"
+    "uuid": "^13.0.0",
+    "dotenv": "^17.2.3",
+    "multer": "^2.0.2",
+    "axios": "^1.13.2",
+    "minio": "^8.0.6"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
