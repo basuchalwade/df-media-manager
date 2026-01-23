@@ -3,6 +3,7 @@ import express from 'express';
 import cors from 'cors';
 import * as Prisma from '@prisma/client';
 import { createQueue, QUEUE_NAMES } from './lib/queue';
+import { seedDefaultBots } from './seed/initBots';
 
 const { PrismaClient } = Prisma as any;
 
@@ -110,6 +111,55 @@ app.post('/api/bots/:type/toggle', async (req, res) => {
   res.json([updated]);
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+app.put('/api/bots/:type', async (req, res) => {
+  const { type } = req.params;
+  const updates = req.body;
+
+  // Protect ID and Type from being changed
+  delete updates.id;
+  delete updates.type;
+  
+  // Ensure we keep existing logs if not provided (though usually handled by frontend state)
+  // Prisma update handles partials well.
+  
+  try {
+    const updated = await prisma.botConfig.update({
+        where: { type },
+        data: updates
+    });
+    // Return array to match frontend expectations of list update or single item
+    // But frontend api.updateBot expects array of all bots usually? 
+    // Actually api.ts: updateBot calls GET /bots usually or replaces local state.
+    // Let's return the full list to be safe and consistent with toggleBot
+    const allBots = await prisma.botConfig.findMany({
+        include: { activities: { take: 5, orderBy: { createdAt: 'desc' } } }
+    });
+    const mapped = allBots.map(b => ({
+        ...b,
+        logs: b.activities.map(a => ({
+            id: a.id,
+            timestamp: a.createdAt,
+            level: a.status === 'FAILED' ? 'Error' : a.status === 'SKIPPED' ? 'Warning' : 'Info',
+            message: a.message
+        }))
+    }));
+    res.json(mapped);
+  } catch (e) {
+    res.status(500).json({ error: 'Update failed' });
+  }
+});
+
+// Initialize and Start
+async function startServer() {
+  // Run seeds
+  await seedDefaultBots(prisma);
+
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+}
+
+startServer().catch(e => {
+  console.error("Failed to start server:", e);
+  process.exit(1);
 });
