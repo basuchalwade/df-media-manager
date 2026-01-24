@@ -2,17 +2,17 @@
 import { PrismaClient, BotType } from '@prisma/client';
 import { OrchestrationService } from './orchestration.service';
 import { GovernanceService } from './governance.service';
-import { BotExecutorService } from './BotExecutorService';
+import { enqueueBotRun } from '../queues/bot.queue';
+import { v4 as uuidv4 } from 'uuid';
 
 const prisma = new PrismaClient();
 const orchestration = new OrchestrationService();
 const governance = new GovernanceService();
-const executor = new BotExecutorService();
 
 export class BotService {
 
   async getBots(organizationId: string) {
-    // Filter by organizationId in schema if applicable, currently global in mock schema
+    // Filter by organizationId in schema if applicable
     const bots = await prisma.botConfig.findMany({
       include: {
         activities: {
@@ -39,7 +39,7 @@ export class BotService {
     if (learningConfig) data.learningConfigJson = learningConfig;
 
     return prisma.botConfig.update({
-      where: { type: botType }, // In real multi-tenant, composite key (orgId, type)
+      where: { type: botType },
       data
     });
   }
@@ -68,12 +68,20 @@ export class BotService {
       throw new Error(policyCheck.reason);
     }
 
-    // 2. Trigger Logic
-    // In production, this would add a job to a queue. For now, calling executor directly.
-    // Fire and forget promise to not block response
-    executor.executeBotCycle('sim-id', botType).catch(console.error);
+    // 2. Resolve Bot ID
+    // We need the database ID for the job, but for now using botType as the logical ID
+    // in this specific schema setup where Type is unique.
+    const bot = await prisma.botConfig.findUnique({ where: { type: botType } });
+    if (!bot) throw new Error(`Bot ${botType} not found.`);
 
-    return { status: 'queued', message: 'Simulation started' };
+    // 3. Enqueue Job
+    const traceId = uuidv4();
+    const job = await enqueueBotRun(bot.type, organizationId, 'API', traceId);
+
+    // 4. Log Audit
+    await governance.logAction(organizationId, 'USER', 'TRIGGER_RUN', 'Bot', bot.type, { jobId: job.id, traceId });
+
+    return { status: 'queued', jobId: job.id, message: 'Simulation run queued successfully' };
   }
 
   // --- Helpers ---
@@ -83,6 +91,5 @@ export class BotService {
       // Example rule
       // throw new Error("Aggressive mode requires human oversight enabled.");
     }
-    // Add schema validation (Zod) here
   }
 }

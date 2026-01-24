@@ -2,6 +2,7 @@
 import { Queue } from 'bullmq';
 import { redisOptions } from '../lib/redis';
 import { QUEUE_NAMES, BotSchedulerJob, ActionExecutorJob, MediaProcessorJob } from './types';
+import { botQueue } from './bot.queue';
 
 // Create Queues
 export const botSchedulerQueue = new Queue<BotSchedulerJob>(QUEUE_NAMES.BOT_SCHEDULER, {
@@ -12,15 +13,15 @@ export const botSchedulerQueue = new Queue<BotSchedulerJob>(QUEUE_NAMES.BOT_SCHE
       type: 'exponential',
       delay: 5000,
     },
-    removeOnComplete: { count: 100 }, // Keep last 100 completed
-    removeOnFail: { count: 500 },     // Keep last 500 failed for debugging
+    removeOnComplete: { count: 100 }, 
+    removeOnFail: { count: 500 },     
   },
 });
 
 export const actionExecutorQueue = new Queue<ActionExecutorJob>(QUEUE_NAMES.ACTION_EXECUTOR, {
   connection: redisOptions,
   defaultJobOptions: {
-    attempts: 2, // Fewer attempts for actions to prevent spamming on errors
+    attempts: 2, 
     backoff: { type: 'fixed', delay: 2000 },
     removeOnComplete: 1000,
   },
@@ -34,11 +35,15 @@ export const mediaProcessorQueue = new Queue<MediaProcessorJob>(QUEUE_NAMES.MEDI
   },
 });
 
+// Re-export botQueue
+export { botQueue };
+
 // Graceful shutdown helper
 export const closeQueues = async () => {
   await Promise.all([
     botSchedulerQueue.close(),
     actionExecutorQueue.close(),
     mediaProcessorQueue.close(),
+    botQueue.close(),
   ]);
 };
