@@ -7,12 +7,12 @@ const { PrismaClient } = PrismaPkg as any;
 const prisma = new PrismaClient();
 const storage = new StorageService();
 
-export const getMedia = async (req: Request, res: Response) => {
+export const getMedia = async (req: any, res: any) => {
   const media = await prisma.mediaAsset.findMany({ orderBy: { createdAt: 'desc' } });
   res.json(media);
 };
 
-export const uploadMedia = async (req: Request, res: Response) => {
+export const uploadMedia = async (req: any, res: any) => {
   try {
     if (!req.file) throw new Error('No file uploaded');
     

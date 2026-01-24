@@ -6,6 +6,7 @@ declare global {
     interface Request {
       user?: User;
       organizationId?: string; // Critical for multi-tenant isolation
+      file?: any; // For Multer uploads
     }
   }
 }

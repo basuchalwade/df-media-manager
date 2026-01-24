@@ -4,7 +4,7 @@ import { CampaignService } from './campaign.service';
 
 const service = new CampaignService();
 
-export const getCampaigns = async (req: Request, res: Response) => {
+export const getCampaigns = async (req: any, res: any) => {
   try {
     // req.organizationId is guaranteed by tenant.middleware
     const campaigns = await service.findAll(req.organizationId!);
@@ -14,7 +14,7 @@ export const getCampaigns = async (req: Request, res: Response) => {
   }
 };
 
-export const createCampaign = async (req: Request, res: Response) => {
+export const createCampaign = async (req: any, res: any) => {
   try {
     const campaign = await service.create(req.organizationId!, req.body);
     res.status(201).json(campaign);

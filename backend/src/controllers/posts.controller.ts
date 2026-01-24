@@ -4,12 +4,12 @@ import { PostRepository } from '../repos/PostRepository';
 
 const repo = new PostRepository();
 
-export const getPosts = async (req: Request, res: Response) => {
+export const getPosts = async (req: any, res: any) => {
   const posts = await repo.findAll();
   res.json(posts);
 };
 
-export const createPost = async (req: Request, res: Response) => {
+export const createPost = async (req: any, res: any) => {
   try {
     const post = await repo.create({
       content: req.body.content,

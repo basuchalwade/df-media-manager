@@ -8,7 +8,7 @@ const { BotType } = PrismaPkg as any;
 
 const botRepo = new BotRepository();
 
-export const getBots = async (req: Request, res: Response) => {
+export const getBots = async (req: any, res: any) => {
   const bots = await botRepo.findAll();
   
   // Enrich with logs from AuditLog table
@@ -36,7 +36,7 @@ export const getBots = async (req: Request, res: Response) => {
   res.json(botsWithLogs);
 };
 
-export const updateBot = async (req: Request, res: Response) => {
+export const updateBot = async (req: any, res: any) => {
   const { id } = req.params;
   
   // 'id' param here refers to BotType in the route URL structure /bots/:type
@@ -50,7 +50,7 @@ export const updateBot = async (req: Request, res: Response) => {
   res.json([updated]); 
 };
 
-export const toggleBot = async (req: Request, res: Response) => {
+export const toggleBot = async (req: any, res: any) => {
   const { id } = req.params; // 'id' refers to BotType
   const bot = await botRepo.findByType(id as any); // id as BotType
   
@@ -65,7 +65,7 @@ export const toggleBot = async (req: Request, res: Response) => {
   res.json([updated]);
 };
 
-export const runSimulation = async (req: Request, res: Response) => {
+export const runSimulation = async (req: any, res: any) => {
   const { botType } = req.body;
   const bot = await botRepo.findByType(botType as any); // botType as BotType
   
