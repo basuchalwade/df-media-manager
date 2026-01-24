@@ -1,8 +1,7 @@
-
 import { PrismaClient, BotType } from '@prisma/client';
 import { OrchestrationService } from './orchestration.service';
 import { GovernanceService } from './governance.service';
-import { enqueueBotRun } from '../queues/bot.queue';
+import { enqueueBotRun } from '../jobs/enqueueBotRun';
 import { v4 as uuidv4 } from 'uuid';
 
 const prisma = new PrismaClient();
@@ -76,7 +75,7 @@ export class BotService {
 
     // 3. Enqueue Job
     const traceId = uuidv4();
-    const job = await enqueueBotRun(bot.type, organizationId, 'API', traceId);
+    const job = await enqueueBotRun(bot.type, organizationId, 'MANUAL', traceId);
 
     // 4. Log Audit
     await governance.logAction(organizationId, 'USER', 'TRIGGER_RUN', 'Bot', bot.type, { jobId: job.id, traceId });

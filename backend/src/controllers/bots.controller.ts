@@ -1,6 +1,7 @@
 
 import { Request, Response } from 'express';
 import { BotService } from '../services/bot.service';
+import { BotOrchestrator } from '../services/orchestrator/botOrchestrator';
 
 const botService = new BotService();
 
@@ -8,7 +9,7 @@ export const getBots = async (req: any, res: any) => {
   try {
     const bots = await botService.getBots(req.organizationId);
     
-    // Map to frontend view model (preserving legacy controller logic for response shape)
+    // Map to frontend view model
     const mapped = bots.map((b: any) => ({
       ...b,
       logs: b.activities.map((a: any) => ({
@@ -48,9 +49,19 @@ export const toggleBot = async (req: any, res: any) => {
 export const runSimulation = async (req: any, res: any) => {
   const { botType } = req.body;
   try {
-    const result = await botService.runSimulation(req.organizationId, botType);
-    res.json(result);
+    // REFACTOR: Use Orchestrator instead of direct execution
+    const result = await BotOrchestrator.authorizeAndQueueBotRun(
+      botType, 
+      req.organizationId || 'system', 
+      'MANUAL'
+    );
+
+    if (!result.accepted) {
+      return res.status(400).json({ error: result.reason });
+    }
+
+    res.json({ message: 'Bot run queued successfully', status: 'queued' });
   } catch (error: any) {
-    res.status(400).json({ error: error.message });
+    res.status(500).json({ error: error.message });
   }
 };
