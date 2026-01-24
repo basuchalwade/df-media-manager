@@ -1,95 +1,100 @@
+import { Queue, QueueOptions, WorkerOptions, ConnectionOptions, Worker, Processor } from 'bullmq';
 
-import { Queue, QueueOptions, Worker, WorkerOptions, Processor } from 'bullmq';
-import * as Prisma from '@prisma/client';
-
-// Bypass TS error when client is not generated
-const { PrismaClient } = Prisma as any;
-const prisma = new PrismaClient();
-
-const IS_SIMULATION = process.env.SIMULATION_MODE === 'true';
-const REDIS_CONFIG = {
+// Centralized Redis Connection
+// Using a shared connection object helps manage connection limits in production
+const connection: ConnectionOptions = {
   host: process.env.REDIS_HOST || 'localhost',
   port: parseInt(process.env.REDIS_PORT || '6379'),
+  password: process.env.REDIS_PASSWORD,
 };
+
+// Standard Job Options
+// Ensures resilience against network blips or API rate limits
+const defaultJobOptions = {
+  attempts: 3,
+  backoff: {
+    type: 'exponential',
+    delay: 1000, // 1s, 2s, 4s
+  },
+  removeOnComplete: 1000, // Keep history for debugging
+  removeOnFail: 5000,     // Keep failures longer
+};
+
+// --- Constants ---
 
 export const QUEUE_NAMES = {
-  POST_PUBLISH: 'postPublishQueue',
-  ENGAGEMENT: 'engagementQueue',
-  GROWTH: 'growthQueue',
-  FINDER: 'finderQueue',
+  POST_PUBLISH: 'cc-post-publish',
+  ENGAGEMENT: 'cc-engagement',
+  GROWTH: 'cc-growth',
+  FINDER: 'cc-finder',
+  SCHEDULER: 'cc-scheduler-queue',
+  EXECUTOR: 'cc-executor-queue',
+  LEARNING: 'cc-learning-queue'
 };
 
-// --- In-Memory Simulation Shim ---
-class SimulationQueue {
-  private name: string;
-  private processor?: Processor;
+// --- Factories ---
 
-  constructor(name: string) {
-    this.name = name;
-  }
-
-  async add(name: string, data: any, opts?: any) {
-    console.log(`[SIMULATION] Job added to ${this.name}: ${name}`);
-    
-    // Log to DB for visibility
-    await prisma.jobQueue.create({
-      data: {
-        queueName: this.name,
-        status: 'DELAYED',
-        scheduledFor: opts?.delay ? new Date(Date.now() + opts.delay) : new Date(),
-        payload: data,
-        postId: data.postId
-      }
-    });
-
-    // Determine execution time
-    const delay = opts?.delay || 0;
-    
-    setTimeout(async () => {
-      console.log(`[SIMULATION] Executing job ${name} on ${this.name}`);
-      if (this.processor) {
-        try {
-          await this.processor({ name, data } as any);
-          console.log(`[SIMULATION] Job ${name} completed`);
-        } catch (e) {
-          console.error(`[SIMULATION] Job ${name} failed`, e);
-        }
-      }
-    }, delay);
-
-    return { id: `sim-${Date.now()}`, name, data };
-  }
-}
-
-class SimulationWorker {
-  constructor(name: string, processor: Processor) {
-    // Find the queue instance and attach the processor
-    // In a real implementation, we'd use a global registry. 
-    // For this mock, we assume the queue is instantiated in the same process (Backend in Sim mode).
-    // Note: This shim mainly works if Backend and Worker logic are in same process or if we just execute immediately.
-    
-    // Actually, in Sim mode, the "Backend" does the scheduling via setTimeout. 
-    // The "Worker" service might be idle or disabled in docker-compose, 
-    // but here we allow defining processors that can be called by the shim.
-    (globalThis as any)[`SIM_PROC_${name}`] = processor;
-  }
-}
-
-// --- Factory ---
-
-export const createQueue = (name: string): any => {
-  if (IS_SIMULATION) {
-    const q = new SimulationQueue(name);
-    // Hook up processor if it exists (simulating shared memory for simplicity in this demo structure)
-    q['processor'] = (globalThis as any)[`SIM_PROC_${name}`];
-    return q;
-  }
-  return new Queue(name, { connection: REDIS_CONFIG });
+export const createQueue = (name: string, options?: QueueOptions) => {
+  return new Queue(name, {
+    connection,
+    defaultJobOptions,
+    ...options
+  });
 };
 
-export const createWorker = (name: string, processor: Processor): any => {
-  if (IS_SIMULATION) {
-    return new SimulationWorker(name, processor);
-  }
-  return new Worker(name, processor, { connection: REDIS_CONFIG });
+export const createWorker = (name: string, processor: Processor, options?: WorkerOptions) => {
+  return new Worker(name, processor, {
+    connection,
+    concurrency: 5,
+    limiter: {
+      max: 10,
+      duration: 1000,
+    },
+    ...options
+  });
+};
+
+// --- Queue Definitions ---
+
+/**
+ * 1. Scheduler Queue
+ * Handles the "Heartbeat" of the system.
+ * Jobs here trigger the scanning of the database for bots ready to run.
+ */
+export const botSchedulerQueue = new Queue(QUEUE_NAMES.SCHEDULER, {
+  connection,
+  defaultJobOptions,
+});
+
+/**
+ * 2. Executor Queue
+ * The heavy lifter. Each job represents a single execution cycle
+ * for a specific bot instance.
+ */
+export const botExecutorQueue = new Queue(QUEUE_NAMES.EXECUTOR, {
+  connection,
+  defaultJobOptions,
+});
+
+/**
+ * 3. Learning Queue
+ * Low-priority background processing for analyzing patterns
+ * and generating strategy insights.
+ */
+export const learningQueue = new Queue(QUEUE_NAMES.LEARNING, {
+  connection,
+  defaultJobOptions: {
+    ...defaultJobOptions,
+    priority: 10, // Lower priority than execution
+  },
+});
+
+// Shared Worker Config
+export const workerConnectionConfig: WorkerOptions = {
+  connection,
+  concurrency: 5, // Process 5 bots in parallel per worker instance
+  limiter: {
+    max: 10,      // Max 10 jobs
+    duration: 1000, // per second (Global Rate Limiting Protection)
+  },
 };
