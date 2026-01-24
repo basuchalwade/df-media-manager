@@ -28,7 +28,8 @@
     "minio": "^8.0.6",
     "buffer": "^6.0.3",
     "bcrypt": "^6.0.0",
-    "jsonwebtoken": "^9.0.3"
+    "jsonwebtoken": "^9.0.3",
+    "ioredis": "^5.9.2"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

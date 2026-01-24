@@ -1,12 +1,11 @@
 
 import { Request, Response } from 'express';
-import { CampaignService } from './campaign.service';
+import { CampaignService } from '../../services/campaign.service';
 
 const service = new CampaignService();
 
 export const getCampaigns = async (req: any, res: any) => {
   try {
-    // req.organizationId is guaranteed by tenant.middleware
     const campaigns = await service.findAll(req.organizationId!);
     res.json(campaigns);
   } catch (error: any) {

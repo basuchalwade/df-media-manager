@@ -1,78 +1,56 @@
 
 import { Request, Response } from 'express';
-import { BotRepository } from '../repos/BotRepository';
-import { queues } from '../jobs/queues';
-import * as PrismaPkg from '@prisma/client';
+import { BotService } from '../services/bot.service';
 
-const { BotType } = PrismaPkg as any;
-
-const botRepo = new BotRepository();
+const botService = new BotService();
 
 export const getBots = async (req: any, res: any) => {
-  const bots = await botRepo.findAll();
-  
-  // Enrich with logs from AuditLog table
-  const botsWithLogs = await Promise.all(bots.map(async (bot: any) => {
-    const logs = await botRepo.getLogs(bot.id, 5);
+  try {
+    const bots = await botService.getBots(req.organizationId);
     
-    // Map AuditLog format to the frontend 'BotLogEntry' shape
-    const mappedLogs = logs.map((l: any) => {
-      const meta = l.metadataJson as any;
-      return {
-        id: l.id,
-        timestamp: l.timestamp,
-        // Map status/metadata to log levels
-        level: meta?.status === 'FAILED' ? 'Error' : meta?.status === 'WARNING' ? 'Warning' : 'Info',
-        message: meta?.message || l.action
-      };
-    });
+    // Map to frontend view model (preserving legacy controller logic for response shape)
+    const mapped = bots.map((b: any) => ({
+      ...b,
+      logs: b.activities.map((a: any) => ({
+        id: a.id,
+        timestamp: a.createdAt,
+        level: a.status === 'FAILED' ? 'Error' : a.status === 'SKIPPED' ? 'Warning' : 'Info',
+        message: a.message
+      }))
+    }));
 
-    return {
-      ...bot,
-      logs: mappedLogs
-    };
-  }));
-
-  res.json(botsWithLogs);
+    res.json(mapped);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
 };
 
 export const updateBot = async (req: any, res: any) => {
-  const { id } = req.params;
-  
-  // 'id' param here refers to BotType in the route URL structure /bots/:type
-  let bot = await botRepo.findByType(id as any); // id as BotType
-  
-  if (!bot) {
-      return res.status(404).json({ error: 'Bot not found' });
+  const { id } = req.params; // 'id' here is bot type in route
+  try {
+    const updated = await botService.updateConfig(req.organizationId, id, req.body.config, req.body.learning);
+    res.json([updated]); 
+  } catch (error: any) {
+    res.status(404).json({ error: error.message });
   }
-
-  const updated = await botRepo.updateConfig(bot.id, req.body.config, req.body.learning);
-  res.json([updated]); 
 };
 
 export const toggleBot = async (req: any, res: any) => {
-  const { id } = req.params; // 'id' refers to BotType
-  const bot = await botRepo.findByType(id as any); // id as BotType
-  
-  if (!bot) return res.status(404).json({ error: 'Bot not found' });
-
-  const updated = await botRepo.toggleEnabled(bot.id, !bot.enabled);
-  
-  if (updated.enabled) {
-    queues.botExecution.add('manual-trigger', { botId: bot.id, type: bot.type });
+  const { id } = req.params;
+  try {
+    const updated = await botService.toggleBot(req.organizationId, id);
+    res.json([updated]);
+  } catch (error: any) {
+    res.status(404).json({ error: error.message });
   }
-
-  res.json([updated]);
 };
 
 export const runSimulation = async (req: any, res: any) => {
   const { botType } = req.body;
-  const bot = await botRepo.findByType(botType as any); // botType as BotType
-  
-  if (bot) {
-    await queues.botExecution.add('simulation-run', { botId: bot.id, type: bot.type });
-    res.json({ status: 'queued' });
-  } else {
-    res.status(404).json({ error: 'Bot not found' });
+  try {
+    const result = await botService.runSimulation(req.organizationId, botType);
+    res.json(result);
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
   }
 };
