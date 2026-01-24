@@ -1,7 +1,7 @@
 
 import { Request, Response } from 'express';
 import { BotService } from '../services/bot.service';
-import { BotOrchestrator } from '../services/orchestrator/botOrchestrator';
+import { enqueueBotRun } from '../queues/bot.queue';
 
 const botService = new BotService();
 
@@ -48,20 +48,25 @@ export const toggleBot = async (req: any, res: any) => {
 
 export const runSimulation = async (req: any, res: any) => {
   const { botType } = req.body;
-  try {
-    // REFACTOR: Use Orchestrator instead of direct execution
-    const result = await BotOrchestrator.authorizeAndQueueBotRun(
-      botType, 
-      req.organizationId || 'system', 
-      'MANUAL'
-    );
+  const tenantId = req.organizationId || 'system';
 
-    if (!result.accepted) {
-      return res.status(400).json({ error: result.reason });
+  try {
+    if (!botType) {
+      return res.status(400).json({ error: 'botType is required' });
     }
 
-    res.json({ message: 'Bot run queued successfully', status: 'queued' });
+    // Enqueue the job for asynchronous processing
+    const result = await enqueueBotRun(botType, tenantId);
+
+    // Respond immediately
+    res.status(202).json({ 
+      status: 'queued', 
+      jobId: result.jobId,
+      message: `Bot run for ${botType} has been queued.` 
+    });
+
   } catch (error: any) {
+    console.error('Failed to enqueue bot run:', error);
     res.status(500).json({ error: error.message });
   }
 };
