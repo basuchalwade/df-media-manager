@@ -8,7 +8,7 @@ const botService = new BotService();
 export const getBots = async (req: any, res: any) => {
   try {
     const bots = await botService.getBots(req.organizationId);
-    // Map to frontend view model (preserving existing logic)
+    
     const mapped = bots.map((b: any) => ({
       ...b,
       logs: b.activities.map((a: any) => ({
@@ -45,7 +45,7 @@ export const toggleBot = async (req: any, res: any) => {
 };
 
 export const runSimulation = async (req: any, res: any) => {
-  const { botType } = req.body;
+  const { botType, adminOverride } = req.body;
   const tenantId = req.organizationId || 'system';
 
   try {
@@ -53,12 +53,18 @@ export const runSimulation = async (req: any, res: any) => {
       return res.status(400).json({ error: 'botType is required' });
     }
 
-    // ARCHITECTURE CHANGE: 
-    // We do NOT execute logic here. We ask the Orchestrator to queue it.
-    const result = await BotOrchestrator.dispatchBotRun(botType, tenantId, 'MANUAL');
+    // Call Orchestrator directly
+    // Pass adminOverride from request body to allow governance bypass if user is Admin
+    const result = await BotOrchestrator.dispatchBotRun(
+      botType, 
+      tenantId, 
+      'MANUAL',
+      { adminOverride: !!adminOverride } 
+    );
 
     if (!result.success) {
-      return res.status(400).json({ error: result.reason });
+      // 403 Forbidden is more appropriate for policy blocks than 400
+      return res.status(403).json({ error: result.reason, status: 'blocked' });
     }
 
     res.status(202).json({ 

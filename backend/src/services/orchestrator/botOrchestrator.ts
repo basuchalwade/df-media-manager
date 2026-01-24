@@ -3,68 +3,117 @@ import { PrismaClient } from '@prisma/client';
 import { botQueue, TriggerSource } from '../../queues/bot.queue';
 import { v4 as uuidv4 } from 'uuid';
 
+// Policies
+import { IBotPolicy } from './policies/types';
+import { QuietHoursPolicy } from './policies/quietHours.policy';
+import { CampaignStatusPolicy } from './policies/campaignStatus.policy';
+import { BudgetPolicy } from './policies/budget.policy';
+import { GovernancePolicy } from './policies/governance.policy';
+
 const prisma = new PrismaClient();
 
 export class BotOrchestrator {
   
+  // Register Policies
+  private static policies: IBotPolicy[] = [
+    new GovernancePolicy(), // High priority security check first
+    new QuietHoursPolicy(),
+    new CampaignStatusPolicy(),
+    new BudgetPolicy()
+  ];
+
   /**
    * AUTHORIZE AND DISPATCH
    * 
-   * This is the "Strategist" layer. It does NOT execute the bot.
-   * It checks if the bot *should* run, logs the decision, and delegates to the worker.
+   * The "Brain" that decides if a bot runs.
+   * Evaluates all policies sequentially.
    */
   static async dispatchBotRun(
-    botType: string, // In this schema, we often use 'type' as the ID
+    botType: string,
     tenantId: string, 
-    trigger: TriggerSource
+    trigger: TriggerSource,
+    meta?: any
   ): Promise<{ success: boolean; jobId?: string; reason?: string }> {
     
     const traceId = uuidv4();
 
-    // 1. Load Bot State
-    const bot = await prisma.botConfig.findUnique({ where: { type: botType } });
-
-    if (!bot) {
-      return { success: false, reason: `Bot ${botType} not found in configuration.` };
-    }
-
-    // 2. Policy Check: Enabled?
-    if (!bot.enabled && trigger !== 'MANUAL') {
-      // We allow MANUAL overrides, but scheduled runs are blocked if disabled
-      return { success: false, reason: 'Bot is disabled.' };
-    }
-
-    // 3. Governance: Log the Intent (DecisionAudit)
-    // We record that the system *decided* to run the bot.
-    await prisma.decisionAudit.create({
-      data: {
-        decisionType: 'BOT_ACTION',
-        source: 'RULE_ENGINE', // or 'SCHEDULER'
-        description: `Dispatching ${botType} for execution.`,
-        reasoning: `Triggered by ${trigger}. Trace: ${traceId}`,
-        confidenceScore: 1.0,
-        status: 'PROPOSED', // Status is PROPOSED until Worker picks it up
-        botId: bot.id, 
-        // organizationId: tenantId (if schema supports)
-      }
+    // 1. Load Bot with Context (Campaigns)
+    const bot = await prisma.botConfig.findUnique({ 
+      where: { type: botType },
+      include: { campaigns: true } 
     });
 
-    // 4. Enqueue (Delegate to Worker)
+    if (!bot) {
+      return { success: false, reason: `Bot ${botType} not found.` };
+    }
+
+    // 2. Global Enable Check (Hard Gate)
+    if (!bot.enabled && trigger !== 'MANUAL') {
+      return { success: false, reason: 'Bot is globally disabled.' };
+    }
+
+    // 3. Policy Evaluation
+    const context = { bot, tenantId, trigger, meta };
+    
+    for (const policy of this.policies) {
+      try {
+        const result = await policy.evaluate(context);
+        
+        if (!result.allowed) {
+          console.warn(`[Orchestrator] Blocked by ${result.policyName}: ${result.reason}`);
+          
+          // Log Rejection Audit
+          await this.logDecision(bot.id, 'BLOCKED_POLICY', `Blocked by ${result.policyName}`, result.reason || 'Policy check failed');
+          
+          // Log visible error for user
+          await prisma.botLog.create({
+            data: {
+              botId: bot.type,
+              level: 'Warning',
+              message: `Run Skipped: ${result.reason}`
+            }
+          });
+
+          return { success: false, reason: result.reason };
+        }
+      } catch (err: any) {
+        console.error(`[Orchestrator] Policy Error (${policy.name}):`, err);
+        return { success: false, reason: `Internal Policy Error: ${err.message}` };
+      }
+    }
+
+    // 4. Log Approval Audit
+    await this.logDecision(bot.id, 'BOT_ACTION', `Dispatching ${botType}`, `All policies passed. Trigger: ${trigger}`);
+
+    // 5. Enqueue Job
     const job = await botQueue.add(
       'run-bot-logic',
       {
-        botId: bot.type, // Passing 'type' as ID based on current schema usage
+        botId: bot.type,
         tenantId,
         trigger,
         traceId
       },
       {
-        jobId: `run-${botType}-${Date.now()}` // Prevent duplicate queuing in same ms
+        jobId: `run-${botType}-${Date.now()}`
       }
     );
 
     console.log(`[Orchestrator] Dispatched ${botType} (Job: ${job.id})`);
-
     return { success: true, jobId: job.id };
+  }
+
+  private static async logDecision(botId: string, type: string, desc: string, reason: string) {
+    await prisma.decisionAudit.create({
+      data: {
+        decisionType: type,
+        source: 'ORCHESTRATOR',
+        description: desc,
+        reasoning: reason,
+        confidenceScore: 1.0,
+        status: type === 'BLOCKED_POLICY' ? 'REJECTED' : 'PROPOSED',
+        botId: botId, // Linking using internal UUID if possible, or handling relation elsewhere
+      }
+    });
   }
 }
