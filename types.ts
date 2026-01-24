@@ -46,6 +46,57 @@ export interface BotActivity {
   finishedAt?: string;
 }
 
+// --- Campaign Types (Phase 10) ---
+
+export enum CampaignObjective {
+  Reach = 'Reach',
+  Engagement = 'Engagement',
+  Traffic = 'Traffic',
+  Conversions = 'Conversions'
+}
+
+export enum CampaignStatus {
+  Draft = 'Draft',
+  Active = 'Active',
+  Paused = 'Paused',
+  Completed = 'Completed'
+}
+
+export interface CampaignRecommendation {
+  id: string;
+  type: 'budget' | 'platform' | 'bot_config';
+  title: string;
+  description: string;
+  impact: 'High' | 'Medium' | 'Low';
+  actionLabel: string;
+  status: 'pending' | 'applied' | 'dismissed';
+}
+
+export interface Campaign {
+  id: string;
+  name: string;
+  objective: CampaignObjective;
+  status: CampaignStatus;
+  platforms: Platform[];
+  botIds: BotType[]; // Using BotType as ID for simplicity in this system
+  startDate: string;
+  endDate?: string;
+  budget: {
+    total: number;
+    daily: number;
+    spent: number;
+    currency: string;
+  };
+  metrics: {
+    impressions: number;
+    clicks: number;
+    conversions: number;
+    costPerResult: number;
+    roas?: number;
+  };
+  aiRecommendations: CampaignRecommendation[];
+}
+
 // --- Bot Specific Rules ---
 
 export interface FinderBotRules {

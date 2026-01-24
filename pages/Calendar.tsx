@@ -568,7 +568,7 @@ export const Calendar: React.FC<PageProps> = ({ onNavigate, params }) => {
                         );
                     })}
                     
-                    {Object.values(agendaGroups).every(g => g.length === 0) && (
+                    {Object.values(agendaGroups).every((g: any) => g.length === 0) && (
                         <div className="h-full flex flex-col items-center justify-center text-gray-400 opacity-60 min-h-[400px]">
                              <Filter className="w-16 h-16 mb-4 stroke-1 text-gray-300" />
                              <p className="text-lg font-medium text-gray-500">No posts found.</p>

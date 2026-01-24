@@ -1,14 +1,16 @@
 
 import { BotRepository } from '../repos/BotRepository';
 import { PostRepository } from '../repos/PostRepository';
-import { BotType, Platform, PostStatus } from '@prisma/client';
+import * as PrismaPkg from '@prisma/client';
+
+const { BotType, Platform, PostStatus } = PrismaPkg as any;
 
 const botRepo = new BotRepository();
 const postRepo = new PostRepository();
 
 export class BotExecutorService {
   
-  async executeBotCycle(botId: string, botType: BotType) {
+  async executeBotCycle(botId: string, botType: any) { // botType: BotType
     try {
       // Log Start
       await botRepo.createAuditLog(

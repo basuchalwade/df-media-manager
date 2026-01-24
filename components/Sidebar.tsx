@@ -1,5 +1,6 @@
+
 import React from 'react';
-import { LayoutDashboard, PenTool, Calendar, Settings, Bot, BarChart3, Cast, Users, Link, Image } from 'lucide-react';
+import { LayoutDashboard, PenTool, Calendar, Settings, Bot, BarChart3, Cast, Users, Link, Image, Target } from 'lucide-react';
 
 interface SidebarProps {
   currentPage: string;
@@ -10,6 +11,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, onNavigate }) => 
   const menuItems = [
     { section: 'Workspace', items: [
       { id: 'overview', label: 'Overview', icon: LayoutDashboard },
+      { id: 'campaigns', label: 'Campaigns', icon: Target },
       { id: 'creator', label: 'Creator Studio', icon: PenTool },
       { id: 'media', label: 'Media Library', icon: Image },
       { id: 'calendar', label: 'Calendar', icon: Calendar },

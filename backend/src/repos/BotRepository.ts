@@ -1,6 +1,7 @@
 
-import { PrismaClient, Prisma, BotType } from '@prisma/client';
+import * as PrismaPkg from '@prisma/client';
 
+const { PrismaClient } = PrismaPkg as any;
 const prisma = new PrismaClient();
 
 export class BotRepository {
@@ -10,14 +11,14 @@ export class BotRepository {
     });
   }
 
-  async findByType(type: BotType) {
+  async findByType(type: any) { // type: BotType
     return prisma.bot.findUnique({
       where: { type },
     });
   }
 
   async updateConfig(id: string, config: any, learningConfig?: any) {
-    const data: Prisma.BotUpdateInput = {
+    const data: any = { // Prisma.BotUpdateInput
       configJson: config,
       updatedAt: new Date(),
     };

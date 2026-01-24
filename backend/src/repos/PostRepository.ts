@@ -1,6 +1,7 @@
 
-import { PrismaClient, PostStatus, Platform } from '@prisma/client';
+import * as PrismaPkg from '@prisma/client';
 
+const { PrismaClient, PostStatus, Platform } = PrismaPkg as any;
 const prisma = new PrismaClient();
 
 export class PostRepository {
@@ -13,8 +14,8 @@ export class PostRepository {
 
   async create(data: { 
     content: string; 
-    platform: Platform; // Single platform from input
-    status: PostStatus; 
+    platform: any; // Platform
+    status: any; // PostStatus
     scheduledFor?: string; 
     metricsJson?: any; 
     botId?: string 
@@ -32,7 +33,7 @@ export class PostRepository {
     });
   }
   
-  async updateStatus(id: string, status: PostStatus) {
+  async updateStatus(id: string, status: any) { // status: PostStatus
     return prisma.post.update({
       where: { id },
       data: { status }

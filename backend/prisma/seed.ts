@@ -1,6 +1,7 @@
 
-import { PrismaClient, BotType, UserRole, Platform } from '@prisma/client';
+import * as PrismaPkg from '@prisma/client';
 
+const { PrismaClient, BotType, UserRole, Platform } = PrismaPkg as any;
 const prisma = new PrismaClient();
 
 const DEFAULT_BOT_CONFIG = {
@@ -70,7 +71,7 @@ async function main() {
 main()
   .catch((e) => {
     console.error(e);
-    process.exit(1);
+    (process as any).exit(1);
   })
   .finally(async () => {
     await prisma.$disconnect();

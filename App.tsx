@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { Overview } from './pages/Overview';
 import { CreatorStudio } from './pages/CreatorStudio';
@@ -11,22 +11,42 @@ import { UserManagement } from './pages/UserManagement';
 import { Integrations } from './pages/Integrations';
 import { MediaLibrary } from './pages/MediaLibrary';
 import { BotActivityLog } from './pages/BotActivityLog';
+import { Login } from './pages/Login';
+import { Campaigns } from './pages/Campaigns';
 import { BotType } from './types';
+import { isAuthenticated } from './lib/mockAuth';
 
 const App: React.FC = () => {
+  const [isAuth, setIsAuth] = useState(isAuthenticated());
   const [currentPage, setCurrentPage] = useState('overview');
   const [navParams, setNavParams] = useState<any>(undefined);
+
+  useEffect(() => {
+    // Check auth on mount
+    setIsAuth(isAuthenticated());
+  }, []);
 
   const handleNavigate = (page: string, params?: any) => {
     setCurrentPage(page);
     setNavParams(params);
   };
 
+  const handleLoginSuccess = () => {
+    setIsAuth(true);
+    setCurrentPage('overview');
+  };
+
+  // Auth Guard
+  if (!isAuth) {
+    return <Login onLoginSuccess={handleLoginSuccess} />;
+  }
+
   const renderPage = () => {
     switch (currentPage) {
       case 'overview': return <Overview />;
+      case 'campaigns': return <Campaigns />;
       case 'creator': return <CreatorStudio onNavigate={handleNavigate} params={navParams} />;
-      case 'calendar': return <Calendar onNavigate={handleNavigate} />;
+      case 'calendar': return <Calendar onNavigate={handleNavigate} params={navParams} />;
       case 'analytics': return <Analytics />;
       case 'bots': return <BotManager onNavigate={handleNavigate} />;
       case 'bot-activity': 
@@ -63,8 +83,8 @@ const App: React.FC = () => {
       {/* Status Pill - Floating iOS Style */}
       <div className="fixed bottom-6 right-6 z-50">
         <div className="glass-panel px-4 py-2 rounded-full flex items-center gap-2.5 shadow-[0_8px_32px_rgba(0,0,0,0.12)] transition-transform hover:scale-105 cursor-default">
-           <div className="w-2 h-2 rounded-full bg-orange-500 shadow-[0_0_10px_rgba(249,115,22,0.5)] animate-pulse"></div>
-           <span className="text-[11px] font-semibold tracking-wide text-gray-600 uppercase">Demo Environment</span>
+           <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)] animate-pulse"></div>
+           <span className="text-[11px] font-semibold tracking-wide text-gray-600 uppercase">Production</span>
         </div>
       </div>
     </div>

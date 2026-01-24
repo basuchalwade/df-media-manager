@@ -1,8 +1,9 @@
 
 import { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import * as PrismaPkg from '@prisma/client';
 import { StorageService } from '../services/StorageService';
 
+const { PrismaClient } = PrismaPkg as any;
 const prisma = new PrismaClient();
 const storage = new StorageService();
 

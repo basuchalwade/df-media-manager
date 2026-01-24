@@ -25,7 +25,8 @@
     "dotenv": "^17.2.3",
     "multer": "^2.0.2",
     "axios": "^1.13.2",
-    "minio": "^8.0.6"
+    "minio": "^8.0.6",
+    "buffer": "^6.0.3"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

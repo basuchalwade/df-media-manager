@@ -1,5 +1,7 @@
+
 import { Client } from 'minio';
 import { config } from '../config/env';
+import { Buffer } from 'buffer';
 
 // Define interface compatible with Multer's file object
 export interface UploadedFile {
