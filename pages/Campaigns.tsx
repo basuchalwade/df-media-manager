@@ -164,34 +164,65 @@ export const Campaigns: React.FC = () => {
 // --- Sub-components ---
 
 const CampaignOverview: React.FC<{ campaign: Campaign }> = ({ campaign }) => {
-    // Mock Pacing Data
-    const data = Array.from({length: 10}, (_, i) => ({
-        day: `Day ${i+1}`,
-        spend: Math.floor(campaign.budget.daily * (0.8 + Math.random() * 0.4)),
-        target: campaign.budget.daily
-    }));
+    // Pacing Data Visualization
+    const pacing = campaign.intelligence?.pacing;
+    
+    // Generate Chart Data from Pacing (Mocking historic trend for UI)
+    const data = Array.from({length: 10}, (_, i) => {
+        const factor = 1 - (i * 0.1);
+        const daySpend = (pacing?.actualSpend || 0) * 0.1; 
+        return {
+            day: `Day ${i+1}`,
+            spend: Math.max(0, Math.floor(daySpend * (0.8 + Math.random() * 0.4))),
+            target: Math.floor((campaign.budget.daily || 100))
+        };
+    });
+
+    const kpis = campaign.intelligence?.kpiMapping || { "Primary Metric": "Activity" };
 
     return (
         <div className="space-y-6">
             <div className="grid grid-cols-4 gap-4">
-                <MetricCard title="Total Spend" value={`$${campaign.budget.spent.toLocaleString()}`} sub={`of $${campaign.budget.total}`} icon={DollarSign} color="slate" />
-                <MetricCard title="Impressions" value={campaign.metrics.impressions.toLocaleString()} sub="Total Views" icon={Megaphone} color="blue" />
-                <MetricCard title="Conversions" value={campaign.metrics.conversions.toLocaleString()} sub={`Avg CPA: $${campaign.metrics.costPerResult.toFixed(2)}`} icon={Target} color="green" />
-                <MetricCard title="ROAS" value={`${campaign.metrics.roas || 0}x`} sub="Return on Ad Spend" icon={TrendingUp} color="purple" />
+                <MetricCard title="Total Spend" value={`$${campaign.budget.spent.toLocaleString(undefined, {maximumFractionDigits:0})}`} sub={`of $${campaign.budget.total}`} icon={DollarSign} color="slate" />
+                <MetricCard title={kpis["Primary Metric"]} value={campaign.metrics.impressions.toLocaleString()} sub="Total Volume" icon={Megaphone} color="blue" />
+                <MetricCard title={kpis["Primary Metric"] === 'Conversions' ? 'Conversions' : 'Engagement'} value={campaign.metrics.clicks.toLocaleString()} sub={`Avg CPA: $${campaign.metrics.costPerResult.toFixed(2)}`} icon={Target} color="green" />
+                <MetricCard title="ROAS" value={`${campaign.metrics.roas?.toFixed(2) || 0}x`} sub="Return on Ad Spend" icon={TrendingUp} color="purple" />
             </div>
 
-            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                <h3 className="font-bold text-slate-900 mb-6">Budget Pacing (Last 10 Days)</h3>
-                <div className="h-64 w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={data}>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                            <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#64748b'}} />
-                            <Tooltip cursor={{fill: '#f8fafc'}} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-                            <Bar dataKey="spend" fill="#3b82f6" radius={[4, 4, 0, 0]} name="Actual Spend" />
-                            <Bar dataKey="target" fill="#e2e8f0" radius={[4, 4, 0, 0]} name="Target Cap" />
-                        </BarChart>
-                    </ResponsiveContainer>
+            <div className="grid grid-cols-3 gap-6">
+                <div className="col-span-2 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                    <h3 className="font-bold text-slate-900 mb-6">Budget Pacing (Last 10 Days)</h3>
+                    <div className="h-64 w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={data}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#64748b'}} />
+                                <Tooltip cursor={{fill: '#f8fafc'}} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                                <Bar dataKey="spend" fill="#3b82f6" radius={[4, 4, 0, 0]} name="Actual Spend" />
+                                <Bar dataKey="target" fill="#e2e8f0" radius={[4, 4, 0, 0]} name="Daily Target" />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+                
+                {/* Pacing Status Card */}
+                <div className={`p-6 rounded-2xl border flex flex-col justify-center items-center text-center ${
+                    pacing?.pacingStatus === 'OVER' ? 'bg-red-50 border-red-200 text-red-900' :
+                    pacing?.pacingStatus === 'UNDER' ? 'bg-amber-50 border-amber-200 text-amber-900' :
+                    'bg-green-50 border-green-200 text-green-900'
+                }`}>
+                    <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-4 ${
+                        pacing?.pacingStatus === 'OVER' ? 'bg-red-200' :
+                        pacing?.pacingStatus === 'UNDER' ? 'bg-amber-200' :
+                        'bg-green-200'
+                    }`}>
+                        <TrendingUp className="w-8 h-8" />
+                    </div>
+                    <h3 className="text-2xl font-bold">{pacing?.pacingStatus || 'CALCULATING'}</h3>
+                    <p className="text-sm opacity-80 mt-2 font-medium">Budget Pacing Status</p>
+                    <div className="mt-4 w-full bg-white/50 rounded-lg p-3 text-xs font-bold">
+                        {pacing?.burnRate.toFixed(1)}% Daily Burn Rate
+                    </div>
                 </div>
             </div>
         </div>
@@ -199,34 +230,47 @@ const CampaignOverview: React.FC<{ campaign: Campaign }> = ({ campaign }) => {
 };
 
 const CampaignIntelligence: React.FC<{ campaign: Campaign, onApplyRec: any, onDismissRec: any }> = ({ campaign, onApplyRec, onDismissRec }) => {
+    const attribution = campaign.intelligence?.attribution || [];
+    const strategySummary = campaign.intelligence?.strategySummary || "Analyzing campaign strategy...";
+
     return (
         <div className="grid grid-cols-3 gap-6 h-full">
             <div className="col-span-2 space-y-6">
                 {/* Bot Contribution */}
                 <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
                     <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
-                        <Bot className="w-5 h-5 text-indigo-600" /> Bot Attribution
+                        <Bot className="w-5 h-5 text-indigo-600" /> Bot Attribution Model
                     </h3>
                     <div className="space-y-4">
-                        {campaign.botIds.map(botType => (
-                            <div key={botType} className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-sm text-slate-600 border border-slate-200">
-                                        {botType === BotType.Creator ? <Megaphone className="w-5 h-5" /> : 
-                                         botType === BotType.Engagement ? <Users className="w-5 h-5" /> : 
-                                         <TrendingUp className="w-5 h-5" />}
+                        {attribution.length === 0 ? (
+                            <div className="text-center py-8 text-slate-400 italic">No attribution data available yet.</div>
+                        ) : (
+                            attribution.map(attr => (
+                                <div key={attr.botId} className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-sm text-slate-600 border border-slate-200">
+                                            {attr.botId === BotType.Creator ? <Megaphone className="w-5 h-5" /> : 
+                                             attr.botId === BotType.Engagement ? <Users className="w-5 h-5" /> : 
+                                             <TrendingUp className="w-5 h-5" />}
+                                        </div>
+                                        <div>
+                                            <div className="font-bold text-slate-900 text-sm">{attr.botId}</div>
+                                            <div className="text-xs text-slate-500">Primary: {attr.primaryContribution}</div>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <div className="font-bold text-slate-900 text-sm">{botType}</div>
-                                        <div className="text-xs text-slate-500">Contributing to {campaign.objective}</div>
+                                    <div className="text-right">
+                                        <div className="font-bold text-slate-900">${attr.spend.toFixed(0)} Spent</div>
+                                        <div className="text-xs text-green-600 font-bold">+{attr.liftPercentage.toFixed(1)}% Lift</div>
+                                    </div>
+                                    <div className="w-24">
+                                        <div className="text-[10px] text-slate-400 mb-1 text-right">Impact Score</div>
+                                        <div className="w-full bg-slate-200 rounded-full h-1.5">
+                                            <div className="bg-indigo-500 h-1.5 rounded-full" style={{width: `${attr.impactScore}%`}}></div>
+                                        </div>
                                     </div>
                                 </div>
-                                <div className="text-right">
-                                    <div className="font-bold text-slate-900">${(Math.random() * 200).toFixed(0)} Spent</div>
-                                    <div className="text-xs text-green-600 font-bold">+{(Math.random() * 20).toFixed(1)}% Lift</div>
-                                </div>
-                            </div>
-                        ))}
+                            ))
+                        )}
                     </div>
                 </div>
 
@@ -235,7 +279,7 @@ const CampaignIntelligence: React.FC<{ campaign: Campaign, onApplyRec: any, onDi
                     <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600 rounded-full blur-[100px] opacity-20 pointer-events-none"></div>
                     <h3 className="font-bold text-lg mb-2 relative z-10">Active Strategy: Multi-Agent Coordination</h3>
                     <p className="text-slate-300 text-sm leading-relaxed relative z-10 max-w-2xl">
-                        The <strong>Creator Bot</strong> is prioritizing high-engagement formats on LinkedIn to drive top-of-funnel traffic, while the <strong>Engagement Bot</strong> nurtures comments to boost algorithmic visibility. Budget is dynamically shifting towards Twitter during peak hours (9 AM - 11 AM EST).
+                        {strategySummary}
                     </p>
                 </div>
             </div>

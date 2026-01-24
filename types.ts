@@ -72,6 +72,32 @@ export interface CampaignRecommendation {
   status: 'pending' | 'applied' | 'dismissed';
 }
 
+// Phase 10.1: Intelligence Types
+export type PacingStatus = 'UNDER' | 'OPTIMAL' | 'OVER';
+
+export interface BudgetPacing {
+  expectedSpend: number;
+  actualSpend: number;
+  pacingStatus: PacingStatus;
+  burnRate: number; // % of budget used per day
+  daysRemaining: number;
+}
+
+export interface BotAttribution {
+  botId: BotType;
+  spend: number;
+  impactScore: number; // 0-100
+  liftPercentage: number;
+  primaryContribution: string; // e.g. "Reach", "Clicks"
+}
+
+export interface CampaignIntelligenceData {
+  pacing: BudgetPacing;
+  attribution: BotAttribution[];
+  kpiMapping: Record<string, string>; // e.g. "Primary Metric": "Impressions"
+  strategySummary: string;
+}
+
 export interface Campaign {
   id: string;
   name: string;
@@ -95,6 +121,9 @@ export interface Campaign {
     roas?: number;
   };
   aiRecommendations: CampaignRecommendation[];
+  
+  // New Intelligence Layer
+  intelligence?: CampaignIntelligenceData;
 }
 
 // --- Bot Specific Rules ---

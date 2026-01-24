@@ -16,6 +16,7 @@ import { emitExecutionEvent } from './executionTelemetry';
 import { analyzePerformance, getStrategyProfile } from './strategyOptimizer';
 import { recordLearning } from './learningMemory';
 import { analyzeBotPerformance } from './learningEngine';
+import { enrichCampaignWithIntelligence } from './campaignIntelligence';
 
 // --- MOCK DATA CONSTANTS ---
 
@@ -144,17 +145,7 @@ const INITIAL_CAMPAIGNS: Campaign[] = [
     endDate: new Date(Date.now() + 86400000 * 25).toISOString(),
     budget: { total: 5000, daily: 150, spent: 750, currency: 'USD' },
     metrics: { impressions: 45000, clicks: 1200, conversions: 45, costPerResult: 16.66, roas: 3.2 },
-    aiRecommendations: [
-      {
-        id: 'rec-1',
-        type: 'platform',
-        title: 'Expand to Instagram',
-        description: 'Visual assets in this campaign are performing well. Adding Instagram could increase reach by 40%.',
-        impact: 'High',
-        actionLabel: 'Add Platform',
-        status: 'pending'
-      }
-    ]
+    aiRecommendations: []
   },
   {
     id: 'camp-2',
@@ -166,17 +157,7 @@ const INITIAL_CAMPAIGNS: Campaign[] = [
     startDate: new Date(Date.now() - 86400000 * 15).toISOString(),
     budget: { total: 2000, daily: 50, spent: 850, currency: 'USD' },
     metrics: { impressions: 120000, clicks: 450, conversions: 10, costPerResult: 0.007, roas: 1.5 },
-    aiRecommendations: [
-      {
-        id: 'rec-2',
-        type: 'budget',
-        title: 'Increase Daily Spend',
-        description: 'Cost per result is extremely efficient. Scaling daily budget to $75 could maximize low-cost reach.',
-        impact: 'Medium',
-        actionLabel: 'Increase to $75',
-        status: 'pending'
-      }
-    ]
+    aiRecommendations: []
   }
 ];
 
@@ -543,20 +524,25 @@ class HybridStore {
   // --- Campaign Management (Phase 10) ---
 
   async getCampaigns(): Promise<Campaign[]> {
-      // Simulate live metric updates
+      // Simulate live metric updates via Intelligence Layer
       this.campaigns = this.campaigns.map(c => {
           if (c.status === CampaignStatus.Active) {
-              return {
-                  ...c,
-                  budget: { ...c.budget, spent: c.budget.spent + Math.random() * 5 }, // Tick spend up
-                  metrics: { 
-                      ...c.metrics, 
-                      impressions: c.metrics.impressions + Math.floor(Math.random() * 100),
-                      clicks: c.metrics.clicks + Math.floor(Math.random() * 5)
-                  }
+              // 1. Simulate data movement (Metric tick)
+              const updatedMetrics = { 
+                  ...c.metrics, 
+                  impressions: c.metrics.impressions + Math.floor(Math.random() * 50),
+                  clicks: c.metrics.clicks + Math.floor(Math.random() * 2)
               };
+              
+              // 2. Simulate budget spend
+              const updatedBudget = { ...c.budget, spent: c.budget.spent + Math.random() * 2 };
+
+              // 3. Run Intelligence Engine
+              const tempCampaign = { ...c, metrics: updatedMetrics, budget: updatedBudget };
+              return enrichCampaignWithIntelligence(tempCampaign);
           }
-          return c;
+          // For inactive campaigns, just ensure structure is consistent
+          return enrichCampaignWithIntelligence(c);
       });
       return this.campaigns;
   }
@@ -571,13 +557,14 @@ class HybridStore {
       };
       this.campaigns = [newCampaign, ...this.campaigns];
       this.saveState();
-      return newCampaign;
+      return enrichCampaignWithIntelligence(newCampaign);
   }
 
   async updateCampaign(id: string, updates: Partial<Campaign>): Promise<Campaign> {
       this.campaigns = this.campaigns.map(c => c.id === id ? { ...c, ...updates } : c);
       this.saveState();
-      return this.campaigns.find(c => c.id === id) as Campaign;
+      const updated = this.campaigns.find(c => c.id === id) as Campaign;
+      return enrichCampaignWithIntelligence(updated);
   }
 
   async applyCampaignRecommendation(campaignId: string, recId: string) {
@@ -590,7 +577,7 @@ class HybridStore {
           
           // Apply Logic Mock
           if (rec.type === 'budget') {
-              campaign.budget.daily = 75; // Example hardcoded based on initial mock logic
+              campaign.budget.daily += 50; // Simple bump
           } else if (rec.type === 'platform') {
               if (!campaign.platforms.includes(Platform.Instagram)) {
                   campaign.platforms.push(Platform.Instagram);
