@@ -1,15 +1,14 @@
 
 import { Request, Response } from 'express';
 import { BotService } from '../services/bot.service';
-import { enqueueBotRun } from '../queues/bot.queue';
+import { BotOrchestrator } from '../services/orchestrator/botOrchestrator';
 
 const botService = new BotService();
 
 export const getBots = async (req: any, res: any) => {
   try {
     const bots = await botService.getBots(req.organizationId);
-    
-    // Map to frontend view model
+    // Map to frontend view model (preserving existing logic)
     const mapped = bots.map((b: any) => ({
       ...b,
       logs: b.activities.map((a: any) => ({
@@ -19,7 +18,6 @@ export const getBots = async (req: any, res: any) => {
         message: a.message
       }))
     }));
-
     res.json(mapped);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -27,7 +25,7 @@ export const getBots = async (req: any, res: any) => {
 };
 
 export const updateBot = async (req: any, res: any) => {
-  const { id } = req.params; // 'id' here is bot type in route
+  const { id } = req.params;
   try {
     const updated = await botService.updateConfig(req.organizationId, id, req.body.config, req.body.learning);
     res.json([updated]); 
@@ -55,14 +53,18 @@ export const runSimulation = async (req: any, res: any) => {
       return res.status(400).json({ error: 'botType is required' });
     }
 
-    // Enqueue the job for asynchronous processing
-    const result = await enqueueBotRun(botType, tenantId);
+    // ARCHITECTURE CHANGE: 
+    // We do NOT execute logic here. We ask the Orchestrator to queue it.
+    const result = await BotOrchestrator.dispatchBotRun(botType, tenantId, 'MANUAL');
 
-    // Respond immediately
+    if (!result.success) {
+      return res.status(400).json({ error: result.reason });
+    }
+
     res.status(202).json({ 
       status: 'queued', 
       jobId: result.jobId,
-      message: `Bot run for ${botType} has been queued.` 
+      message: `Bot run for ${botType} queued successfully.` 
     });
 
   } catch (error: any) {

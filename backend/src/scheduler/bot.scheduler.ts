@@ -1,4 +1,3 @@
-
 import { PrismaClient } from '@prisma/client';
 import { BotOrchestrator } from '../services/orchestrator/botOrchestrator';
 
@@ -37,7 +36,7 @@ export class BotScheduler {
         if (now >= nextRun) {
           // 2. Dispatch to Orchestrator
           // Using a placeholder tenantId as schema currently doesn't enforce it strictly on BotConfig
-          await BotOrchestrator.authorizeAndQueueBotRun(bot.type, 'system-tenant', 'SCHEDULED');
+          await BotOrchestrator.dispatchBotRun(bot.type, 'system-tenant', 'SCHEDULED');
         }
       }
     } catch (error) {

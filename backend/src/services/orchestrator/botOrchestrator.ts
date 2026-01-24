@@ -1,59 +1,70 @@
 
 import { PrismaClient } from '@prisma/client';
-import { botQueue } from '../../queues/bot.queue';
+import { botQueue, TriggerSource } from '../../queues/bot.queue';
+import { v4 as uuidv4 } from 'uuid';
 
 const prisma = new PrismaClient();
 
 export class BotOrchestrator {
   
   /**
-   * Central gatekeeper for bot execution.
-   * Checks permissions, logs audit trails, and enqueues the job if approved.
+   * AUTHORIZE AND DISPATCH
+   * 
+   * This is the "Strategist" layer. It does NOT execute the bot.
+   * It checks if the bot *should* run, logs the decision, and delegates to the worker.
    */
-  static async authorizeAndQueueBotRun(
-    botId: string, // In this schema, botId is often the 'type' string (e.g. 'Creator Bot')
+  static async dispatchBotRun(
+    botType: string, // In this schema, we often use 'type' as the ID
     tenantId: string, 
-    trigger: 'SCHEDULED' | 'MANUAL' | 'RETRY'
-  ): Promise<{ accepted: boolean; reason?: string }> {
+    trigger: TriggerSource
+  ): Promise<{ success: boolean; jobId?: string; reason?: string }> {
     
-    // 1. Fetch Bot Configuration
-    // Note: Assuming 'type' is unique per tenant or global in current schema
-    const bot = await prisma.botConfig.findUnique({ where: { type: botId } });
+    const traceId = uuidv4();
+
+    // 1. Load Bot State
+    const bot = await prisma.botConfig.findUnique({ where: { type: botType } });
 
     if (!bot) {
-      return { accepted: false, reason: 'Bot configuration not found' };
+      return { success: false, reason: `Bot ${botType} not found in configuration.` };
     }
 
-    // 2. Policy Check
+    // 2. Policy Check: Enabled?
     if (!bot.enabled && trigger !== 'MANUAL') {
-      return { accepted: false, reason: 'Bot is disabled' };
+      // We allow MANUAL overrides, but scheduled runs are blocked if disabled
+      return { success: false, reason: 'Bot is disabled.' };
     }
 
-    // 3. Governance: Log Intent (DecisionAudit)
-    // We record that the system *intends* to run the bot.
+    // 3. Governance: Log the Intent (DecisionAudit)
+    // We record that the system *decided* to run the bot.
     await prisma.decisionAudit.create({
       data: {
         decisionType: 'BOT_ACTION',
-        source: 'RULE_ENGINE',
-        description: `Orchestrator authorizing ${trigger} run for ${botId}`,
-        reasoning: `Triggered by ${trigger}`,
+        source: 'RULE_ENGINE', // or 'SCHEDULER'
+        description: `Dispatching ${botType} for execution.`,
+        reasoning: `Triggered by ${trigger}. Trace: ${traceId}`,
         confidenceScore: 1.0,
-        status: 'PROPOSED',
-        // In full multi-tenant schema, link to tenantId here
+        status: 'PROPOSED', // Status is PROPOSED until Worker picks it up
+        botId: bot.id, 
+        // organizationId: tenantId (if schema supports)
       }
     });
 
-    // 4. Enqueue Job
-    await botQueue.add(`run-${botId}-${Date.now()}`, {
-      botId,
-      tenantId,
-      trigger
-    });
+    // 4. Enqueue (Delegate to Worker)
+    const job = await botQueue.add(
+      'run-bot-logic',
+      {
+        botId: bot.type, // Passing 'type' as ID based on current schema usage
+        tenantId,
+        trigger,
+        traceId
+      },
+      {
+        jobId: `run-${botType}-${Date.now()}` // Prevent duplicate queuing in same ms
+      }
+    );
 
-    // 5. Log activity start attempt
-    // (Optional: Worker will log the actual start, but this acknowledges receipt)
-    console.log(`[Orchestrator] Enqueued job for ${botId} (${trigger})`);
+    console.log(`[Orchestrator] Dispatched ${botType} (Job: ${job.id})`);
 
-    return { accepted: true };
+    return { success: true, jobId: job.id };
   }
 }

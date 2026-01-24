@@ -2,19 +2,13 @@
 import express from 'express';
 import cors from 'cors';
 import * as Prisma from '@prisma/client';
-import { createQueue, QUEUE_NAMES } from './lib/queue';
 import { seedDefaultBots } from './seed/initBots';
-import { BotEngine } from './services/botEngine';
 
-// Import New Infrastructure
-import { botWorker } from './workers/bot.worker';
+// Import Infrastructure
+import { botWorker } from './workers/bot.worker'; // Importing starts the worker listener
 import { botScheduler } from './scheduler/bot.scheduler';
 
 const { PrismaClient } = Prisma as any;
-
-// Queues (Legacy wrapper for other queues if needed, otherwise moving to dedicated files)
-const postQueue = createQueue(QUEUE_NAMES.POST_PUBLISH);
-
 const prisma = new PrismaClient();
 const app = express();
 const PORT = process.env.PORT || 8000;
@@ -37,22 +31,13 @@ app.post('/api/posts', async (req, res) => {
       status: req.body.status || 'Draft',
     }
   });
-
-  if (post.status === 'Scheduled' || post.status === 'Published') {
-    const delay = new Date(post.scheduledFor).getTime() - Date.now();
-    const finalDelay = delay > 0 ? delay : 0;
-    
-    await postQueue.add('publish-post', { postId: post.id }, { delay: finalDelay });
-    console.log(`Scheduled post ${post.id} with ${finalDelay}ms delay`);
-  }
-
+  // Note: Post scheduling queue logic would go here in P4
   res.json(post);
 });
 
-// 2. Bots Config (Delegated to Controller via Routes typically, but kept inline for this file structure)
+// 2. Bots Config
 import { getBots, updateBot, toggleBot, runSimulation } from './controllers/bots.controller';
 
-// Using simple middleware mock for org ID in this simplified server file
 const mockAuth = (req: any, res: any, next: any) => {
   req.organizationId = 'system-tenant';
   next();
@@ -71,7 +56,7 @@ app.get('/api/bots/:type/activity', async (req, res) => {
 });
 app.post('/api/bots/:type/simulate', mockAuth, runSimulation);
 app.post('/api/bots/:type/toggle', mockAuth, toggleBot);
-app.put('/api/bots/:id', mockAuth, updateBot); // Note: :id here maps to botType in controller
+app.put('/api/bots/:id', mockAuth, updateBot);
 
 // 5. Global Activity
 app.get('/api/activity/recent', async (req, res) => {
@@ -93,13 +78,14 @@ async function startServer() {
   // START BACKGROUND SERVICES
   console.log('🚀 Starting Background Services...');
   
-  // 1. Start Worker
   if (botWorker) {
-    console.log('✅ Bot Worker attached.');
+    console.log('✅ Bot Worker: Listening for jobs');
   }
-
-  // 2. Start Scheduler
-  botScheduler.start();
+  
+  if (botScheduler) {
+    botScheduler.start();
+    console.log('✅ Scheduler: Active');
+  }
 
   app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);

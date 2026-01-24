@@ -2,43 +2,30 @@
 import { Queue } from 'bullmq';
 import { redisConnectionOptions } from '../lib/redis';
 
-export const BOT_QUEUE_NAME = 'bot-execution';
+export const BOT_QUEUE_NAME = 'bot-execution-queue';
 
-export interface BotRunJobPayload {
-  botId: string;
-  tenantId: string;
-  triggeredBy: string; // 'API' | 'SCHEDULER'
+export type TriggerSource = 'MANUAL' | 'SCHEDULED' | 'EVENT' | 'RETRY';
+
+export interface BotJobPayload {
+  botId: string;        // Database ID (or unique Type if singleton)
+  tenantId: string;     // Multi-tenancy context
+  trigger: TriggerSource;
+  traceId: string;      // Distributed tracing ID
 }
 
-// The Queue instance
-export const botQueue = new Queue<BotRunJobPayload>(BOT_QUEUE_NAME, {
+/**
+ * The Communication Channel.
+ * This queue holds "Intents" for bots to execute.
+ */
+export const botQueue = new Queue<BotJobPayload>(BOT_QUEUE_NAME, {
   connection: redisConnectionOptions,
   defaultJobOptions: {
     attempts: 3,
     backoff: {
       type: 'exponential',
-      delay: 2000,
+      delay: 2000, // 2s, 4s, 8s
     },
-    removeOnComplete: 1000, // Keep last 1000 successful jobs
-    removeOnFail: 5000,     // Keep last 5000 failed jobs for debugging
+    removeOnComplete: 100, // Keep last 100 for debugging
+    removeOnFail: 500,     // Keep failures longer
   },
 });
-
-/**
- * Producer: Enqueue a bot run job
- */
-export const enqueueBotRun = async (botId: string, tenantId: string) => {
-  const jobId = `run-${botId}-${Date.now()}`;
-  
-  await botQueue.add(
-    'execute-bot', 
-    {
-      botId,
-      tenantId,
-      triggeredBy: 'API'
-    },
-    { jobId } // Prevent duplicate jobs if triggered rapidly with same ID
-  );
-
-  return { jobId, status: 'queued' };
-};
