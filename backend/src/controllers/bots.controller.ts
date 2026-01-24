@@ -2,37 +2,51 @@
 import { Request, Response } from 'express';
 import { BotRepository } from '../repos/BotRepository';
 import { queues } from '../jobs/queues';
+import { BotType } from '@prisma/client';
 
 const botRepo = new BotRepository();
 
 export const getBots = async (req: Request, res: Response) => {
   const bots = await botRepo.findAll();
-  res.json(bots);
+  
+  // Enrich with logs
+  const botsWithLogs = await Promise.all(bots.map(async (bot) => {
+    const logs = await botRepo.getLogs(bot.id, 5);
+    return {
+      ...bot,
+      logs: logs.map(l => ({
+        id: l.id,
+        timestamp: l.timestamp,
+        level: (l.metadataJson as any)?.status === 'FAILED' ? 'Error' : 'Info',
+        message: (l.metadataJson as any)?.message || l.action
+      }))
+    };
+  }));
+
+  res.json(botsWithLogs);
 };
 
 export const updateBot = async (req: Request, res: Response) => {
-  const { id } = req.params; // Can be ID or Type
-  // Logic to resolve ID from Type if needed
-  let bot = await botRepo.findByType(id as any); // Try finding by type Enum
+  const { id } = req.params;
+  
+  let bot = await botRepo.findByType(id as BotType);
   
   if (!bot) {
-      // Logic for UUID check omitted for brevity
       return res.status(404).json({ error: 'Bot not found' });
   }
 
   const updated = await botRepo.updateConfig(bot.id, req.body.config, req.body.learning);
-  res.json([updated]); // Frontend expects array for optimistic update
+  res.json([updated]); 
 };
 
 export const toggleBot = async (req: Request, res: Response) => {
   const { id } = req.params;
-  const bot = await botRepo.findByType(id as any);
+  const bot = await botRepo.findByType(id as BotType);
   if (!bot) return res.status(404).json({ error: 'Bot not found' });
 
   const updated = await botRepo.toggleEnabled(bot.id, !bot.enabled);
   
   if (updated.enabled) {
-    // Trigger initial run
     queues.botExecution.add('manual-trigger', { botId: bot.id, type: bot.type });
   }
 
@@ -41,10 +55,9 @@ export const toggleBot = async (req: Request, res: Response) => {
 
 export const runSimulation = async (req: Request, res: Response) => {
   const { botType } = req.body;
-  const bot = await botRepo.findByType(botType);
+  const bot = await botRepo.findByType(botType as BotType);
   
   if (bot) {
-    // Enqueue job immediately
     await queues.botExecution.add('simulation-run', { botId: bot.id, type: bot.type });
     res.json({ status: 'queued' });
   } else {

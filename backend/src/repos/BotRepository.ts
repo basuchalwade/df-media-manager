@@ -1,25 +1,18 @@
 
-import { PrismaClient, Bot, Prisma } from '@prisma/client';
+import { PrismaClient, Prisma, BotType } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
 export class BotRepository {
   async findAll() {
     return prisma.bot.findMany({
-      include: {
-        activities: {
-          take: 5,
-          orderBy: { createdAt: 'desc' }
-        }
-      },
       orderBy: { type: 'asc' }
     });
   }
 
-  async findByType(type: any) {
+  async findByType(type: BotType) {
     return prisma.bot.findUnique({
       where: { type },
-      include: { learningConfigJson: true } // Access extended config
     });
   }
 
@@ -43,14 +36,25 @@ export class BotRepository {
     });
   }
 
-  async logActivity(data: Prisma.BotActivityCreateInput) {
-    return prisma.botActivity.create({ data });
+  async createAuditLog(actorId: string, action: string, entity: string, entityId: string, metadata: any) {
+    return prisma.auditLog.create({
+      data: {
+        actorId,
+        action,
+        entity,
+        entityId,
+        metadataJson: metadata
+      }
+    });
   }
   
-  async getActivities(botId: string, limit = 50) {
-    return prisma.botActivity.findMany({
-      where: { botId },
-      orderBy: { createdAt: 'desc' },
+  async getLogs(botId: string, limit = 50) {
+    return prisma.auditLog.findMany({
+      where: {
+        entity: 'Bot',
+        entityId: botId
+      },
+      orderBy: { timestamp: 'desc' },
       take: limit
     });
   }

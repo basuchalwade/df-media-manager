@@ -1,5 +1,5 @@
 
-import { PrismaClient, BotType } from '@prisma/client';
+import { PrismaClient, BotType, UserRole, Platform } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -19,14 +19,17 @@ async function main() {
     create: {
       email: 'admin@contentcaster.io',
       name: 'Admin User',
-      password: 'hashed_password_here', // In prod use bcrypt
-      role: 'Admin'
+      password: 'hashed_password_here',
+      role: UserRole.Admin,
+      connectedAccounts: {
+        [Platform.X]: { connected: true, handle: '@admin' }
+      }
     }
   });
 
   // 2. Create Bots
   const bots = [
-    { type: BotType.Creator, config: { ...DEFAULT_BOT_CONFIG, contentTopics: ['Tech'] } },
+    { type: BotType.Creator, config: { ...DEFAULT_BOT_CONFIG, contentTopics: ['Tech'], targetPlatforms: [Platform.X] } },
     { type: BotType.Engagement, config: { ...DEFAULT_BOT_CONFIG, replyTone: 'Casual' } },
     { type: BotType.Finder, config: { ...DEFAULT_BOT_CONFIG, trackKeywords: ['AI'] } },
     { type: BotType.Growth, config: { ...DEFAULT_BOT_CONFIG, followRate: 10 } }
@@ -39,6 +42,7 @@ async function main() {
       create: {
         type: bot.type,
         configJson: bot.config,
+        statsJson: { currentDailyActions: 0, maxDailyActions: 50, consecutiveErrors: 0 },
         enabled: false,
         intervalMinutes: 60
       }
