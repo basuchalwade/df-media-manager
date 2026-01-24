@@ -5,12 +5,15 @@ const prisma = new PrismaClient();
 
 export class PostRepository {
   async findAll() {
-    return prisma.post.findMany({ orderBy: { createdAt: 'desc' } });
+    return prisma.post.findMany({ 
+      orderBy: { createdAt: 'desc' },
+      include: { media: true } 
+    });
   }
 
   async create(data: { 
     content: string; 
-    platform: Platform; 
+    platform: Platform; // Single platform from input
     status: PostStatus; 
     scheduledFor?: string; 
     metricsJson?: any; 
@@ -19,10 +22,12 @@ export class PostRepository {
     return prisma.post.create({
       data: {
         content: data.content,
-        platforms: [data.platform],
+        // Schema expects Platform[] array
+        platforms: [data.platform], 
         status: data.status,
         scheduledFor: data.scheduledFor ? new Date(data.scheduledFor) : undefined,
-        metricsJson: { ...data.metricsJson, createdByBotId: data.botId }
+        metricsJson: { ...data.metricsJson, createdByBotId: data.botId },
+        botId: data.botId
       }
     });
   }

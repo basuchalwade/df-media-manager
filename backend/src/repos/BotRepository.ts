@@ -37,6 +37,8 @@ export class BotRepository {
   }
 
   async createAuditLog(actorId: string, action: string, entity: string, entityId: string, metadata: any) {
+    // Note: actorId in AuditLog is a string. If it matches a User ID, Prisma can link it, 
+    // but if it's a "BotType" string (e.g. "Creator"), the relation won't connect, which is fine for the schema.
     return prisma.auditLog.create({
       data: {
         actorId,

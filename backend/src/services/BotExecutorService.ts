@@ -10,12 +10,13 @@ export class BotExecutorService {
   
   async executeBotCycle(botId: string, botType: BotType) {
     try {
+      // Log Start
       await botRepo.createAuditLog(
-        botType, // actorId
+        botType, // Use BotType string as actorId
         'CYCLE_START',
         'Bot',
         botId,
-        { status: 'STARTED', message: 'Bot waking up for scheduled run.', platform: Platform.X }
+        { status: 'STARTED', message: 'Bot waking up for scheduled run.' }
       );
 
       // --- SIMULATED LOGIC ---
@@ -23,29 +24,35 @@ export class BotExecutorService {
       if (botType === BotType.Creator) {
         // Mock Content Generation
         await new Promise(r => setTimeout(r, 2000));
+        
+        // Ensure platform is mapped to valid Enum (X, not Twitter)
+        const targetPlatform = Platform.X; 
+
         await postRepo.create({
           content: `Automated content generated at ${new Date().toISOString()}`,
-          platform: Platform.X,
+          platform: targetPlatform, 
           status: PostStatus.Draft,
           botId: botId
         });
       }
 
+      // Log Success
       await botRepo.createAuditLog(
         botType,
         'CYCLE_COMPLETE',
         'Bot',
         botId,
-        { status: 'SUCCESS', message: 'Cycle completed successfully.', platform: Platform.X }
+        { status: 'SUCCESS', message: 'Cycle completed successfully.' }
       );
 
     } catch (e: any) {
+      // Log Failure
       await botRepo.createAuditLog(
         botType,
         'ERROR',
         'Bot',
         botId,
-        { status: 'FAILED', message: e.message, error: JSON.stringify(e), platform: Platform.X }
+        { status: 'FAILED', message: e.message, error: JSON.stringify(e) }
       );
     }
   }

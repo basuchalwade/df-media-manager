@@ -13,13 +13,17 @@ async function main() {
   console.log('🌱 Seeding database...');
 
   // 1. Create Admin
-  await prisma.user.upsert({
-    where: { email: 'admin@contentcaster.io' },
+  const adminEmail = 'admin@contentcaster.io';
+  // We use a dummy ID for actorId relations in AuditLog if strictly needed, 
+  // but usually actorId is just a string in the log.
+  
+  const admin = await prisma.user.upsert({
+    where: { email: adminEmail },
     update: {},
     create: {
-      email: 'admin@contentcaster.io',
+      email: adminEmail,
       name: 'Admin User',
-      password: 'hashed_password_here',
+      password: 'hashed_password_here', // In prod, use bcrypt
       role: UserRole.Admin,
       connectedAccounts: {
         [Platform.X]: { connected: true, handle: '@admin' }
@@ -36,7 +40,7 @@ async function main() {
   ];
 
   for (const bot of bots) {
-    await prisma.bot.upsert({
+    const createdBot = await prisma.bot.upsert({
       where: { type: bot.type },
       update: {},
       create: {
@@ -45,6 +49,17 @@ async function main() {
         statsJson: { currentDailyActions: 0, maxDailyActions: 50, consecutiveErrors: 0 },
         enabled: false,
         intervalMinutes: 60
+      }
+    });
+
+    // Create initial log
+    await prisma.auditLog.create({
+      data: {
+        actorId: admin.id,
+        action: 'INIT',
+        entity: 'Bot',
+        entityId: createdBot.id,
+        metadataJson: { message: `Initialized ${bot.type}` }
       }
     });
   }

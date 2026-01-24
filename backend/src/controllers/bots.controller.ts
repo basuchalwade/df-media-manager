@@ -9,17 +9,25 @@ const botRepo = new BotRepository();
 export const getBots = async (req: Request, res: Response) => {
   const bots = await botRepo.findAll();
   
-  // Enrich with logs
+  // Enrich with logs from AuditLog table
   const botsWithLogs = await Promise.all(bots.map(async (bot) => {
     const logs = await botRepo.getLogs(bot.id, 5);
-    return {
-      ...bot,
-      logs: logs.map(l => ({
+    
+    // Map AuditLog format to the frontend 'BotLogEntry' shape
+    const mappedLogs = logs.map(l => {
+      const meta = l.metadataJson as any;
+      return {
         id: l.id,
         timestamp: l.timestamp,
-        level: (l.metadataJson as any)?.status === 'FAILED' ? 'Error' : 'Info',
-        message: (l.metadataJson as any)?.message || l.action
-      }))
+        // Map status/metadata to log levels
+        level: meta?.status === 'FAILED' ? 'Error' : meta?.status === 'WARNING' ? 'Warning' : 'Info',
+        message: meta?.message || l.action
+      };
+    });
+
+    return {
+      ...bot,
+      logs: mappedLogs
     };
   }));
 
@@ -29,6 +37,7 @@ export const getBots = async (req: Request, res: Response) => {
 export const updateBot = async (req: Request, res: Response) => {
   const { id } = req.params;
   
+  // 'id' param here refers to BotType in the route URL structure /bots/:type
   let bot = await botRepo.findByType(id as BotType);
   
   if (!bot) {
@@ -40,8 +49,9 @@ export const updateBot = async (req: Request, res: Response) => {
 };
 
 export const toggleBot = async (req: Request, res: Response) => {
-  const { id } = req.params;
+  const { id } = req.params; // 'id' refers to BotType
   const bot = await botRepo.findByType(id as BotType);
+  
   if (!bot) return res.status(404).json({ error: 'Bot not found' });
 
   const updated = await botRepo.toggleEnabled(bot.id, !bot.enabled);
