@@ -44,6 +44,7 @@ export const api = {
 
   // Users
   getUsers: () => request<User[]>('/users'),
+  getCurrentUser: () => request<User>('/users/current'),
   addUser: (user: Partial<User>) => request<User[]>('/users', { method: 'POST', body: JSON.stringify(user) }),
   updateUser: (id: string, updates: Partial<User>) => request<User[]>(`/users/${id}`, { method: 'PUT', body: JSON.stringify(updates) }),
 

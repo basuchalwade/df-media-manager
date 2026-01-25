@@ -1,98 +1,83 @@
 
 import express from 'express';
 import cors from 'cors';
-import * as Prisma from '@prisma/client';
-import { seedDefaultBots } from './seed/initBots';
+import v1Routes from './routes/v1';
+import { mockDb } from './db/mockDb';
 
-// Import Infrastructure
-import { botWorker } from './workers/bot.worker'; // Importing starts the worker listener
-import { botScheduler } from './scheduler/bot.scheduler';
-
-const { PrismaClient } = Prisma as any;
-const prisma = new PrismaClient();
 const app = express();
 const PORT = process.env.PORT || 8000;
 
 app.use(cors());
-app.use(express.json() as any);
+app.use(express.json());
 
-// --- Routes ---
+// Mount API Routes
+app.use('/api', v1Routes);
 
-// 1. Posts
-app.get('/api/posts', async (req, res) => {
-  const posts = await prisma.post.findMany({ orderBy: { scheduledFor: 'desc' } });
-  res.json(posts);
+// --- Extra Routes not in v1 yet (Mocking for Phase 1 Completeness) ---
+
+// Media
+app.get('/api/media', (req, res) => res.json(mockDb.media));
+app.post('/api/media/upload', (req, res) => {
+    // In memory upload mock
+    const newMedia = {
+        id: `m-${Date.now()}`,
+        url: 'https://images.unsplash.com/photo-1557804506-669a67965ba0', // Mock URL
+        type: 'Image',
+        size: 500000,
+        governanceStatus: 'Pending',
+        createdAt: new Date()
+    };
+    mockDb.media.unshift(newMedia);
+    res.json(newMedia);
+});
+app.delete('/api/media/:id', (req, res) => {
+    mockDb.media = mockDb.media.filter(m => m.id !== req.params.id);
+    res.json({ success: true });
+});
+app.post('/api/media/:id/approve', (req, res) => {
+    const m = mockDb.media.find(x => x.id === req.params.id);
+    if(m) m.governanceStatus = 'Approved';
+    res.json(m);
 });
 
-app.post('/api/posts', async (req, res) => {
-  const post = await prisma.post.create({
-    data: {
-      ...req.body,
-      status: req.body.status || 'Draft',
-    }
-  });
-  // Note: Post scheduling queue logic would go here in P4
-  res.json(post);
+// Settings & Users
+app.get('/api/settings', (req, res) => {
+    res.json({
+        demoMode: true,
+        geminiApiKey: '',
+        general: { language: 'en', dateFormat: 'MM/DD/YYYY', startOfWeek: 'Monday' },
+        workspace: { timezone: 'UTC', defaultTone: 'Professional' },
+        notifications: { channels: { email: true, inApp: true, slack: false }, alerts: { botActivity: true, failures: true, approvals: true } },
+        security: { twoFactorEnabled: false, sessionTimeout: '30m' },
+        automation: { globalSafetyLevel: 'Moderate', defaultWorkHours: { start: '09:00', end: '17:00' } }
+    });
+});
+app.put('/api/settings', (req, res) => res.json(req.body));
+
+app.get('/api/users', (req, res) => res.json(mockDb.users));
+app.get('/api/users/current', (req, res) => res.json(mockDb.users[0])); // Mock current user
+
+// Dashboard Stats
+app.get('/api/stats', (req, res) => {
+    res.json({
+        totalPosts: mockDb.posts.length,
+        totalReach: 12500,
+        engagementRate: 4.2,
+        activeBots: mockDb.bots.filter(b => b.enabled).length
+    });
 });
 
-// 2. Bots Config
-import { getBots, updateBot, toggleBot, runSimulation } from './controllers/bots.controller';
-
-const mockAuth = (req: any, res: any, next: any) => {
-  req.organizationId = 'system-tenant';
-  next();
-};
-
-app.get('/api/bots', mockAuth, getBots);
-app.get('/api/bots/:type/activity', async (req, res) => {
-  const { type } = req.params;
-  const { limit = 100 } = req.query;
-  const activities = await prisma.botActivity.findMany({
-    where: { botType: type },
-    orderBy: { createdAt: 'desc' },
-    take: Number(limit)
-  });
-  res.json(activities);
-});
-app.post('/api/bots/:type/simulate', mockAuth, runSimulation);
-app.post('/api/bots/:type/toggle', mockAuth, toggleBot);
-app.put('/api/bots/:id', mockAuth, updateBot);
-
-// 5. Global Activity
-app.get('/api/activity/recent', async (req, res) => {
-  const activities = await prisma.botActivity.findMany({
-    orderBy: { createdAt: 'desc' },
-    take: 50
-  });
-  res.json(activities);
+// Integrations
+app.post('/api/integrations/:platform/toggle', (req, res) => {
+    const { platform } = req.params;
+    // Mock toggle logic
+    res.json({ success: true, platform });
 });
 
-// Initialize and Start
-async function startServer() {
-  try {
-    await seedDefaultBots(prisma);
-  } catch (e) {
-    console.error("Startup seed failed, continuing...", e);
-  }
+// Health Check
+app.get('/health', (req, res) => res.json({ status: 'ok', phase: '1' }));
 
-  // START BACKGROUND SERVICES
-  console.log('🚀 Starting Background Services...');
-  
-  if (botWorker) {
-    console.log('✅ Bot Worker: Listening for jobs');
-  }
-  
-  if (botScheduler) {
-    botScheduler.start();
-    console.log('✅ Scheduler: Active');
-  }
-
-  app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-  });
-}
-
-startServer().catch(e => {
-  console.error("Failed to start server:", e);
-  (process as any).exit(1);
+app.listen(PORT, () => {
+  console.log(`🚀 ContentCaster Mock API Server running on port ${PORT}`);
+  console.log(`👉 Environment: Phase 1 (In-Memory Database)`);
 });
