@@ -1,47 +1,58 @@
 
-# ContentCaster - AI Social Media Automation Studio
+# ContentCaster Enterprise Monorepo
 
-**ContentCaster** is a modern SaaS dashboard for managing social media campaigns, automated bots, and AI content creation.
+Production-grade architecture for Social Media Automation.
 
-## 🚀 Getting Started
+## 🏗 System Architecture
 
-### 1. Install Dependencies
+*   **Services**:
+    *   `api-gateway`: REST API + Policy Enforcement Point.
+    *   `worker-executor`: Async job processor (Bots, Publishing).
+*   **Infrastructure**:
+    *   PostgreSQL (Data & Audit).
+    *   Redis (Message Broker).
+
+## 🚀 Setup Instructions
+
+### 1. Prerequisites
+*   Node.js v18+
+*   PostgreSQL running locally (or Docker).
+*   Redis running locally (or Docker).
+
+### 2. Installation
 ```bash
+# Install dependencies for all workspaces
 npm install
 ```
 
-### 2. Run Development Server
+### 3. Database Setup
 ```bash
+# Create .env from example
+cp .env.example .env
+
+# Push Schema to DB
+npm run db:push
+
+# (Optional) Seed Initial Data
+npm run db:seed
+```
+
+### 4. Running Services (Terminal 1)
+Start the Backend Gateway and Worker:
+```bash
+npm run start:all
+```
+*   Gateway: http://localhost:3000
+*   Worker: (Background Process)
+
+### 5. Frontend (Terminal 2)
+```bash
+cd frontend
 npm run dev
 ```
-The application will start at `http://localhost:3000`.
+*   Dashboard: http://localhost:5173
 
-## 🧠 AI Configuration (Optional)
-
-By default, the application runs in **Simulation Mode**. All AI responses (content generation, safety checks) are mocked for zero-cost testing.
-
-To enable **Real AI** features using Google Gemini:
-
-1. Create a file named `.env` in the root directory.
-2. Add your API Key:
-   ```env
-   VITE_GEMINI_API_KEY=your_actual_api_key_here
-   ```
-3. Restart the server (`npm run dev`).
-
-## 🏗️ Project Structure
-
-*   `src/pages/CreatorStudio.tsx`: AI-powered content editor with mobile previews.
-*   `src/pages/BotManager.tsx`: Configuration for autonomous agents.
-*   `src/pages/Calendar.tsx`: Visual scheduling grid.
-*   `src/services/mockStore.ts`: Local storage persistence layer (simulates backend).
-*   `src/services/geminiService.ts`: AI logic handling simulation vs real API calls.
-
-## 📦 Tech Stack
-
-*   React 19
-*   TypeScript
-*   Vite
-*   Tailwind CSS
-*   Recharts
-*   Google GenAI SDK
+## 🔒 Security Notes
+*   **Policy Gateway**: All API requests pass through `src/middleware/policy.middleware.ts`.
+*   **Audit Logs**: Every bot action is recorded in `DecisionAudit` table.
+*   **Secrets**: Platform OAuth tokens are encrypted at rest (implement encryption util in `packages/auth-utils`).
