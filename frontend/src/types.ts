@@ -214,3 +214,17 @@ export interface PlatformAnalytics {
   };
   history: AnalyticsDataPoint[];
 }
+
+export interface OptimizationEvent {
+  id: string;
+  timestamp: string;
+  botId: string;
+  field: string;
+  oldValue: string | number | boolean;
+  newValue: string | number | boolean;
+  reason: string;
+  confidence: number;
+  metricsUsed: string[];
+  status: 'pending' | 'applied' | 'rejected' | 'simulated';
+  appliedAt?: string;
+}
