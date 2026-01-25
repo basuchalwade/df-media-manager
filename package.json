@@ -3,27 +3,18 @@
   "name": "contentcaster-monorepo",
   "private": true,
   "workspaces": [
-    "packages/*",
-    "services/*",
+    "backend",
     "frontend"
   ],
   "scripts": {
-    "setup": "npm install && npm run db:generate",
-    "db:generate": "npx prisma generate --schema=./infra/db/schema.prisma",
-    "db:push": "npx prisma db push --schema=./infra/db/schema.prisma",
-    "db:seed": "ts-node infra/db/seed.ts",
-    "dev:gateway": "cd services/api-gateway && npm run dev",
-    "dev:worker": "cd services/worker-executor && npm run dev",
-    "dev:frontend": "cd frontend && npm run dev",
-    "start:all": "concurrently \"npm run dev:gateway\" \"npm run dev:worker\" \"npm run dev:frontend\""
+    "install:all": "npm install && npm run install:backend && npm run install:frontend",
+    "install:backend": "cd backend && npm install",
+    "install:frontend": "cd frontend && npm install",
+    "start:all": "concurrently \"npm run start:backend\" \"npm run start:frontend\"",
+    "start:backend": "cd backend && npm run dev",
+    "start:frontend": "cd frontend && npm run dev"
   },
   "devDependencies": {
-    "concurrently": "^8.2.2",
-    "prisma": "^5.10.2",
-    "ts-node": "^10.9.2",
-    "typescript": "^5.3.3"
-  },
-  "dependencies": {
-    "@prisma/client": "^5.10.2"
+    "concurrently": "^8.2.2"
   }
 }

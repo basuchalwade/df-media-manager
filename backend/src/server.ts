@@ -13,7 +13,7 @@ app.use(express.json());
 // Mount API Routes
 app.use('/api', v1Routes);
 
-// --- Extra Routes not in v1 yet (Mocking for Phase 1 Completeness) ---
+// --- Extra Routes for Phase 1 Mock Completeness ---
 
 // Media
 app.get('/api/media', (req, res) => res.json(mockDb.media));
@@ -39,6 +39,11 @@ app.post('/api/media/:id/approve', (req, res) => {
     if(m) m.governanceStatus = 'Approved';
     res.json(m);
 });
+app.post('/api/media/:id/reject', (req, res) => {
+    const m = mockDb.media.find(x => x.id === req.params.id);
+    if(m) m.governanceStatus = 'Rejected';
+    res.json(m);
+});
 
 // Settings & Users
 app.get('/api/settings', (req, res) => {
@@ -55,7 +60,21 @@ app.get('/api/settings', (req, res) => {
 app.put('/api/settings', (req, res) => res.json(req.body));
 
 app.get('/api/users', (req, res) => res.json(mockDb.users));
-app.get('/api/users/current', (req, res) => res.json(mockDb.users[0])); // Mock current user
+app.post('/api/users', (req, res) => {
+    const newUser = { ...req.body, id: `u-${Date.now()}` };
+    mockDb.users.push(newUser);
+    res.json(newUser);
+});
+app.put('/api/users/:id', (req, res) => {
+    const idx = mockDb.users.findIndex(u => u.id === req.params.id);
+    if (idx !== -1) {
+        mockDb.users[idx] = { ...mockDb.users[idx], ...req.body };
+        res.json(mockDb.users[idx]);
+    } else {
+        res.status(404).json({error: 'User not found'});
+    }
+});
+app.get('/api/users/current', (req, res) => res.json(mockDb.users[0]));
 
 // Dashboard Stats
 app.get('/api/stats', (req, res) => {
@@ -70,8 +89,17 @@ app.get('/api/stats', (req, res) => {
 // Integrations
 app.post('/api/integrations/:platform/toggle', (req, res) => {
     const { platform } = req.params;
-    // Mock toggle logic
-    res.json({ success: true, platform });
+    // Update mock user connection
+    const user = mockDb.users[0];
+    if (user) {
+        const connected = user.connectedAccounts[platform]?.connected;
+        user.connectedAccounts[platform] = { 
+            connected: !connected, 
+            handle: !connected ? `@${platform.toLowerCase()}_user` : undefined,
+            lastSync: new Date()
+        };
+    }
+    res.json(user);
 });
 
 // Health Check

@@ -1,154 +1,81 @@
 
 import { api } from './api';
-import { 
-  BotConfig, BotType, DashboardStats, Post, UserSettings, 
-  PlatformAnalytics, User, MediaItem, BotActivity, 
-  MediaVariant, EnhancementType, Campaign 
-} from '../types';
+import { BotConfig, BotType, DashboardStats, Post, UserSettings, PlatformAnalytics, User, MediaItem, BotActivity, MediaVariant, EnhancementType, Campaign } from '../types';
 
-/**
- * PHASE 1 STORE: API PROXY
- * This store now delegates ALL logic to the Backend API.
- * No local state is maintained here.
- */
 export const store = {
-  // --- Posts ---
-  getPosts: async (): Promise<Post[]> => {
-    return await api.getPosts();
-  },
-  addPost: async (post: Post): Promise<Post> => {
-    return await api.addPost(post);
-  },
-  updatePost: async (post: Post): Promise<Post> => {
-    return await api.updatePost(post);
-  },
-  deletePost: async (id: string): Promise<void> => {
-    return await api.deletePost(id);
-  },
+  getPosts: () => api.getPosts(),
+  addPost: (post: Post) => api.addPost(post),
+  updatePost: (post: Post) => api.updatePost(post),
+  deletePost: (id: string) => api.deletePost(id),
 
-  // --- Bots ---
-  getBots: async (): Promise<BotConfig[]> => {
-    return await api.getBots();
-  },
-  toggleBot: async (type: BotType): Promise<BotConfig[]> => {
-    return await api.toggleBot(type);
-  },
-  updateBot: async (bot: BotConfig): Promise<BotConfig[]> => {
-    return await api.updateBot(bot);
-  },
-  getBotActivity: async (type: BotType): Promise<BotActivity[]> => {
-    return await api.getBotActivity(type);
-  },
-  simulateBot: async (type: BotType): Promise<BotActivity[]> => {
-    return await api.simulateBot(type);
-  },
+  getBots: () => api.getBots(),
+  toggleBot: (type: BotType) => api.toggleBot(type),
+  updateBot: (bot: BotConfig) => api.updateBot(bot),
+  getBotActivity: (type: BotType) => api.getBotActivity(type),
+  simulateBot: (type: BotType) => api.simulateBot(type),
 
-  // --- Campaigns ---
   getCampaigns: async (): Promise<Campaign[]> => {
-    return await api.getPosts().then(() => []); // Placeholder: Add API call if endpoint exists, else return empty for Phase 1 safety
-    // Note: In a full impl, this would be: return await api.getCampaigns();
-    // Assuming api.ts needs update or we use a direct fetch here:
-    const response = await fetch(`${(import.meta as any).env.VITE_API_URL || 'http://localhost:8000'}/api/campaigns`);
-    return await response.json();
+    // Mock Campaign fetching from API manually since it's not fully in api.ts yet
+    const token = localStorage.getItem('cc_auth_token');
+    const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+    const res = await fetch('/api/campaigns', { headers });
+    return res.json();
   },
-  addCampaign: async (campaign: any): Promise<Campaign> => {
-    const response = await fetch(`${(import.meta as any).env.VITE_API_URL || 'http://localhost:8000'}/api/campaigns`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(campaign)
+  addCampaign: async (campaign: any) => {
+    const token = localStorage.getItem('cc_auth_token');
+    const headers = token ? { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` } : { 'Content-Type': 'application/json' };
+    const res = await fetch('/api/campaigns', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(campaign)
     });
-    return await response.json();
+    return res.json();
   },
-  updateCampaign: async (id: string, updates: Partial<Campaign>): Promise<Campaign> => {
-    // Phase 1 Mock Update
-    return {} as Campaign; 
-  },
-  applyCampaignRecommendation: async (campaignId: string, recId: string) => {
-    // API Call placeholder
-  },
-  dismissCampaignRecommendation: async (campaignId: string, recId: string) => {
-    // API Call placeholder
-  },
+  
+  // Phase 1 Mock Logic for frontend-only state
+  updateCampaign: async (id: string, updates: Partial<Campaign>) => ({ id, ...updates } as Campaign),
+  applyCampaignRecommendation: async (id: string, recId: string) => {},
+  dismissCampaignRecommendation: async (id: string, recId: string) => {},
 
-  // --- Media ---
-  getMedia: async (): Promise<MediaItem[]> => {
-    return await api.getMedia();
-  },
-  uploadMedia: async (file: File): Promise<MediaItem> => {
-    return await api.uploadMedia(file);
-  },
-  deleteMedia: async (id: string): Promise<MediaItem[]> => {
-    await api.deleteMedia(id);
-    return await api.getMedia();
-  },
-  approveMedia: async (id: string, user: string): Promise<MediaItem[]> => {
-    await fetch(`${(import.meta as any).env.VITE_API_URL || 'http://localhost:8000'}/api/media/${id}/approve`, { method: 'POST' });
-    return await api.getMedia();
-  },
-  rejectMedia: async (id: string, reason: string): Promise<MediaItem[]> => {
-    await fetch(`${(import.meta as any).env.VITE_API_URL || 'http://localhost:8000'}/api/media/${id}/reject`, { method: 'POST', body: JSON.stringify({ reason }) });
-    return await api.getMedia();
-  },
-  resetMedia: async (id: string): Promise<MediaItem[]> => {
-    return await api.getMedia(); // Mock
-  },
-  createVariant: async (id: string, platform: string): Promise<MediaVariant> => {
-    return {} as MediaVariant; // Mock return
-  },
-  createEnhancedVariant: async (id: string, type: EnhancementType): Promise<MediaVariant> => {
-    return {} as MediaVariant; // Mock return
-  },
-  deleteVariant: async (parentId: string, variantId: string): Promise<void> => {
-    // Mock
-  },
+  getMedia: () => api.getMedia(),
+  uploadMedia: (file: File) => api.uploadMedia(file),
+  deleteMedia: (id: string) => api.deleteMedia(id),
+  approveMedia: (id: string, user: string) => api.approveMedia(id, user),
+  rejectMedia: (id: string, reason: string) => api.rejectMedia(id, reason),
+  resetMedia: async (id: string) => api.getMedia(), // Mock
 
-  // --- Platform & Users ---
-  getStats: async (): Promise<DashboardStats> => {
-    return await api.getStats();
-  },
-  getSettings: async (): Promise<UserSettings> => {
-    return await api.getSettings();
-  },
-  saveSettings: async (s: UserSettings): Promise<UserSettings> => {
-    return await api.saveSettings(s);
-  },
-  getUsers: async (): Promise<User[]> => {
-    return await api.getUsers();
-  },
-  getCurrentUser: async (): Promise<User | undefined> => {
-    return await api.getCurrentUser();
-  },
-  addUser: async (u: any): Promise<User[]> => {
-    await api.addUser(u);
-    return await api.getUsers();
-  },
-  updateUser: async (id: string, u: any): Promise<User[]> => {
-    await api.updateUser(id, u);
-    return await api.getUsers();
-  },
+  createVariant: async (id: string, platform: string) => ({} as MediaVariant),
+  createEnhancedVariant: async (id: string, type: EnhancementType) => ({} as MediaVariant),
+  deleteVariant: async (parentId: string, variantId: string) => {},
+
+  getStats: () => api.getStats(),
+  getSettings: () => api.getSettings(),
+  saveSettings: (s: UserSettings) => api.saveSettings(s),
+  getUsers: () => api.getUsers(),
+  getCurrentUser: () => api.getCurrentUser(),
+  addUser: (u: any) => api.addUser(u),
+  updateUser: (id: string, u: any) => api.updateUser(id, u),
+  
   getPlatformAnalytics: async (p: any): Promise<PlatformAnalytics> => {
-    // Mock Data for Analytics (complex to calculate on fly)
     return { 
         platform: p, 
         summary: { followers: 1200, followersGrowth: 5.4, impressions: 45000, impressionsGrowth: 12.5, engagementRate: 3.8, engagementGrowth: 1.2 }, 
         history: Array.from({length: 7}, (_, i) => ({ date: new Date(Date.now() - (6-i)*86400000).toLocaleDateString(), followers: 1200 + i*10, impressions: 4000 + Math.random()*1000, engagement: 200 + Math.random()*50 })) 
     }; 
   },
-  togglePlatformConnection: async (p: any): Promise<User> => {
-    return await api.togglePlatformConnection(p);
-  },
-  
-  // --- Orchestration/Helpers (Keep pure functions or move to backend later) ---
-  getGlobalPolicy: () => ({ emergencyStop: false, quietHours: { enabled: false, startTime: '00:00', endTime: '00:00', timezone: 'UTC' }, platformLimits: {} }),
+  togglePlatformConnection: (p: any) => api.togglePlatformConnection(p),
+
+  // Helpers
+  getGlobalPolicy: () => ({ emergencyStop: false, quietHours: { enabled: false, startTime: '', endTime: '', timezone: '' }, platformLimits: {} }),
   getDailyGlobalActions: () => ({}),
-  updateGlobalPolicy: (cfg: any) => {},
+  updateGlobalPolicy: () => {},
   getAdaptiveConfig: () => ({ mode: 'Balanced', autoOptimize: false, lastOptimization: '' }),
-  setAdaptiveConfig: (cfg: any) => {},
+  setAdaptiveConfig: () => {},
   getOptimizationSuggestions: () => [],
-  applyLearningEvent: (botType: string, id: string) => {},
-  ignoreLearningEvent: (botType: string, id: string) => {},
-  lockLearningField: (botType: string, field: string) => {},
-  getPlatforms: () => [], // Should fetch from API
-  togglePlatformEnabled: (id: any) => {},
-  setPlatformOutage: (id: any, val: boolean) => {},
+  applyLearningEvent: () => {},
+  ignoreLearningEvent: () => {},
+  lockLearningField: () => {},
+  getPlatforms: () => [],
+  togglePlatformEnabled: () => {},
+  setPlatformOutage: () => {},
 };

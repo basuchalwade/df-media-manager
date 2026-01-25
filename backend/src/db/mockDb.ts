@@ -1,10 +1,8 @@
 
-import { BotType, Platform, CampaignStatus, UserRole, UserStatus } from '@prisma/client';
-
-// Types mimicking Prisma Client
+// Types mimicking Prisma Client for Mock usage
 export interface MockUser { id: string; email: string; name: string; role: any; status: any; connectedAccounts: any; organizationId?: string; }
 export interface MockBot { id: string; type: string; enabled: boolean; status: string; intervalMinutes: number; configJson: any; statsJson: any; learningConfigJson?: any; activities: any[]; }
-export interface MockPost { id: string; content: string; platforms: string[]; status: string; scheduledFor?: Date; createdAt: Date; }
+export interface MockPost { id: string; content: string; platforms: string[]; status: string; scheduledFor?: Date; createdAt: Date; metricsJson?: any; botId?: string; }
 export interface MockCampaign { id: string; name: string; objective: string; status: string; startDate: Date; budgetConfig: any; bots: any[]; }
 export interface MockMedia { id: string; url: string; type: string; size: number; governanceStatus: string; createdAt: Date; }
 
