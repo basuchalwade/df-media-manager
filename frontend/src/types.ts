@@ -27,6 +27,48 @@ export enum PostStatus {
   Processing = 'Processing'
 }
 
+export type EnhancementType =
+  | 'auto_brightness'
+  | 'auto_contrast'
+  | 'smart_crop'
+  | 'face_focus'
+  | 'text_safe_margin'
+  | 'brand_overlay';
+
+export interface PlatformCompatibility {
+  compatible: boolean;
+  issues: string[];
+}
+
+export interface MediaVariant {
+  id: string;
+  parentId: string;
+  platform: string;
+  url: string;
+  thumbnailUrl: string;
+  width: number;
+  height: number;
+  createdAt: string;
+  generatedBy: 'ai' | 'user';
+  status: 'ready' | 'failed';
+  enhancementType?: EnhancementType;
+}
+
+export interface MediaMetadata {
+  width: number;
+  height: number;
+  duration?: number;
+  sizeMB: number;
+  format: string;
+  aspectRatio: number;
+}
+
+export interface MediaAIMetadata {
+  generated: boolean;
+  tool?: string;
+  disclosureRequired: boolean;
+}
+
 export interface MediaItem {
   id: string;
   name: string;
@@ -36,8 +78,23 @@ export interface MediaItem {
   createdAt: string;
   thumbnailUrl?: string;
   tags?: string[];
-  governance: { status: string; approvedBy?: string };
+  governance: { 
+    status: string; // 'pending' | 'approved' | 'rejected'
+    approvedBy?: string;
+    approvedAt?: string;
+    rejectionReason?: string;
+  };
   usageCount?: number;
+  
+  // Extended properties
+  processingStatus?: 'uploading' | 'processing' | 'ready' | 'failed';
+  variants?: MediaVariant[];
+  platformCompatibility?: Record<string, PlatformCompatibility>;
+  collections?: string[];
+  metadata?: MediaMetadata;
+  performanceScore?: number;
+  performanceTrend?: 'up' | 'down' | 'stable';
+  aiMetadata?: MediaAIMetadata;
 }
 
 export interface Post {

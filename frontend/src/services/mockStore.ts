@@ -1,5 +1,5 @@
 
-import { BotConfig, BotType, DashboardStats, MediaItem, Post, PostStatus, Platform, Campaign, CampaignObjective, CampaignStatus } from "../types";
+import { BotConfig, BotType, DashboardStats, MediaItem, Post, PostStatus, Platform, Campaign, CampaignObjective, CampaignStatus, UserSettings, PlatformAnalytics, EnhancementType, MediaVariant } from "../types";
 
 // Initial Mock Data
 const INITIAL_BOTS: BotConfig[] = [
@@ -10,8 +10,8 @@ const INITIAL_BOTS: BotConfig[] = [
 ];
 
 const INITIAL_MEDIA: MediaItem[] = [
-  { id: '1', name: 'product-launch.jpg', type: 'image', url: 'https://images.unsplash.com/photo-1611162617474-5b21e879e113?w=500&q=80', size: 2400000, createdAt: new Date().toISOString(), governance: { status: 'approved' } },
-  { id: '2', name: 'team.jpg', type: 'image', url: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=500&q=80', size: 1200000, createdAt: new Date().toISOString(), governance: { status: 'pending' } },
+  { id: '1', name: 'product-launch.jpg', type: 'image', url: 'https://images.unsplash.com/photo-1611162617474-5b21e879e113?w=500&q=80', size: 2400000, createdAt: new Date().toISOString(), governance: { status: 'approved' }, processingStatus: 'ready' },
+  { id: '2', name: 'team.jpg', type: 'image', url: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=500&q=80', size: 1200000, createdAt: new Date().toISOString(), governance: { status: 'pending' }, processingStatus: 'ready' },
 ];
 
 const INITIAL_POSTS: Post[] = [
@@ -73,7 +73,16 @@ class MockStore {
   async getMedia() { return this.get<MediaItem[]>('cc_media'); }
   async uploadMedia(file: File) {
     const url = URL.createObjectURL(file);
-    const item: MediaItem = { id: Date.now().toString(), name: file.name, type: file.type.startsWith('video') ? 'video' : 'image', url, size: file.size, createdAt: new Date().toISOString(), governance: { status: 'approved' } };
+    const item: MediaItem = { 
+        id: Date.now().toString(), 
+        name: file.name, 
+        type: file.type.startsWith('video') ? 'video' : 'image', 
+        url, 
+        size: file.size, 
+        createdAt: new Date().toISOString(), 
+        governance: { status: 'approved' },
+        processingStatus: 'ready'
+    };
     const media = await this.getMedia();
     this.set('cc_media', [item, ...media]);
     return item;
@@ -90,7 +99,130 @@ class MockStore {
     return camp;
   }
 
-  // --- Stats ---
+  // --- Media Governance & Variants ---
+  async approveMedia(id: string, approvedBy: string) {
+    const media = await this.getMedia();
+    const updated = media.map(m => m.id === id ? { ...m, governance: { status: 'approved', approvedBy, approvedAt: new Date().toISOString() } } : m);
+    this.set('cc_media', updated);
+    return updated;
+  }
+
+  async rejectMedia(id: string, reason: string) {
+    const media = await this.getMedia();
+    const updated = media.map(m => m.id === id ? { ...m, governance: { status: 'rejected', rejectionReason: reason } } : m);
+    this.set('cc_media', updated);
+    return updated;
+  }
+
+  async resetMedia(id: string) {
+     const media = await this.getMedia();
+     const updated = media.map(m => m.id === id ? { ...m, governance: { status: 'pending' } } : m);
+     this.set('cc_media', updated);
+     return updated;
+  }
+
+  async createVariant(id: string, platform: string): Promise<void> {
+    const media = await this.getMedia();
+    const updated = media.map(m => {
+        if (m.id === id) {
+            const variant: MediaVariant = {
+                id: `v-${Date.now()}`,
+                parentId: id,
+                platform,
+                url: m.url, // Mock
+                thumbnailUrl: m.thumbnailUrl || m.url,
+                width: 1080,
+                height: 1080,
+                createdAt: new Date().toISOString(),
+                generatedBy: 'ai',
+                status: 'ready'
+            };
+            return { ...m, variants: [...(m.variants || []), variant] };
+        }
+        return m;
+    });
+    this.set('cc_media', updated);
+  }
+
+  async createEnhancedVariant(id: string, type: EnhancementType): Promise<void> {
+      const media = await this.getMedia();
+      const updated = media.map(m => {
+          if (m.id === id) {
+              const variant: MediaVariant = {
+                  id: `v-enh-${Date.now()}`,
+                  parentId: id,
+                  platform: 'All',
+                  url: m.url, // Mock
+                  thumbnailUrl: m.thumbnailUrl || m.url,
+                  width: 1080,
+                  height: 1080,
+                  createdAt: new Date().toISOString(),
+                  generatedBy: 'ai',
+                  status: 'ready',
+                  enhancementType: type
+              };
+              return { ...m, variants: [...(m.variants || []), variant] };
+          }
+          return m;
+      });
+      this.set('cc_media', updated);
+  }
+
+  async deleteVariant(parentId: string, variantId: string): Promise<void> {
+      const media = await this.getMedia();
+      const updated = media.map(m => {
+          if (m.id === parentId) {
+              return { ...m, variants: (m.variants || []).filter(v => v.id !== variantId) };
+          }
+          return m;
+      });
+      this.set('cc_media', updated);
+  }
+
+  // --- Settings ---
+  async getSettings(): Promise<UserSettings> {
+    const defaultSettings: UserSettings = {
+      demoMode: false,
+      geminiApiKey: '',
+      general: { language: 'English', dateFormat: 'MM/DD/YYYY', startOfWeek: 'Monday' },
+      workspace: { timezone: 'UTC', defaultTone: 'Professional' },
+      notifications: { channels: { email: true, inApp: true, slack: false }, alerts: { botActivity: true, failures: true, approvals: true } },
+      security: { twoFactorEnabled: false, sessionTimeout: '30m' },
+      automation: { globalSafetyLevel: 'Moderate', defaultWorkHours: { start: '09:00', end: '17:00' } }
+    };
+    return this.get<UserSettings>('cc_settings') || defaultSettings;
+  }
+
+  async saveSettings(settings: UserSettings): Promise<UserSettings> {
+    this.set('cc_settings', settings);
+    return settings;
+  }
+
+  // --- Analytics ---
+  async getPlatformAnalytics(platform: any): Promise<PlatformAnalytics> {
+    return {
+      platform: platform,
+      summary: {
+        followers: 12500,
+        followersGrowth: 5.4,
+        impressions: 45000,
+        impressionsGrowth: 12.5,
+        engagementRate: 3.8,
+        engagementGrowth: 1.2
+      },
+      history: [
+        { date: 'Mon', followers: 12000, impressions: 4000, engagement: 300 },
+        { date: 'Tue', followers: 12100, impressions: 4500, engagement: 350 },
+        { date: 'Wed', followers: 12200, impressions: 4200, engagement: 320 },
+        { date: 'Thu', followers: 12300, impressions: 4800, engagement: 380 },
+        { date: 'Fri', followers: 12400, impressions: 5000, engagement: 400 },
+        { date: 'Sat', followers: 12450, impressions: 5500, engagement: 450 },
+        { date: 'Sun', followers: 12500, impressions: 6000, engagement: 500 },
+      ]
+    };
+  }
+
+  // --- Stats & User ---
   async getStats() {
     const posts = await this.getPosts();
     const bots = await this.getBots();
@@ -103,7 +235,17 @@ class MockStore {
   }
 
   async getCurrentUser() {
-    return { id: '1', name: 'Admin', email: 'admin@contentcaster.io', role: 'Admin', status: 'Active', connectedAccounts: { [Platform.Twitter]: { connected: true, handle: '@admin' } } };
+    return { 
+        id: '1', 
+        name: 'Admin', 
+        email: 'admin@contentcaster.io', 
+        role: 'Admin' as any, 
+        status: 'Active' as any, 
+        lastActive: 'Now', 
+        connectedAccounts: { 
+            [Platform.Twitter]: { connected: true, handle: '@admin' } 
+        } 
+    };
   }
 }
 

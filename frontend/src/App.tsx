@@ -22,8 +22,6 @@ const App: React.FC = () => {
   const [navParams, setNavParams] = useState<any>(undefined);
 
   const handleNavigate = (page: string, params?: any) => {
-    // In a real router, we'd use useNavigate() hook here, 
-    // but preserving the prop drill interface for now to match component expectations
     setNavParams(params);
   };
 
