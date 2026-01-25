@@ -1,99 +1,89 @@
+
 import React, { useState } from 'react';
-import { Sparkles, Send, RefreshCw, Check } from 'lucide-react';
-import { generatePostContent } from '../services/geminiService';
+import { Sparkles, Send, Smartphone, Image as ImageIcon, RefreshCw, Copy, Plus } from 'lucide-react';
 import { store } from '../services/mockStore';
-import { Platform, PostStatus } from '../types';
 
-const CreatorStudio: React.FC = () => {
-  const [topic, setTopic] = useState('');
-  const [tone, setTone] = useState('Professional');
-  const [content, setContent] = useState('');
+const CreatorStudio = () => {
+  const [prompt, setPrompt] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
-  const [selectedPlatforms, setSelectedPlatforms] = useState<Platform[]>([Platform.Twitter]);
-
-  const handleGenerate = async () => {
-    if (!topic) return;
+  const [content, setContent] = useState('');
+  
+  const handleGenerate = () => {
+    if (!prompt) return;
     setIsGenerating(true);
-    // Added context parameter to match function signature
-    const result = await generatePostContent(topic, 'Twitter', tone, {
-      scheduledTime: 'Now',
-      platformConstraints: 'Standard Twitter constraints',
-      brandVoice: tone
-    });
-    setContent(result);
-    setIsGenerating(false);
+    setTimeout(() => {
+      setContent(`🚀 Exciting news! We just launched ${prompt} and it's going to change the game. \n\n#Innovation #Tech #Growth`);
+      setIsGenerating(false);
+    }, 1500);
   };
 
-  const handleSave = async () => {
-    if (!content) return;
-    await store.addPost({
+  const handleSave = () => {
+    store.addPost({
       id: Date.now().toString(),
       content,
-      platforms: selectedPlatforms,
-      status: PostStatus.Draft,
-      scheduledFor: new Date().toISOString(),
-      author: 'User'
+      platform: 'Twitter',
+      date: new Date(),
+      status: 'Draft'
     });
-    alert('Draft saved!');
-    setTopic('');
+    alert('Saved to drafts!');
     setContent('');
+    setPrompt('');
   };
 
   return (
-    <div className="flex gap-8 h-[calc(100vh-8rem)]">
+    <div className="flex gap-8 h-[calc(100vh-8rem)] animate-fade-in">
       {/* Editor */}
       <div className="flex-1 bg-white rounded-3xl shadow-sm border border-gray-100 p-8 flex flex-col">
-        <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
-          <Sparkles className="text-yellow-500" /> AI Content Generator
-        </h2>
-
-        <div className="space-y-4 mb-6">
-          <div>
-            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Topic</label>
-            <input 
-              className="w-full p-3 bg-gray-50 rounded-xl border-none focus:ring-2 focus:ring-blue-500" 
-              placeholder="e.g. New Product Launch"
-              value={topic}
-              onChange={(e) => setTopic(e.target.value)}
-            />
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-bold flex items-center gap-2">
+            <Sparkles className="text-purple-600" /> AI Assistant
+          </h2>
+          <div className="flex gap-2">
+            {['Twitter', 'LinkedIn', 'Instagram'].map(p => (
+              <button key={p} className="text-xs font-bold px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-600 transition-colors">
+                {p}
+              </button>
+            ))}
           </div>
-          
-          <div>
-            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Tone</label>
-            <select 
-              className="w-full p-3 bg-gray-50 rounded-xl border-none focus:ring-2 focus:ring-blue-500"
-              value={tone}
-              onChange={(e) => setTone(e.target.value)}
-            >
-              <option>Professional</option>
-              <option>Viral/Hype</option>
-              <option>Witty</option>
-              <option>Empathetic</option>
-            </select>
-          </div>
-
-          <button 
-            onClick={handleGenerate}
-            disabled={isGenerating || !topic}
-            className="w-full py-3 bg-black text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-gray-800 transition-colors disabled:opacity-50"
-          >
-            {isGenerating ? <RefreshCw className="animate-spin" /> : <Sparkles size={18} />}
-            Generate Draft
-          </button>
         </div>
 
-        <div className="flex-1 relative">
+        <div className="space-y-4 mb-6">
+          <label className="block text-xs font-bold text-gray-500 uppercase">What should we write about?</label>
+          <div className="flex gap-2">
+            <input 
+              className="flex-1 p-3 bg-gray-50 rounded-xl border-none focus:ring-2 focus:ring-purple-500 transition-all" 
+              placeholder="e.g. New feature launch..."
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+            />
+            <button 
+              onClick={handleGenerate}
+              disabled={isGenerating}
+              className="px-6 bg-black text-white rounded-xl font-bold flex items-center gap-2 hover:bg-gray-800 transition-colors"
+            >
+              {isGenerating ? <RefreshCw className="animate-spin" size={18} /> : <Sparkles size={18} />}
+              Generate
+            </button>
+          </div>
+        </div>
+
+        <div className="flex-1 relative group">
           <textarea 
-            className="w-full h-full resize-none p-4 bg-gray-50 rounded-xl border-none focus:ring-2 focus:ring-blue-500"
-            placeholder="Generated content will appear here..."
+            className="w-full h-full resize-none p-4 bg-gray-50 rounded-xl border-none focus:ring-2 focus:ring-purple-500 transition-all text-gray-700 leading-relaxed"
+            placeholder="AI Output will appear here..."
             value={content}
             onChange={(e) => setContent(e.target.value)}
           />
+          <div className="absolute bottom-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button className="p-2 bg-white shadow-md rounded-lg text-gray-500 hover:text-purple-600"><Copy size={16} /></button>
+            <button className="p-2 bg-white shadow-md rounded-lg text-gray-500 hover:text-purple-600"><ImageIcon size={16} /></button>
+          </div>
         </div>
 
         <div className="mt-6 flex justify-end gap-3">
-          <button onClick={handleSave} className="px-6 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-colors">
-            Save Draft
+          <button className="px-6 py-3 text-gray-500 font-bold hover:bg-gray-50 rounded-xl transition-colors">Save as Draft</button>
+          <button onClick={handleSave} className="px-6 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-colors flex items-center gap-2">
+            <Send size={18} /> Schedule
           </button>
         </div>
       </div>
@@ -118,11 +108,18 @@ const CreatorStudio: React.FC = () => {
               ) : (
                 <>
                   <div className="w-full h-3 bg-gray-100 rounded" />
+                  <div className="w-full h-3 bg-gray-100 rounded" />
                   <div className="w-3/4 h-3 bg-gray-100 rounded" />
                   <div className="w-full h-32 bg-gray-100 rounded-xl mt-4" />
                 </>
               )}
             </div>
+          </div>
+          <div className="absolute bottom-0 w-full p-4 bg-gray-50 border-t border-gray-100 flex justify-around text-gray-400">
+            <div className="w-6 h-6 bg-gray-200 rounded" />
+            <div className="w-6 h-6 bg-gray-200 rounded" />
+            <div className="w-6 h-6 bg-gray-200 rounded" />
+            <div className="w-6 h-6 bg-gray-200 rounded" />
           </div>
         </div>
       </div>

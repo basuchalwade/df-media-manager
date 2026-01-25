@@ -1,111 +1,38 @@
 
-import { BotConfig, BotType, Post, PostStatus, MediaItem, Platform } from '../types';
-
-// Initial Mock Data
-const INITIAL_POSTS: Post[] = [
-  {
-    id: '1',
-    content: 'Launching our new feature today! 🚀 #SaaS',
-    platforms: [Platform.Twitter, Platform.LinkedIn],
-    scheduledFor: new Date().toISOString(),
-    status: PostStatus.Published,
-    author: 'User',
-    metrics: { likes: 45, shares: 12, comments: 5 }
-  }
-];
-
-const INITIAL_BOTS: BotConfig[] = [
-  {
-    type: BotType.Creator,
-    enabled: true,
-    status: 'Idle',
-    intervalMinutes: 60,
-    stats: { currentDailyActions: 5, maxDailyActions: 20, consecutiveErrors: 0 },
-    config: { topics: ['Tech', 'AI'], tone: 'Professional' },
-    logs: []
-  },
-  {
-    type: BotType.Engagement,
-    enabled: true,
-    status: 'Running',
-    intervalMinutes: 15,
-    stats: { currentDailyActions: 42, maxDailyActions: 100, consecutiveErrors: 0 },
-    config: { targetTags: ['#Tech'], replyStrategy: 'Friendly' },
-    logs: []
-  }
-];
+import { Bot, Campaign, Asset, Post } from '../types';
 
 class MockStore {
-  private posts: Post[] = INITIAL_POSTS;
-  private bots: BotConfig[] = INITIAL_BOTS;
-  private media: MediaItem[] = [];
-  
-  constructor() {
-    this.loadFromStorage();
+  bots: Bot[] = [
+    { id: '1', name: 'Viral Writer', type: 'Creator', status: 'Running', dailyUsage: 45, dailyLimit: 50, enabled: true },
+    { id: '2', name: 'Community Manager', type: 'Engagement', status: 'Idle', dailyUsage: 12, dailyLimit: 100, enabled: true },
+    { id: '3', name: 'Lead Scout', type: 'Finder', status: 'Paused', dailyUsage: 0, dailyLimit: 50, enabled: false },
+    { id: '4', name: 'Network Builder', type: 'Growth', status: 'Running', dailyUsage: 88, dailyLimit: 150, enabled: true },
+  ];
+
+  campaigns: Campaign[] = [
+    { id: '1', name: 'Q3 Product Launch', status: 'Active', progress: 65, bots: ['1', '2'], startDate: '2023-10-01' },
+    { id: '2', name: 'Brand Awareness', status: 'Active', progress: 30, bots: ['4'], startDate: '2023-10-15' },
+    { id: '3', name: 'Holiday Special', status: 'Draft', progress: 0, bots: ['1', '2', '4'], startDate: '2023-12-01' },
+  ];
+
+  assets: Asset[] = [
+    { id: '1', name: 'Hero_Image_v1.jpg', type: 'image', platform: 'Instagram', campaignId: '1', url: 'https://images.unsplash.com/photo-1611162617474-5b21e879e113?w=400&q=80' },
+    { id: '2', name: 'Demo_Video.mp4', type: 'video', platform: 'YouTube', campaignId: '1', url: 'https://images.unsplash.com/photo-1611162616475-46b635cb6868?w=400&q=80' },
+    { id: '3', name: 'Team_Photo.jpg', type: 'image', platform: 'LinkedIn', campaignId: '2', url: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=400&q=80' },
+  ];
+
+  posts: Post[] = [
+    { id: '1', content: 'Launching our new feature today! 🚀', platform: 'Twitter', date: new Date(), status: 'Published' },
+    { id: '2', content: 'Behind the scenes at the office.', platform: 'Instagram', date: new Date(Date.now() + 86400000), status: 'Scheduled' },
+  ];
+
+  toggleBot(id: string) {
+    this.bots = this.bots.map(b => b.id === id ? { ...b, enabled: !b.enabled, status: !b.enabled ? 'Running' : 'Paused' } : b);
+    return [...this.bots];
   }
 
-  private loadFromStorage() {
-    const savedPosts = localStorage.getItem('cc_posts');
-    if (savedPosts) this.posts = JSON.parse(savedPosts);
-    
-    const savedBots = localStorage.getItem('cc_bots');
-    if (savedBots) this.bots = JSON.parse(savedBots);
-  }
-
-  private save() {
-    localStorage.setItem('cc_posts', JSON.stringify(this.posts));
-    localStorage.setItem('cc_bots', JSON.stringify(this.bots));
-  }
-
-  // --- Posts ---
-  async getPosts() { return [...this.posts]; }
-  
-  async addPost(post: Post) {
-    this.posts.unshift(post);
-    this.save();
-    return post;
-  }
-
-  async updatePost(updated: Post) {
-    this.posts = this.posts.map(p => p.id === updated.id ? updated : p);
-    this.save();
-  }
-
-  async deletePost(id: string) {
-    this.posts = this.posts.filter(p => p.id !== id);
-    this.save();
-  }
-
-  // --- Bots ---
-  async getBots() { return [...this.bots]; }
-
-  async toggleBot(type: BotType) {
-    this.bots = this.bots.map(b => b.type === type ? { ...b, enabled: !b.enabled } : b);
-    this.save();
-    return this.bots;
-  }
-
-  async getBotActivity(type: BotType) {
-    const bot = this.bots.find(b => b.type === type);
-    return bot?.logs || [];
-  }
-
-  // --- Media ---
-  async getMedia() { return [...this.media]; }
-  
-  async uploadMedia(file: File) {
-    const mockUrl = URL.createObjectURL(file);
-    const item: MediaItem = {
-      id: Date.now().toString(),
-      name: file.name,
-      type: file.type.startsWith('video') ? 'video' : 'image',
-      url: mockUrl,
-      size: file.size,
-      createdAt: new Date().toISOString(),
-      governance: { status: 'approved' } // Auto-approve in mock
-    };
-    this.media.unshift(item);
-    return item;
+  addPost(post: Post) {
+    this.posts.push(post);
   }
 }
 
