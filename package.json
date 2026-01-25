@@ -3,16 +3,18 @@
   "name": "contentcaster-monorepo",
   "private": true,
   "workspaces": [
-    "backend",
-    "frontend"
+    "frontend",
+    "services/*"
   ],
   "scripts": {
-    "install:all": "npm install && npm run install:backend && npm run install:frontend",
-    "install:backend": "cd backend && npm install",
+    "install:all": "npm install && npm run install:gateway && npm run install:worker && npm run install:frontend",
+    "install:gateway": "cd services/api-gateway && npm install",
+    "install:worker": "cd services/worker-executor && npm install",
     "install:frontend": "cd frontend && npm install",
-    "start:all": "concurrently \"npm run start:backend\" \"npm run start:frontend\"",
-    "start:backend": "cd backend && npm run dev",
-    "start:frontend": "cd frontend && npm run dev"
+    "dev:gateway": "cd services/api-gateway && npm run dev",
+    "dev:worker": "cd services/worker-executor && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "start:all": "concurrently \"npm run dev:gateway\" \"npm run dev:worker\" \"npm run dev:frontend\""
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

@@ -1,441 +1,82 @@
 
 import React, { useEffect, useState } from 'react';
-import { Target, Plus, TrendingUp, Users, DollarSign, Calendar, Clock, MoreVertical, Play, Pause, Bot, ArrowRight, BarChart3, BrainCircuit, Check, X, Megaphone, Globe } from 'lucide-react';
-import { store } from '../services/mockStore';
-import { Campaign, CampaignObjective, CampaignStatus, Platform, BotType, CampaignRecommendation } from '../types';
-import { PlatformIcon } from '../components/PlatformIcon';
-import { AreaChart, Area, XAxis, Tooltip, ResponsiveContainer, BarChart, Bar, CartesianGrid } from 'recharts';
+import { Target, MoreHorizontal, Plus } from 'lucide-react';
+import { api } from '../services/api';
+import { Campaign } from '../types';
 
-export const Campaigns: React.FC = () => {
+const Campaigns = () => {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
-  const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'intelligence'>('overview');
 
   useEffect(() => {
-    loadCampaigns();
-    const interval = setInterval(loadCampaigns, 3000); // Live metrics
-    return () => clearInterval(interval);
+    api.getCampaigns().then(setCampaigns);
   }, []);
 
-  const loadCampaigns = async () => {
-    const data = await store.getCampaigns();
-    setCampaigns(data);
-    // Keep selected campaign metrics fresh
-    if (selectedCampaign) {
-        const fresh = data.find(c => c.id === selectedCampaign.id);
-        if (fresh) setSelectedCampaign(fresh);
-    }
-  };
-
-  const handleCreate = async (data: any) => {
-      await store.addCampaign(data);
-      loadCampaigns();
-      setIsCreateModalOpen(false);
-  };
-
-  const handleApplyRec = async (campaignId: string, recId: string) => {
-      await store.applyCampaignRecommendation(campaignId, recId);
-      loadCampaigns();
-  };
-
-  const handleDismissRec = async (campaignId: string, recId: string) => {
-      await store.dismissCampaignRecommendation(campaignId, recId);
-      loadCampaigns();
+  const handleNew = async () => {
+    const newCamp = { name: 'New Campaign ' + Date.now().toString().slice(-4), objective: 'Reach', startDate: new Date().toISOString() };
+    await api.addCampaign(newCamp);
+    api.getCampaigns().then(setCampaigns);
   };
 
   return (
-    <div className="space-y-6 h-full flex flex-col pb-6 animate-in fade-in duration-500">
-      
-      {/* Header */}
-      <div className="flex justify-between items-center shrink-0">
+    <div className="space-y-6 animate-fade-in">
+      <header className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900 tracking-tight flex items-center gap-3">
-            <Target className="w-8 h-8 text-blue-600" />
-            Campaign Intelligence
-          </h1>
-          <p className="text-lg text-slate-500 font-medium mt-1">Orchestrate multi-bot strategies and budget allocation.</p>
+          <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Campaigns</h1>
+          <p className="text-gray-500 mt-1">Manage your strategic initiatives.</p>
         </div>
-        {!selectedCampaign && (
-            <button 
-                onClick={() => setIsCreateModalOpen(true)}
-                className="bg-blue-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-lg shadow-blue-500/20 hover:bg-blue-700 transition-all flex items-center gap-2 active:scale-95"
-            >
-                <Plus className="w-4 h-4" /> New Campaign
-            </button>
-        )}
-      </div>
+        <button onClick={handleNew} className="bg-black text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 hover:bg-gray-800 transition-colors">
+          <Plus size={18} /> New Campaign
+        </button>
+      </header>
 
-      {selectedCampaign ? (
-          // Detail View
-          <div className="flex-1 flex flex-col gap-6 overflow-hidden">
-              <div className="flex items-center gap-4 border-b border-slate-200 pb-4">
-                  <button onClick={() => setSelectedCampaign(null)} className="text-slate-400 hover:text-slate-600 font-bold text-sm flex items-center gap-1">
-                      Campaigns <ArrowRight className="w-3 h-3" />
-                  </button>
-                  <h2 className="text-xl font-bold text-slate-900">{selectedCampaign.name}</h2>
-                  <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase border ${selectedCampaign.status === CampaignStatus.Active ? 'bg-green-50 text-green-700 border-green-200' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
-                      {selectedCampaign.status}
-                  </span>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {campaigns.map(campaign => (
+          <div key={campaign.id} className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+            <div className="flex justify-between items-start mb-4">
+              <div className="flex items-center gap-3">
+                <div className={`p-3 rounded-xl ${campaign.status === 'Active' ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-500'}`}>
+                  <Target size={24} />
+                </div>
+                <div>
+                  <h3 className="font-bold text-lg text-gray-900">{campaign.name}</h3>
+                  <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">Started {new Date(campaign.startDate).toLocaleDateString()}</p>
+                </div>
               </div>
+              <button className="text-gray-400 hover:text-gray-600"><MoreHorizontal /></button>
+            </div>
 
-              {/* Tabs */}
-              <div className="flex gap-6 border-b border-slate-100">
-                  <button 
-                    onClick={() => setActiveTab('overview')}
-                    className={`pb-3 text-sm font-bold border-b-2 transition-colors ${activeTab === 'overview' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
-                  >
-                      Overview & Pacing
-                  </button>
-                  <button 
-                    onClick={() => setActiveTab('intelligence')}
-                    className={`pb-3 text-sm font-bold border-b-2 transition-colors ${activeTab === 'intelligence' ? 'border-purple-600 text-purple-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
-                  >
-                      Intelligence Engine
-                  </button>
+            <div className="mb-6">
+              <div className="flex justify-between text-sm font-medium mb-2">
+                <span className="text-gray-600">Progress</span>
+                <span className="text-gray-900">{campaign.progress}%</span>
               </div>
-
-              {/* Tab Content */}
-              <div className="flex-1 overflow-y-auto custom-scrollbar pr-2">
-                  {activeTab === 'overview' && <CampaignOverview campaign={selectedCampaign} />}
-                  {activeTab === 'intelligence' && <CampaignIntelligence campaign={selectedCampaign} onApplyRec={handleApplyRec} onDismissRec={handleDismissRec} />}
+              <div className="w-full bg-gray-100 rounded-full h-2">
+                <div 
+                  className="bg-blue-600 h-2 rounded-full transition-all duration-1000" 
+                  style={{ width: `${campaign.progress}%` }}
+                />
               </div>
-          </div>
-      ) : (
-          // List View
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 overflow-y-auto custom-scrollbar pb-20">
-              {campaigns.map(camp => (
-                  <div 
-                    key={camp.id} 
-                    onClick={() => setSelectedCampaign(camp)}
-                    className="bg-white rounded-2xl border border-slate-200 p-6 cursor-pointer hover:shadow-lg hover:border-blue-200 transition-all group"
-                  >
-                      <div className="flex justify-between items-start mb-4">
-                          <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${getObjectColor(camp.objective)}`}>
-                              {getObjectiveIcon(camp.objective)}
-                          </div>
-                          <div className="flex items-center gap-2">
-                              {camp.status === CampaignStatus.Active && <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>}
-                              <MoreVertical className="w-5 h-5 text-slate-300 hover:text-slate-500" />
-                          </div>
-                      </div>
-                      
-                      <h3 className="font-bold text-lg text-slate-900 mb-1 group-hover:text-blue-600 transition-colors">{camp.name}</h3>
-                      <div className="flex items-center gap-2 text-xs text-slate-500 mb-4 font-medium">
-                          <span>{camp.objective}</span>
-                          <span>•</span>
-                          <span>{new Date(camp.startDate).toLocaleDateString()}</span>
-                      </div>
+            </div>
 
-                      {/* Mini Budget Bar */}
-                      <div className="mb-4">
-                          <div className="flex justify-between text-xs font-bold text-slate-500 mb-1">
-                              <span>${camp.budget.spent.toFixed(0)} Spent</span>
-                              <span>${camp.budget.total.toLocaleString()} Total</span>
-                          </div>
-                          <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                              <div className="h-full bg-slate-800 rounded-full" style={{ width: `${Math.min((camp.budget.spent / camp.budget.total) * 100, 100)}%` }}></div>
-                          </div>
-                      </div>
-
-                      <div className="flex justify-between items-center border-t border-slate-100 pt-4">
-                          <div className="flex -space-x-2">
-                              {camp.platforms.map(p => (
-                                  <div key={p} className="w-6 h-6 rounded-full bg-white border border-slate-200 flex items-center justify-center shadow-sm">
-                                      <PlatformIcon platform={p} size={10} />
-                                  </div>
-                              ))}
-                          </div>
-                          <div className="flex items-center gap-1 text-xs font-bold text-slate-600 bg-slate-50 px-2 py-1 rounded-lg">
-                              <Bot className="w-3 h-3" />
-                              {camp.botIds.length} Bots
-                          </div>
-                      </div>
+            <div className="flex items-center justify-between pt-4 border-t border-gray-100">
+              <div className="flex -space-x-2">
+                {(campaign.bots || []).map((botId, i) => (
+                  <div key={i} className="w-8 h-8 rounded-full bg-gray-200 border-2 border-white flex items-center justify-center text-xs font-bold text-gray-500">
+                    B
                   </div>
-              ))}
+                ))}
+              </div>
+              <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                campaign.status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
+              }`}>
+                {campaign.status}
+              </span>
+            </div>
           </div>
-      )}
-
-      {isCreateModalOpen && <CreateCampaignModal onClose={() => setIsCreateModalOpen(false)} onCreate={handleCreate} />}
+        ))}
+      </div>
     </div>
   );
 };
 
-// --- Sub-components ---
-
-const CampaignOverview: React.FC<{ campaign: Campaign }> = ({ campaign }) => {
-    // Pacing Data Visualization
-    const pacing = campaign.intelligence?.pacing;
-    
-    // Generate Chart Data from Pacing (Mocking historic trend for UI)
-    const data = Array.from({length: 10}, (_, i) => {
-        const factor = 1 - (i * 0.1);
-        const daySpend = (pacing?.actualSpend || 0) * 0.1; 
-        return {
-            day: `Day ${i+1}`,
-            spend: Math.max(0, Math.floor(daySpend * (0.8 + Math.random() * 0.4))),
-            target: Math.floor((campaign.budget.daily || 100))
-        };
-    });
-
-    const kpis = campaign.intelligence?.kpiMapping || { "Primary Metric": "Activity" };
-
-    return (
-        <div className="space-y-6">
-            <div className="grid grid-cols-4 gap-4">
-                <MetricCard title="Total Spend" value={`$${campaign.budget.spent.toLocaleString(undefined, {maximumFractionDigits:0})}`} sub={`of $${campaign.budget.total}`} icon={DollarSign} color="slate" />
-                <MetricCard title={kpis["Primary Metric"]} value={campaign.metrics.impressions.toLocaleString()} sub="Total Volume" icon={Megaphone} color="blue" />
-                <MetricCard title={kpis["Primary Metric"] === 'Conversions' ? 'Conversions' : 'Engagement'} value={campaign.metrics.clicks.toLocaleString()} sub={`Avg CPA: $${campaign.metrics.costPerResult.toFixed(2)}`} icon={Target} color="green" />
-                <MetricCard title="ROAS" value={`${campaign.metrics.roas?.toFixed(2) || 0}x`} sub="Return on Ad Spend" icon={TrendingUp} color="purple" />
-            </div>
-
-            <div className="grid grid-cols-3 gap-6">
-                <div className="col-span-2 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                    <h3 className="font-bold text-slate-900 mb-6">Budget Pacing (Last 10 Days)</h3>
-                    <div className="h-64 w-full">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={data}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#64748b'}} />
-                                <Tooltip cursor={{fill: '#f8fafc'}} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-                                <Bar dataKey="spend" fill="#3b82f6" radius={[4, 4, 0, 0]} name="Actual Spend" />
-                                <Bar dataKey="target" fill="#e2e8f0" radius={[4, 4, 0, 0]} name="Daily Target" />
-                            </BarChart>
-                        </ResponsiveContainer>
-                    </div>
-                </div>
-                
-                {/* Pacing Status Card */}
-                <div className={`p-6 rounded-2xl border flex flex-col justify-center items-center text-center ${
-                    pacing?.pacingStatus === 'OVER' ? 'bg-red-50 border-red-200 text-red-900' :
-                    pacing?.pacingStatus === 'UNDER' ? 'bg-amber-50 border-amber-200 text-amber-900' :
-                    'bg-green-50 border-green-200 text-green-900'
-                }`}>
-                    <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-4 ${
-                        pacing?.pacingStatus === 'OVER' ? 'bg-red-200' :
-                        pacing?.pacingStatus === 'UNDER' ? 'bg-amber-200' :
-                        'bg-green-200'
-                    }`}>
-                        <TrendingUp className="w-8 h-8" />
-                    </div>
-                    <h3 className="text-2xl font-bold">{pacing?.pacingStatus || 'CALCULATING'}</h3>
-                    <p className="text-sm opacity-80 mt-2 font-medium">Budget Pacing Status</p>
-                    <div className="mt-4 w-full bg-white/50 rounded-lg p-3 text-xs font-bold">
-                        {pacing?.burnRate.toFixed(1)}% Daily Burn Rate
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-const CampaignIntelligence: React.FC<{ campaign: Campaign, onApplyRec: any, onDismissRec: any }> = ({ campaign, onApplyRec, onDismissRec }) => {
-    const attribution = campaign.intelligence?.attribution || [];
-    const strategySummary = campaign.intelligence?.strategySummary || "Analyzing campaign strategy...";
-
-    return (
-        <div className="grid grid-cols-3 gap-6 h-full">
-            <div className="col-span-2 space-y-6">
-                {/* Bot Contribution */}
-                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                    <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
-                        <Bot className="w-5 h-5 text-indigo-600" /> Bot Attribution Model
-                    </h3>
-                    <div className="space-y-4">
-                        {attribution.length === 0 ? (
-                            <div className="text-center py-8 text-slate-400 italic">No attribution data available yet.</div>
-                        ) : (
-                            attribution.map(attr => (
-                                <div key={attr.botId} className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-sm text-slate-600 border border-slate-200">
-                                            {attr.botId === BotType.Creator ? <Megaphone className="w-5 h-5" /> : 
-                                             attr.botId === BotType.Engagement ? <Users className="w-5 h-5" /> : 
-                                             <TrendingUp className="w-5 h-5" />}
-                                        </div>
-                                        <div>
-                                            <div className="font-bold text-slate-900 text-sm">{attr.botId}</div>
-                                            <div className="text-xs text-slate-500">Primary: {attr.primaryContribution}</div>
-                                        </div>
-                                    </div>
-                                    <div className="text-right">
-                                        <div className="font-bold text-slate-900">${attr.spend.toFixed(0)} Spent</div>
-                                        <div className="text-xs text-green-600 font-bold">+{attr.liftPercentage.toFixed(1)}% Lift</div>
-                                    </div>
-                                    <div className="w-24">
-                                        <div className="text-[10px] text-slate-400 mb-1 text-right">Impact Score</div>
-                                        <div className="w-full bg-slate-200 rounded-full h-1.5">
-                                            <div className="bg-indigo-500 h-1.5 rounded-full" style={{width: `${attr.impactScore}%`}}></div>
-                                        </div>
-                                    </div>
-                                </div>
-                            ))
-                        )}
-                    </div>
-                </div>
-
-                {/* Strategy Text */}
-                <div className="bg-slate-900 text-white p-6 rounded-2xl shadow-lg relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600 rounded-full blur-[100px] opacity-20 pointer-events-none"></div>
-                    <h3 className="font-bold text-lg mb-2 relative z-10">Active Strategy: Multi-Agent Coordination</h3>
-                    <p className="text-slate-300 text-sm leading-relaxed relative z-10 max-w-2xl">
-                        {strategySummary}
-                    </p>
-                </div>
-            </div>
-
-            {/* Recommendations Panel */}
-            <div className="bg-gradient-to-b from-purple-50 to-white border border-purple-100 rounded-2xl p-6 shadow-sm flex flex-col">
-                <div className="flex items-center gap-2 mb-6">
-                    <BrainCircuit className="w-6 h-6 text-purple-600" />
-                    <h3 className="font-bold text-slate-900">AI Suggestions</h3>
-                </div>
-                
-                <div className="flex-1 space-y-4 overflow-y-auto custom-scrollbar pr-1">
-                    {campaign.aiRecommendations.filter(r => r.status === 'pending').map(rec => (
-                        <div key={rec.id} className="bg-white p-4 rounded-xl border border-purple-100 shadow-sm transition-transform hover:scale-[1.02]">
-                            <div className="flex justify-between items-start mb-2">
-                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase ${rec.impact === 'High' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-blue-50 text-blue-700 border-blue-200'}`}>
-                                    {rec.impact} Impact
-                                </span>
-                                <span className="text-[10px] text-slate-400 font-medium">Just now</span>
-                            </div>
-                            <h4 className="font-bold text-slate-900 text-sm mb-1">{rec.title}</h4>
-                            <p className="text-xs text-slate-600 mb-4 leading-relaxed">{rec.description}</p>
-                            
-                            <div className="flex gap-2">
-                                <button 
-                                    onClick={() => onApplyRec(campaign.id, rec.id)}
-                                    className="flex-1 bg-purple-600 text-white text-xs font-bold py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center justify-center gap-1"
-                                >
-                                    <Check className="w-3 h-3" /> {rec.actionLabel}
-                                </button>
-                                <button 
-                                    onClick={() => onDismissRec(campaign.id, rec.id)}
-                                    className="px-3 bg-slate-100 text-slate-500 rounded-lg hover:bg-slate-200 transition-colors"
-                                >
-                                    <X className="w-3 h-3" />
-                                </button>
-                            </div>
-                        </div>
-                    ))}
-                    {campaign.aiRecommendations.filter(r => r.status === 'pending').length === 0 && (
-                        <div className="text-center text-slate-400 text-sm py-8 italic">
-                            No new recommendations. Strategy is optimized.
-                        </div>
-                    )}
-                </div>
-            </div>
-        </div>
-    );
-};
-
-const CreateCampaignModal: React.FC<{ onClose: () => void, onCreate: (data: any) => void }> = ({ onClose, onCreate }) => {
-    const [name, setName] = useState('');
-    const [objective, setObjective] = useState<CampaignObjective>(CampaignObjective.Reach);
-    const [budget, setBudget] = useState(100);
-    const [platforms, setPlatforms] = useState<Platform[]>([]);
-    const [bots, setBots] = useState<BotType[]>([]);
-
-    const handleSubmit = () => {
-        onCreate({
-            name,
-            objective,
-            platforms,
-            botIds: bots,
-            startDate: new Date().toISOString(),
-            budget: { total: budget * 30, daily: budget, spent: 0, currency: 'USD' }
-        });
-    };
-
-    const togglePlatform = (p: Platform) => {
-        setPlatforms(prev => prev.includes(p) ? prev.filter(i => i !== p) : [...prev, p]);
-    };
-
-    const toggleBot = (b: BotType) => {
-        setBots(prev => prev.includes(b) ? prev.filter(i => i !== b) : [...prev, b]);
-    };
-
-    return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in">
-            <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-                <div className="p-6 border-b border-slate-100 flex justify-between items-center">
-                    <h3 className="font-bold text-xl text-slate-900">Create New Campaign</h3>
-                    <button onClick={onClose}><X className="w-5 h-5 text-slate-400 hover:text-slate-600" /></button>
-                </div>
-                <div className="p-6 space-y-6">
-                    <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Campaign Name</label>
-                        <input value={name} onChange={e => setName(e.target.value)} className="w-full border border-slate-200 rounded-lg px-4 py-2 font-medium" placeholder="e.g. Summer Sale 2024" />
-                    </div>
-                    <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Objective</label>
-                        <div className="grid grid-cols-2 gap-2">
-                            {Object.values(CampaignObjective).map(obj => (
-                                <button key={obj} onClick={() => setObjective(obj)} className={`py-2 rounded-lg text-sm font-bold border transition-all ${objective === obj ? 'bg-blue-50 border-blue-500 text-blue-700' : 'bg-white border-slate-200 text-slate-600'}`}>{obj}</button>
-                            ))}
-                        </div>
-                    </div>
-                    <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Daily Budget ($)</label>
-                        <input type="number" value={budget} onChange={e => setBudget(Number(e.target.value))} className="w-full border border-slate-200 rounded-lg px-4 py-2 font-medium" />
-                    </div>
-                    <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Target Platforms</label>
-                        <div className="flex gap-2">
-                            {[Platform.Twitter, Platform.LinkedIn, Platform.Instagram].map(p => (
-                                <button key={p} onClick={() => togglePlatform(p)} className={`p-2 rounded-lg border ${platforms.includes(p) ? 'bg-slate-900 border-slate-900 text-white' : 'bg-white border-slate-200 text-slate-400'}`}>
-                                    <PlatformIcon platform={p} size={18} white={platforms.includes(p)} />
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                    <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Assigned Agents</label>
-                        <div className="flex flex-wrap gap-2">
-                            {Object.values(BotType).map(b => (
-                                <button key={b} onClick={() => toggleBot(b)} className={`px-3 py-1.5 text-xs font-bold rounded-lg border ${bots.includes(b) ? 'bg-indigo-50 border-indigo-500 text-indigo-700' : 'bg-white border-slate-200 text-slate-500'}`}>{b}</button>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-                <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
-                    <button onClick={onClose} className="px-4 py-2 text-slate-600 font-bold hover:bg-slate-200 rounded-lg transition-colors">Cancel</button>
-                    <button onClick={handleSubmit} disabled={!name} className="px-6 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50">Launch Campaign</button>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-const MetricCard = ({ title, value, sub, icon: Icon, color }: any) => {
-    const colors: any = { slate: 'bg-slate-100 text-slate-600', blue: 'bg-blue-100 text-blue-600', green: 'bg-green-100 text-green-600', purple: 'bg-purple-100 text-purple-600' };
-    return (
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-            <div className="flex justify-between items-start mb-2">
-                <span className="text-slate-500 text-xs font-bold uppercase tracking-wide">{title}</span>
-                <div className={`p-1.5 rounded-lg ${colors[color]}`}><Icon className="w-4 h-4" /></div>
-            </div>
-            <div className="text-2xl font-bold text-slate-900">{value}</div>
-            <div className="text-xs text-slate-400 mt-1 font-medium">{sub}</div>
-        </div>
-    );
-}
-
-const getObjectiveIcon = (obj: CampaignObjective) => {
-    switch (obj) {
-        case CampaignObjective.Reach: return <Megaphone className="w-5 h-5 text-purple-600" />;
-        case CampaignObjective.Engagement: return <Users className="w-5 h-5 text-pink-600" />;
-        case CampaignObjective.Traffic: return <Globe className="w-5 h-5 text-blue-600" />;
-        case CampaignObjective.Conversions: return <DollarSign className="w-5 h-5 text-green-600" />;
-    }
-};
-
-const getObjectColor = (obj: CampaignObjective) => {
-    switch (obj) {
-        case CampaignObjective.Reach: return 'bg-purple-50';
-        case CampaignObjective.Engagement: return 'bg-pink-50';
-        case CampaignObjective.Traffic: return 'bg-blue-50';
-        case CampaignObjective.Conversions: return 'bg-green-50';
-    }
-};
+export default Campaigns;

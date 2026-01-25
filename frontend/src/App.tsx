@@ -2,18 +2,18 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import AppLayout from './layout/AppLayout';
-import { Overview } from './pages/Overview';
-import { CreatorStudio } from './pages/CreatorStudio';
-import { BotManager } from './pages/BotManager';
-import { Calendar } from './pages/Calendar';
-import { MediaLibrary } from './pages/MediaLibrary';
-import { Analytics } from './pages/Analytics';
+import Overview from './pages/Overview';
+import CreatorStudio from './pages/CreatorStudio';
+import BotManager from './pages/BotManager';
+import Calendar from './pages/Calendar';
+import MediaLibrary from './pages/MediaLibrary';
+import Analytics from './pages/Analytics';
 import { Settings } from './pages/Settings';
-import { Campaigns } from './pages/Campaigns';
+import Campaigns from './pages/Campaigns';
 import { Integrations } from './pages/Integrations';
 import { UserManagement } from './pages/UserManagement';
 import { BotActivityLog } from './pages/BotActivityLog';
-import { Login } from './pages/Login';
+import Login from './pages/Login';
 import { isAuthenticated } from './lib/mockAuth';
 import { BotType } from './types';
 

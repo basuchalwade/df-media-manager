@@ -1,83 +1,71 @@
 
-import { Post, BotConfig, User, UserSettings, MediaItem, DashboardStats, BotType, Platform, BotActivity } from '../types';
+import { BotConfig, Campaign, Post, MediaItem, BotType, User } from '../types';
 
-const API_URL = ''; // Relative path because of Vite proxy
-
-const headers = {
-  'Content-Type': 'application/json',
-};
-
-async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
-  const token = localStorage.getItem('cc_auth_token');
-  const authHeaders = token ? { 'Authorization': `Bearer ${token}` } : {};
-
-  try {
-    const response = await fetch(`${API_URL}/api${endpoint}`, {
-      headers: { ...headers, ...authHeaders, ...options?.headers },
-      ...options,
-    });
-    if (!response.ok) {
-      throw new Error(`API Error: ${response.statusText}`);
-    }
-    return await response.json();
-  } catch (error) {
-    console.error(`Request failed for ${endpoint}:`, error);
-    throw error;
-  }
-}
+const BASE = '/api';
 
 export const api = {
-  // Posts
-  getPosts: () => request<Post[]>('/posts'),
-  addPost: (post: Post) => request<Post>('/posts', { method: 'POST', body: JSON.stringify(post) }),
-  updatePost: (post: Post) => request<Post>(`/posts/${post.id}`, { method: 'PUT', body: JSON.stringify(post) }),
-  deletePost: (id: string) => request<void>(`/posts/${id}`, { method: 'DELETE' }),
-
-  // Bots
-  getBots: () => request<BotConfig[]>('/bots'),
-  getBotActivity: (type: BotType) => request<BotActivity[]>(`/bots/${encodeURIComponent(type)}/activity`),
-  toggleBot: (type: BotType) => request<BotConfig[]>(`/bots/${encodeURIComponent(type)}/toggle`, { method: 'POST' }),
-  updateBot: (bot: BotConfig) => request<BotConfig[]>(`/bots/${encodeURIComponent(bot.type)}/config`, { method: 'PATCH', body: JSON.stringify({config: bot.config, learning: bot.learning}) }),
-  simulateBot: (type: BotType) => request<any>(`/bots/${encodeURIComponent(type)}/simulate`, { method: 'POST' }),
-
-  // Settings
-  getSettings: () => request<UserSettings>('/settings'),
-  saveSettings: (settings: UserSettings) => request<UserSettings>('/settings', { method: 'PUT', body: JSON.stringify(settings) }),
-
-  // Users
-  getUsers: () => request<User[]>('/users'),
-  getCurrentUser: () => request<User>('/users/current'),
-  addUser: (user: Partial<User>) => request<User[]>('/users', { method: 'POST', body: JSON.stringify(user) }),
-  updateUser: (id: string, updates: Partial<User>) => request<User[]>(`/users/${id}`, { method: 'PUT', body: JSON.stringify(updates) }),
-
-  // Media
-  getMedia: () => request<MediaItem[]>('/media'),
-  uploadMedia: async (file: File) => {
-    const formData = new FormData();
-    formData.append('file', file);
-    const token = localStorage.getItem('cc_auth_token');
-    const response = await fetch(`${API_URL}/api/media/upload`, {
-      method: 'POST',
-      body: formData,
-      headers: token ? { 'Authorization': `Bearer ${token}` } : {}
-    });
-    if (!response.ok) throw new Error('Upload failed');
-    return await response.json() as MediaItem;
-  },
-  deleteMedia: (id: string) => request<MediaItem[]>(`/media/${id}`, { method: 'DELETE' }),
-  approveMedia: (id: string, user: string) => request<MediaItem[]>(`/media/${id}/approve`, { method: 'POST' }),
-  rejectMedia: (id: string, reason: string) => request<MediaItem[]>(`/media/${id}/reject`, { method: 'POST', body: JSON.stringify({reason}) }),
-
-  // Stats
-  getStats: () => request<DashboardStats>('/stats'),
-
-  // Integrations
-  togglePlatformConnection: (platform: Platform) => request<User>(`/integrations/${platform}/toggle`, { method: 'POST' }),
-  
   // Auth
-  login: (email: string, password: string) => fetch(`${API_URL}/api/auth/login`, {
+  login: async (email: string, pass: string): Promise<{ token: string, user: User }> => {
+    const res = await fetch(`${BASE}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password })
-  }).then(res => res.json())
+      body: JSON.stringify({ email, password: pass })
+    });
+    return res.json();
+  },
+
+  // Stats
+  getStats: async () => (await fetch(`${BASE}/stats`)).json(),
+  getAnalytics: async () => (await fetch(`${BASE}/analytics`)).json(),
+
+  // Bots
+  getBots: async (): Promise<BotConfig[]> => {
+    const bots = await (await fetch(`${BASE}/bots`)).json();
+    // Map simplified API response to full BotConfig if necessary
+    return bots.map((b: any) => {
+        // Handle name mapping to BotType enum if backend returns simple strings
+        let typeVal = BotType.Creator;
+        if (b.type.includes('Engagement')) typeVal = BotType.Engagement;
+        if (b.type.includes('Growth')) typeVal = BotType.Growth;
+        if (b.type.includes('Finder')) typeVal = BotType.Finder;
+
+        return {
+            ...b,
+            type: typeVal,
+            config: b.configJson || {},
+            stats: { 
+                currentDailyActions: b.dailyUsage || 0, 
+                maxDailyActions: b.dailyLimit || 100,
+                consecutiveErrors: 0 
+            },
+            logs: []
+        } as BotConfig;
+    });
+  },
+  toggleBot: async (id: string) => (await fetch(`${BASE}/bots/${id}/toggle`, { method: 'POST' })).json(),
+
+  // Campaigns
+  getCampaigns: async (): Promise<Campaign[]> => (await fetch(`${BASE}/campaigns`)).json(),
+  addCampaign: async (camp: any) => (await fetch(`${BASE}/campaigns`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(camp)
+  })).json(),
+
+  // Posts
+  getPosts: async (): Promise<Post[]> => (await fetch(`${BASE}/posts`)).json(),
+  addPost: async (post: any) => (await fetch(`${BASE}/posts`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(post)
+  })).json(),
+
+  // Media
+  getMedia: async (): Promise<MediaItem[]> => (await fetch(`${BASE}/media`)).json(),
+  uploadMedia: async (file: File) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      return (await fetch(`${BASE}/media/upload`, { method: 'POST', body: formData })).json();
+  },
+  deleteMedia: async (id: string) => (await fetch(`${BASE}/media/${id}`, { method: 'DELETE' })).json(),
 };

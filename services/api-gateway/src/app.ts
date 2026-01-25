@@ -1,28 +1,22 @@
 
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
-import { policyGateway } from './middleware/policy.middleware';
-import { authMiddleware } from './middleware/auth.middleware'; // Assumed exists
-import routes from './routes';
-
-dotenv.config();
+import router from './routes';
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.API_PORT || 3000;
 
 app.use(cors());
 app.use(express.json());
 
-// 1. Authentication Layer
-app.use(authMiddleware);
+// Logger
+app.use((req, res, next) => {
+  console.log(`[API] ${req.method} ${req.url}`);
+  next();
+});
 
-// 2. Policy Enforcement Layer (Radius-style)
-app.use(policyGateway);
-
-// 3. Routes
-app.use('/api', routes);
+app.use('/api', router);
 
 app.listen(PORT, () => {
-  console.log(`🛡️ API Gateway & Policy Engine running on port ${PORT}`);
+  console.log(`🚀 API Gateway running on port ${PORT}`);
 });

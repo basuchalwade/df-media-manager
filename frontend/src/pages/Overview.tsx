@@ -1,27 +1,29 @@
 
 import React, { useEffect, useState } from 'react';
-import { Users, Activity, TrendingUp, Share2, ArrowUp, ArrowDown } from 'lucide-react';
+import { Users, Activity, TrendingUp, Share2, ArrowUp } from 'lucide-react';
 import { AreaChart, Area, XAxis, Tooltip, ResponsiveContainer } from 'recharts';
-import { store } from '../services/mockStore';
+import { api } from '../services/api';
 
-export const Overview = () => {
+const Overview = () => {
   const [stats, setStats] = useState<any>(null);
+  const [chartData, setChartData] = useState<any[]>([]);
 
   useEffect(() => {
-    store.getStats().then(setStats);
+    const load = async () => {
+      const s = await api.getStats();
+      const a = await api.getAnalytics();
+      setStats(s);
+      setChartData(a.history);
+    };
+    load();
+    const interval = setInterval(load, 3000); // Live poll
+    return () => clearInterval(interval);
   }, []);
 
-  const chartData = [
-    { name: 'Mon', reach: 4000 }, { name: 'Tue', reach: 3000 },
-    { name: 'Wed', reach: 2000 }, { name: 'Thu', reach: 2780 },
-    { name: 'Fri', reach: 4890 }, { name: 'Sat', reach: 2390 },
-    { name: 'Sun', reach: 3490 },
-  ];
-
-  if (!stats) return <div className="p-8">Loading...</div>;
+  if (!stats) return <div className="p-8">Loading Dashboard...</div>;
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
+    <div className="space-y-8 animate-fade-in">
       <header>
         <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Overview</h1>
         <p className="text-gray-500 mt-1">Your real-time social command center.</p>
@@ -47,7 +49,7 @@ export const Overview = () => {
               </defs>
               <XAxis dataKey="name" axisLine={false} tickLine={false} />
               <Tooltip />
-              <Area type="monotone" dataKey="reach" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorReach)" />
+              <Area type="monotone" dataKey="value" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorReach)" />
             </AreaChart>
           </ResponsiveContainer>
         </div>
@@ -57,7 +59,7 @@ export const Overview = () => {
 };
 
 const StatCard = ({ label, value, icon: Icon, color, trend }: any) => (
-  <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+  <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow cursor-default">
     <div className="flex justify-between items-start">
       <div>
         <p className="text-sm font-medium text-gray-500">{label}</p>
@@ -67,10 +69,10 @@ const StatCard = ({ label, value, icon: Icon, color, trend }: any) => (
         <Icon size={20} />
       </div>
     </div>
-    {trend && (
-      <div className="mt-4 flex items-center text-xs font-medium text-green-600">
-        <ArrowUp size={12} className="mr-1" /> {trend} this week
-      </div>
-    )}
+    <div className="mt-4 flex items-center text-xs font-medium text-green-600">
+      <ArrowUp size={12} className="mr-1" /> {trend} this week
+    </div>
   </div>
 );
+
+export default Overview;

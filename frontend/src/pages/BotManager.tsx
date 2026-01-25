@@ -1,34 +1,39 @@
+
 import React, { useEffect, useState } from 'react';
-import { Bot, Power, Activity, Settings, AlertCircle } from 'lucide-react';
-import { store } from '../services/mockStore';
-import { BotConfig, BotType } from '../types';
+import { Bot, Power, Activity, Settings } from 'lucide-react';
+import { api } from '../services/api';
+import { BotConfig } from '../types';
 
-interface BotManagerProps {
-  onNavigate?: (page: string, params?: any) => void;
-}
-
-export const BotManager: React.FC<BotManagerProps> = ({ onNavigate }) => {
+const BotManager = ({ onNavigate }: { onNavigate: any }) => {
   const [bots, setBots] = useState<BotConfig[]>([]);
 
   useEffect(() => {
-    store.getBots().then(setBots);
+    loadBots();
+    const interval = setInterval(loadBots, 3000); // Live sync with worker
+    return () => clearInterval(interval);
   }, []);
 
-  const toggleBot = async (type: BotType) => {
-    const updated = await store.toggleBot(type);
-    setBots(updated as BotConfig[]);
+  const loadBots = async () => {
+    const data = await api.getBots();
+    setBots(data);
+  };
+
+  const toggleBot = async (id: string) => {
+    // In full config, ID might be the type or a uuid. API handles it.
+    await api.toggleBot(id); 
+    loadBots();
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in">
+    <div className="space-y-6 animate-fade-in">
       <header>
-        <h1 className="text-3xl font-bold text-gray-900">Bot Swarm</h1>
-        <p className="text-gray-500">Configure your autonomous agents.</p>
+        <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Bot Swarm</h1>
+        <p className="text-gray-500 mt-1">Configure your autonomous agents.</p>
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
         {bots.map((bot) => (
-          <div key={bot.type} className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 relative overflow-hidden group">
+          <div key={bot.type} className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 relative overflow-hidden group hover:shadow-md transition-all">
             <div className={`absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity`}>
               <Bot size={120} />
             </div>
@@ -39,7 +44,7 @@ export const BotManager: React.FC<BotManagerProps> = ({ onNavigate }) => {
                   <Bot size={24} />
                 </div>
                 <button 
-                  onClick={() => toggleBot(bot.type)}
+                  onClick={() => toggleBot(bot.type)} 
                   className={`p-2 rounded-full transition-colors ${bot.enabled ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-500'}`}
                 >
                   <Power size={20} />
@@ -61,18 +66,21 @@ export const BotManager: React.FC<BotManagerProps> = ({ onNavigate }) => {
                   <div className="w-full bg-gray-200 rounded-full h-1.5">
                     <div 
                       className="bg-blue-500 h-1.5 rounded-full transition-all duration-500" 
-                      style={{ width: `${(bot.stats.currentDailyActions / bot.stats.maxDailyActions) * 100}%` }}
+                      style={{ width: `${Math.min((bot.stats.currentDailyActions / bot.stats.maxDailyActions) * 100, 100)}%` }}
                     />
                   </div>
                 </div>
               </div>
 
               <div className="mt-6 flex gap-2">
-                <button className="flex-1 py-2 text-sm font-bold bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-                  Logs
+                <button 
+                    onClick={() => onNavigate('bot-activity', { botType: bot.type })}
+                    className="flex-1 py-2 text-sm font-bold bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors flex items-center justify-center gap-2"
+                >
+                  <Activity size={16} /> Logs
                 </button>
-                <button className="flex-1 py-2 text-sm font-bold bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-                  Config
+                <button className="flex-1 py-2 text-sm font-bold bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors flex items-center justify-center gap-2">
+                  <Settings size={16} /> Config
                 </button>
               </div>
             </div>
@@ -82,3 +90,5 @@ export const BotManager: React.FC<BotManagerProps> = ({ onNavigate }) => {
     </div>
   );
 };
+
+export default BotManager;

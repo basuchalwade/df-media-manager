@@ -1,56 +1,31 @@
 
-import dotenv from 'dotenv';
-import { bus, QUEUES } from '../../../packages/messaging';
-import { PrismaClient } from '@prisma/client';
+import axios from 'axios';
 
-dotenv.config();
-const prisma = new PrismaClient();
+const API_URL = 'http://localhost:3000/api';
 
 console.log("👷 Worker Executor Service Starting...");
 
-// --- 1. Bot Execution Worker ---
-bus.createWorker(QUEUES.BOT_EXECUTION, async (job) => {
-  const { botId, organizationId, actionType } = job.data;
-  console.log(`[Job ${job.id}] Executing ${actionType} for Bot ${botId}`);
+const run = () => {
+  setInterval(async () => {
+    try {
+      // 1. Fetch Bots
+      const { data: bots } = await axios.get(`${API_URL}/bots`);
+      
+      // 2. Simulate Activity for Active Bots
+      bots.forEach(async (bot: any) => {
+        if (bot.enabled && bot.status === 'Running') {
+          // Random chance to act
+          if (Math.random() > 0.7) {
+            console.log(`[Worker] Executing action for ${bot.name}...`);
+            await axios.post(`${API_URL}/bots/${bot.id}/activity`, {});
+          }
+        }
+      });
 
-  try {
-    // Logic placeholder:
-    // 1. Fetch Bot Config
-    // 2. Execute Action (e.g. Call Twitter API)
-    // 3. Log Audit Success
-    
-    await prisma.decisionAudit.create({
-      data: {
-        organizationId,
-        decisionType: 'BOT_ACTION',
-        source: 'WORKER',
-        description: `Executed ${actionType}`,
-        reasoning: 'Scheduled Job',
-        status: 'EXECUTED',
-        snapshotJson: { jobId: job.id, result: 'Success' }
-      }
-    });
+    } catch (e) {
+      console.error("[Worker] Failed to connect to API Gateway");
+    }
+  }, 3000); // Run every 3 seconds
+};
 
-  } catch (error: any) {
-    console.error(`Job failed:`, error);
-    // Log Audit Failure
-    await prisma.decisionAudit.create({
-      data: {
-        organizationId,
-        decisionType: 'BOT_ACTION',
-        source: 'WORKER',
-        description: `Failed to execute ${actionType}`,
-        reasoning: error.message,
-        status: 'FAILED',
-        snapshotJson: { jobId: job.id }
-      }
-    });
-    throw error;
-  }
-});
-
-// --- 2. Post Publishing Worker ---
-bus.createWorker(QUEUES.POST_PUBLISH, async (job) => {
-  console.log(`[Job ${job.id}] Publishing Post ${job.data.postId}`);
-  // Publish logic...
-});
+run();
