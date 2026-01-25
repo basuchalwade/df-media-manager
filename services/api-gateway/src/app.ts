@@ -1,22 +1,28 @@
 
 import express from 'express';
 import cors from 'cors';
-import router from './routes';
+import routes from './routes';
+import { authMiddleware } from './middleware/auth.middleware';
 
 const app = express();
-const PORT = process.env.API_PORT || 3000;
 
+// Middleware
 app.use(cors());
 app.use(express.json());
 
-// Logger
+// Latency Simulation
+app.use((req, res, next) => {
+  const latency = Math.floor(Math.random() * 300) + 300; // 300-600ms
+  setTimeout(() => next(), latency);
+});
+
+// Request Logger
 app.use((req, res, next) => {
   console.log(`[API] ${req.method} ${req.url}`);
   next();
 });
 
-app.use('/api', router);
+// Routes
+app.use('/api', authMiddleware, routes);
 
-app.listen(PORT, () => {
-  console.log(`🚀 API Gateway running on port ${PORT}`);
-});
+export default app;

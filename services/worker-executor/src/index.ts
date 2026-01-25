@@ -1,37 +1,24 @@
 
-import axios from 'axios';
+import { MockQueue } from './queue/mockQueue';
+import { runBotCycle } from './jobs/bot.jobs';
+import { processMediaQueue } from './jobs/media.jobs';
 
-const API_URL = 'http://localhost:3000/api';
+console.log('👷 Worker Executor Service Starting on Port 5000 (Virtual)...');
 
-console.log("👷 Worker Executor Service Starting...");
+// Initialize Queue System
+// Request said "bot execution cycles every 30 seconds"
+const botQueue = new MockQueue(30000); 
+botQueue.register(runBotCycle);
 
-const run = () => {
-  setInterval(async () => {
-    try {
-      // 1. Fetch Bots
-      const { data: bots } = await axios.get(`${API_URL}/bots`);
-      
-      // 2. Simulate Activity for Active Bots
-      bots.forEach(async (bot: any) => {
-        if (bot.enabled && bot.status === 'Running') {
-          // Random chance to act
-          if (Math.random() > 0.8) {
-            console.log(`[Worker] Executing action for ${bot.type}...`);
-            await axios.post(`${API_URL}/bots/${encodeURIComponent(bot.type)}/activity`, {
-                botType: bot.type,
-                actionType: 'SIMULATION',
-                platform: 'Twitter',
-                status: 'SUCCESS',
-                message: `Worker executed ${bot.type} action automatically.`
-            });
-          }
-        }
-      });
+const mediaQueue = new MockQueue(10000); // Check media every 10s
+mediaQueue.register(processMediaQueue);
 
-    } catch (e) {
-      console.error("[Worker] Failed to connect to API Gateway", e);
-    }
-  }, 5000); 
-};
+botQueue.start();
+mediaQueue.start();
 
-run();
+// Keep process alive
+(process as any).on('SIGINT', () => {
+    botQueue.stop();
+    mediaQueue.stop();
+    (process as any).exit();
+});
