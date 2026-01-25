@@ -3,6 +3,7 @@
  * SIMULATION MODE
  * 
  * Purely mocked service to simulate AI behavior for the frontend demo.
+ * Removes dependency on @google/genai to ensure clean build.
  */
 
 export const generatePostContent = async (

@@ -6,14 +6,13 @@ export const evaluateCompatibility = (media: MediaItem): Record<string, Platform
   const compatibility: Record<string, PlatformCompatibility> = {};
 
   if (!media.metadata) {
-    // If no metadata, assume indeterminate or not ready
     Object.keys(PLATFORM_RULES).forEach(key => {
       compatibility[key] = { compatible: false, issues: ['Metadata processing required'] };
     });
     return compatibility;
   }
 
-  const { sizeMB, format, aspectRatio, duration } = media.metadata;
+  const { sizeMB, format, aspectRatio } = media.metadata;
   const mimeTypeBase = format.split('/')[0]; // 'image' or 'video'
 
   Object.values(PLATFORM_RULES).forEach(rule => {
@@ -36,7 +35,6 @@ export const evaluateCompatibility = (media: MediaItem): Record<string, Platform
     if (rule.aspectRatioRanges && aspectRatio > 0) {
       const validRatio = rule.aspectRatioRanges.some(([min, max]) => aspectRatio >= min && aspectRatio <= max);
       if (!validRatio) {
-        // Find closest acceptable ratio for helpful message
         const target = rule.aspectRatioRanges[0];
         issues.push(`Aspect ratio ${aspectRatio.toFixed(2)} is incompatible (Target: ${target[0]}-${target[1]})`);
       }

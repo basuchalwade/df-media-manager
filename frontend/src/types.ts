@@ -158,14 +158,6 @@ export type BotRules = FinderBotRules | GrowthBotRules | EngagementBotRules | Cr
 
 export type StrategyMode = 'Conservative' | 'Balanced' | 'Aggressive';
 
-export interface StrategyProfile {
-  mode: StrategyMode;
-  postFrequencyMultiplier: number;
-  engagementIntensity: number;
-  growthAggression: number;
-  riskTolerance: number; // 0-100
-}
-
 export interface AdaptiveConfig {
   mode: StrategyMode;
   autoOptimize: boolean;
@@ -225,12 +217,6 @@ export interface GlobalPolicyConfig {
     timezone: string;
   };
   platformLimits?: any; 
-}
-
-export interface PolicyCheckResult {
-  allowed: boolean;
-  reason?: string;
-  type: 'POLICY' | 'CONFLICT' | 'PRIORITY' | 'PLATFORM' | 'OK';
 }
 
 export interface BotActionRequest {
@@ -615,4 +601,48 @@ export interface ValidationResult {
 export interface PageProps {
   onNavigate: (page: string, params?: any) => void;
   params?: any;
+}
+
+export interface PolicyCheckResult {
+  allowed: boolean;
+  reason?: string;
+  type: 'POLICY' | 'CONFLICT' | 'PRIORITY' | 'PLATFORM' | 'OK';
+}
+
+export interface StrategyProfile {
+  mode: StrategyMode;
+  postFrequencyMultiplier: number;
+  engagementIntensity: number;
+  growthAggression: number;
+  riskTolerance: number;
+}
+
+// --- Simulation Types ---
+
+export interface AssetDecision {
+  assetId: string;
+  assetName: string;
+  status: 'accepted' | 'rejected';
+  reason?: string;
+  score?: number;
+}
+
+export interface SimulationCycle {
+  id: string;
+  timestamp: string; // Virtual time
+  action: string;
+  asset?: MediaItem;
+  decisionTrace: AssetDecision[];
+  outcome: 'Posted' | 'Skipped' | 'Failed';
+  message: string;
+}
+
+export interface SimulationReport {
+  timeline: SimulationCycle[];
+  risks: string[];
+  summary: {
+    totalCycles: number;
+    successful: number;
+    skipped: number;
+  };
 }
