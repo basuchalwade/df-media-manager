@@ -1,103 +1,82 @@
+
 <!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ContentCaster | AI Social Media Automation</title>
+    <title>ContentCaster | AI Social Command</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
       @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
       
       :root {
         --apple-gray-bg: #F5F5F7;
-        --apple-blue: #007AFF;
+        --glass-border: rgba(255, 255, 255, 0.5);
       }
 
       body {
-        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", "Inter", Roboto, Helvetica, Arial, sans-serif;
+        font-family: 'Inter', -apple-system, sans-serif;
         background-color: var(--apple-gray-bg);
         color: #1d1d1f;
         -webkit-font-smoothing: antialiased;
-        -moz-osx-font-smoothing: grayscale;
-        overflow: hidden; /* App container handles scrolling */
       }
 
-      /* Apple-style thin scrollbar */
-      ::-webkit-scrollbar {
-        width: 0px; /* Hidden by default for cleaner look, or very thin */
-        background: transparent;
-      }
-      
+      /* Custom Scrollbar */
       .custom-scrollbar::-webkit-scrollbar {
         width: 6px;
+        height: 6px;
       }
       .custom-scrollbar::-webkit-scrollbar-track {
         background: transparent;
       }
       .custom-scrollbar::-webkit-scrollbar-thumb {
         background: rgba(0, 0, 0, 0.1);
-        border-radius: 100vh;
+        border-radius: 10px;
       }
       .custom-scrollbar::-webkit-scrollbar-thumb:hover {
         background: rgba(0, 0, 0, 0.2);
       }
-      
-      /* Smooth transitions with Apple-like easing */
-      .apple-ease {
-        transition-timing-function: cubic-bezier(0.25, 0.1, 0.25, 1.0);
-      }
 
-      /* Glassmorphism Utilities */
+      /* Glassmorphism */
       .glass-panel {
-        background: rgba(255, 255, 255, 0.72);
+        background: rgba(255, 255, 255, 0.7);
         backdrop-filter: blur(20px);
-        -webkit-backdrop-filter: blur(20px);
-        border: 1px solid rgba(255, 255, 255, 0.5);
-      }
-      
-      .glass-card {
-        background: rgba(255, 255, 255, 0.85);
-        backdrop-filter: blur(12px);
-        box-shadow: 0 4px 24px -1px rgba(0, 0, 0, 0.04);
-      }
-
-      /* Selection Color */
-      ::selection {
-        background: rgba(0, 122, 255, 0.2);
-        color: #000;
+        border: 1px solid var(--glass-border);
       }
     </style>
   <script type="importmap">
 {
   "imports": {
-    "react": "https://esm.sh/react@^19.2.3",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "react/": "https://esm.sh/react@^19.2.3/",
-    "recharts": "https://esm.sh/recharts@^3.6.0",
-    "@google/genai": "https://esm.sh/@google/genai@^1.38.0",
-    "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
-    "vite": "https://esm.sh/vite@^7.3.1",
-    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2",
-    "path": "https://esm.sh/path@^0.12.7",
-    "@prisma/client": "https://esm.sh/@prisma/client@^7.3.0",
-    "cors": "https://esm.sh/cors@^2.8.6",
-    "express": "https://esm.sh/express@^5.2.1",
-    "bullmq": "https://esm.sh/bullmq@^5.66.6",
-    "uuid": "https://esm.sh/uuid@^13.0.0",
-    "dotenv": "https://esm.sh/dotenv@^17.2.3",
-    "multer": "https://esm.sh/multer@^2.0.2",
-    "axios": "https://esm.sh/axios@^1.13.2",
-    "minio": "https://esm.sh/minio@^8.0.6",
-    "buffer": "https://esm.sh/buffer@^6.0.3",
-    "bcrypt": "https://esm.sh/bcrypt@^6.0.0",
     "jsonwebtoken": "https://esm.sh/jsonwebtoken@^9.0.3",
-    "ioredis": "https://esm.sh/ioredis@^5.9.2"
+    "bcrypt": "https://esm.sh/bcrypt@^6.0.0",
+    "ioredis": "https://esm.sh/ioredis@^5.9.2",
+    "@google/genai": "https://esm.sh/@google/genai@^1.38.0",
+    "lucide-react": "https://esm.sh/lucide-react@^0.563.0",
+    "recharts": "https://esm.sh/recharts@^3.7.0",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "vite": "https://esm.sh/vite@^7.3.1",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "react": "https://esm.sh/react@^19.2.3",
+    "date-fns": "https://esm.sh/date-fns@^4.1.0",
+    "uuid": "https://esm.sh/uuid@^13.0.0",
+    "react-router-dom": "https://esm.sh/react-router-dom@^7.13.0",
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2",
+    "dotenv": "https://esm.sh/dotenv@^17.2.3",
+    "cors": "https://esm.sh/cors@^2.8.6",
+    "axios": "https://esm.sh/axios@^1.13.2",
+    "express": "https://esm.sh/express@^5.2.1",
+    "@prisma/client": "https://esm.sh/@prisma/client@^7.3.0",
+    "path": "https://esm.sh/path@^0.12.7",
+    "buffer": "https://esm.sh/buffer@^6.0.3",
+    "minio": "https://esm.sh/minio@^8.0.6",
+    "bullmq": "https://esm.sh/bullmq@^5.67.1"
   }
 }
 </script>
 </head>
   <body>
     <div id="root"></div>
-    <script type="module" src="/index.tsx"></script>
+    <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
