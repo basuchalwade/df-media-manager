@@ -13,8 +13,78 @@ const INITIAL_BOTS: BotConfig[] = [
 ];
 
 const INITIAL_MEDIA: MediaItem[] = [
-  { id: '1', name: 'product-launch.jpg', type: 'image', url: 'https://images.unsplash.com/photo-1611162617474-5b21e879e113?w=500&q=80', size: 2400000, createdAt: new Date().toISOString(), governance: { status: 'approved', approvedBy: 'Admin' }, processingStatus: 'ready', tags: ['launch', 'product'], usageCount: 2, performanceScore: 85, performanceTrend: 'up', metadata: { width: 1080, height: 1080, sizeMB: 2.4, format: 'image/jpeg', aspectRatio: 1, duration: 0 } },
-  { id: '2', name: 'team.jpg', type: 'image', url: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=500&q=80', size: 1200000, createdAt: new Date().toISOString(), governance: { status: 'pending' }, processingStatus: 'ready', tags: ['team', 'culture'], usageCount: 0, performanceScore: 60, performanceTrend: 'stable', metadata: { width: 800, height: 600, sizeMB: 1.2, format: 'image/jpeg', aspectRatio: 1.33, duration: 0 } },
+  { 
+    id: 'm-netflix', 
+    name: 'Netflix_Brand_Asset.png', 
+    type: 'image', 
+    url: 'https://images.unsplash.com/photo-1574375927938-d5a98e8ffe85?auto=format&fit=crop&w=800&q=80', 
+    size: 1500000, 
+    createdAt: new Date().toISOString(), 
+    governance: { status: 'approved', approvedBy: 'Admin' }, 
+    processingStatus: 'ready', 
+    tags: ['brand', 'logo', 'netflix'], 
+    collections: ['c1'],
+    usageCount: 5, 
+    performanceScore: 92, 
+    performanceTrend: 'up', 
+    metadata: { width: 1000, height: 1000, sizeMB: 1.5, format: 'image/png', aspectRatio: 1, duration: 0 } 
+  },
+  { 
+    id: 'm-team', 
+    name: 'Q3_Strategy_Meeting.jpg', 
+    type: 'image', 
+    url: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=800&q=80', 
+    size: 3200000, 
+    createdAt: new Date().toISOString(), 
+    governance: { status: 'approved', approvedBy: 'Sarah' }, 
+    processingStatus: 'ready', 
+    tags: ['team', 'culture', 'office'], 
+    collections: ['c2'],
+    usageCount: 1, 
+    performanceScore: 78, 
+    performanceTrend: 'stable', 
+    metadata: { width: 1920, height: 1080, sizeMB: 3.2, format: 'image/jpeg', aspectRatio: 1.77, duration: 0 } 
+  },
+  {
+    id: 'm1',
+    name: 'Product_Launch_Teaser.mp4',
+    type: 'video',
+    url: 'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4',
+    thumbnailUrl: 'https://storage.googleapis.com/gtv-videos-bucket/sample/images/ForBiggerJoyrides.jpg',
+    size: 15400000,
+    createdAt: new Date().toISOString(),
+    dimensions: '1920x1080',
+    metadata: { width: 1920, height: 1080, duration: 15, sizeMB: 15.4, format: 'video/mp4', aspectRatio: 1.77 },
+    usageCount: 1,
+    tags: ['product', 'launch'],
+    collections: ['c1'],
+    lastUsedAt: new Date().toISOString(),
+    processingStatus: 'ready',
+    governance: { status: 'approved', approvedBy: 'Admin', approvedAt: new Date().toISOString() },
+    aiMetadata: { generated: false, disclosureRequired: false },
+    variants: [],
+    performanceScore: 85,
+    performanceTrend: 'up'
+  },
+  {
+    id: 'm3',
+    name: 'AI_Generated_Concept.jpg',
+    type: 'image',
+    url: 'https://images.unsplash.com/photo-1620712943543-bcc4688e7485?auto=format&fit=crop&w=800&q=80',
+    size: 1800000,
+    createdAt: new Date(Date.now() - 86400000).toISOString(),
+    dimensions: '1200x800',
+    metadata: { width: 1200, height: 800, duration: 0, sizeMB: 1.8, format: 'image/jpeg', aspectRatio: 1.5 },
+    usageCount: 0,
+    tags: ['ai', 'concept', 'NSFW'], 
+    collections: [],
+    processingStatus: 'ready',
+    governance: { status: 'pending' },
+    aiMetadata: { generated: true, tool: 'Midjourney', disclosureRequired: true },
+    variants: [],
+    performanceScore: 0,
+    performanceTrend: 'stable'
+  }
 ];
 
 const INITIAL_POSTS: Post[] = [

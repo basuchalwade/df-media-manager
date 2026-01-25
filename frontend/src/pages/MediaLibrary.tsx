@@ -229,60 +229,105 @@ export const MediaLibrary: React.FC = () => {
 
   return (
     <div className="flex h-full animate-in fade-in duration-500 overflow-hidden">
-        {/* LEFT SIDEBAR */}
-        <div className="w-64 bg-slate-50 border-r border-slate-200 flex flex-col shrink-0">
+        {/* LEFT SIDEBAR FILTERS */}
+        <div className="w-64 bg-slate-50 border-r border-slate-200 flex flex-col shrink-0 custom-scrollbar overflow-y-auto">
             <div className="p-5 border-b border-slate-100">
                 <button 
                     onClick={() => fileInputRef.current?.click()}
-                    className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-sm shadow-sm transition-all flex items-center justify-center gap-2"
+                    className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-sm shadow-sm transition-all flex items-center justify-center gap-2 active:scale-95"
                 >
                     <UploadCloud className="w-4 h-4" /> Upload Asset
                 </button>
                 <input type="file" multiple ref={fileInputRef} className="hidden" onChange={handleUpload} accept="image/*,video/*" />
             </div>
 
-            <div className="flex-1 overflow-y-auto p-3 space-y-6">
+            <div className="p-3 space-y-6">
                 <div>
                     <h3 className="px-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Library</h3>
-                    <button 
-                        onClick={() => { setActiveCollection('all'); setActivePlatformFilter(null); }}
-                        className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${activeCollection === 'all' && !activePlatformFilter ? 'bg-white text-blue-600 shadow-sm ring-1 ring-slate-100' : 'text-slate-600 hover:bg-slate-100'}`}
-                    >
-                        <LayoutGrid className="w-4 h-4" /> All Assets
-                    </button>
+                    <div className="space-y-0.5">
+                        <button 
+                            onClick={() => { setActiveCollection('all'); setActivePlatformFilter(null); }}
+                            className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${activeCollection === 'all' && !activePlatformFilter ? 'bg-white text-blue-600 shadow-sm ring-1 ring-slate-100' : 'text-slate-600 hover:bg-slate-100'}`}
+                        >
+                            <LayoutGrid className="w-4 h-4" /> All Assets
+                        </button>
+                    </div>
                 </div>
-                {/* Campaigns List Placeholder */}
+
+                <div>
+                    <div className="flex items-center justify-between px-3 mb-2">
+                        <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Campaigns</h3>
+                        <button className="text-slate-400 hover:text-blue-600"><Plus className="w-3 h-3" /></button>
+                    </div>
+                    <div className="space-y-0.5">
+                        {collections.filter(c => c.type === 'campaign').map(c => (
+                            <button 
+                                key={c.id}
+                                onClick={() => { setActiveCollection(c.id); setActivePlatformFilter(null); }}
+                                className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium transition-colors ${activeCollection === c.id ? 'bg-white text-blue-600 shadow-sm ring-1 ring-slate-100' : 'text-slate-600 hover:bg-slate-100'}`}
+                            >
+                                <div className="flex items-center gap-2">
+                                    <Folder className="w-4 h-4 text-amber-400 fill-amber-100" />
+                                    <span className="truncate max-w-[120px]">{c.name}</span>
+                                </div>
+                                <span className="text-xs text-slate-400 font-medium bg-slate-100 px-1.5 rounded">{c.count}</span>
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                <div>
+                    <h3 className="px-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Platforms</h3>
+                    <div className="space-y-0.5">
+                        {Object.values(PLATFORM_RULES).map((rule: any) => (
+                            <button 
+                                key={rule.id}
+                                onClick={() => { setActivePlatformFilter(rule.id); setActiveCollection('all'); }}
+                                className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium transition-colors ${activePlatformFilter === rule.id ? 'bg-white text-blue-600 shadow-sm ring-1 ring-slate-100' : 'text-slate-600 hover:bg-slate-100'}`}
+                            >
+                                <div className="flex items-center gap-2">
+                                    <PlatformIcon platform={rule.id} size={14} />
+                                    <span>{rule.label}</span>
+                                </div>
+                                <span className="text-xs text-slate-400 font-medium bg-slate-100 px-1.5 rounded">{platformCounts[rule.id] || 0}</span>
+                            </button>
+                        ))}
+                    </div>
+                </div>
             </div>
         </div>
 
         {/* MAIN CONTENT */}
         <div className="flex-1 flex flex-col min-w-0 bg-white relative">
-            <div className="h-16 border-b border-slate-100 flex items-center justify-between px-6 shrink-0">
-                <div className="relative w-64">
+            <div className="h-16 border-b border-slate-100 flex items-center justify-between px-6 shrink-0 sticky top-0 z-20 bg-white/80 backdrop-blur-md">
+                <div className="relative w-full max-w-md">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                     <input 
                         type="text" 
                         placeholder="Search assets..." 
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-transparent focus:bg-white focus:border-blue-200 focus:ring-2 focus:ring-blue-50 rounded-lg text-sm transition-all"
+                        className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-transparent focus:bg-white focus:border-blue-200 focus:ring-2 focus:ring-blue-50/50 rounded-xl text-sm transition-all"
                     />
                 </div>
                 <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-lg">
-                    <button onClick={() => setViewMode('grid')} className={`p-1.5 rounded-md transition-all ${viewMode === 'grid' ? 'bg-white shadow text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}>
+                    <button onClick={() => setViewMode('grid')} className={`p-1.5 rounded-md transition-all ${viewMode === 'grid' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}>
                         <LayoutGrid className="w-4 h-4" />
                     </button>
-                    <button onClick={() => setViewMode('list')} className={`p-1.5 rounded-md transition-all ${viewMode === 'list' ? 'bg-white shadow text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}>
+                    <button onClick={() => setViewMode('list')} className={`p-1.5 rounded-md transition-all ${viewMode === 'list' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}>
                         <List className="w-4 h-4" />
                     </button>
                 </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6 bg-slate-50/50">
+            <div className="flex-1 overflow-y-auto p-6 bg-slate-50/30 custom-scrollbar">
                 {filteredItems.length === 0 ? (
                     <div className="h-full flex flex-col items-center justify-center text-slate-400 opacity-60">
-                        <ImageIcon className="w-16 h-16 mb-4" />
-                        <p className="text-lg font-medium">No media found</p>
+                        <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mb-4">
+                            <ImageIcon className="w-8 h-8 text-slate-300" />
+                        </div>
+                        <p className="text-lg font-bold text-slate-500">No media found</p>
+                        <p className="text-sm">Try adjusting your filters or upload new assets.</p>
                     </div>
                 ) : (
                     <div className={`grid gap-6 ${viewMode === 'grid' ? 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5' : 'grid-cols-1'}`}>
@@ -291,12 +336,12 @@ export const MediaLibrary: React.FC = () => {
                                 key={item.id}
                                 onClick={() => handleAssetClick(item)}
                                 className={`
-                                    group relative bg-white border border-slate-200 rounded-2xl overflow-hidden cursor-pointer hover:shadow-lg transition-all duration-200
-                                    ${selectedItem?.id === item.id ? 'ring-2 ring-blue-500 border-transparent shadow-md' : 'hover:border-blue-300'}
-                                    ${viewMode === 'list' ? 'flex items-center h-20 p-2 gap-4' : 'aspect-square'}
+                                    group relative bg-white border border-slate-200 rounded-2xl overflow-hidden cursor-pointer hover:shadow-xl transition-all duration-300
+                                    ${selectedItem?.id === item.id ? 'ring-2 ring-blue-500 border-transparent shadow-md transform scale-[1.02]' : 'hover:border-blue-200 hover:-translate-y-1'}
+                                    ${viewMode === 'list' ? 'flex items-center h-20 p-2 gap-4' : 'aspect-[1/1]'}
                                 `}
                             >
-                                <div className={`relative bg-gray-50 flex items-center justify-center ${viewMode === 'list' ? 'w-16 h-16 rounded-lg overflow-hidden shrink-0' : 'w-full h-full'}`}>
+                                <div className={`relative bg-gray-100 flex items-center justify-center overflow-hidden ${viewMode === 'list' ? 'w-16 h-16 rounded-xl shrink-0' : 'w-full h-full'}`}>
                                     {item.processingStatus !== 'failed' && (
                                         <img 
                                             src={item.thumbnailUrl || item.url} 
@@ -305,19 +350,46 @@ export const MediaLibrary: React.FC = () => {
                                             loading="lazy"
                                         />
                                     )}
+                                    
+                                    {/* Video Indicator */}
                                     {item.type === 'video' && (
                                         <div className="absolute inset-0 flex items-center justify-center bg-black/10 group-hover:bg-black/20 transition-colors">
-                                            <div className="w-10 h-10 bg-black/40 backdrop-blur-sm rounded-full flex items-center justify-center shadow-lg">
+                                            <div className="w-10 h-10 bg-black/40 backdrop-blur-sm rounded-full flex items-center justify-center shadow-lg border border-white/20">
                                                 <Play className="w-5 h-5 text-white ml-0.5" fill="currentColor" />
                                             </div>
                                         </div>
                                     )}
+
+                                    {/* Status Dot */}
+                                    <div className="absolute top-2 right-2 z-10">
+                                        {item.governance.status === 'approved' && <div className="w-3 h-3 bg-green-500 rounded-full border-2 border-white shadow-sm"></div>}
+                                        {item.governance.status === 'pending' && <div className="w-3 h-3 bg-amber-500 rounded-full border-2 border-white shadow-sm"></div>}
+                                    </div>
+                                    
+                                    {/* Overlay Gradient on Hover */}
+                                    {viewMode === 'grid' && (
+                                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-4">
+                                            <p className="text-white font-bold text-sm truncate drop-shadow-md">{item.name}</p>
+                                            <p className="text-white/80 text-xs">{formatBytes(item.size)}</p>
+                                        </div>
+                                    )}
                                 </div>
+                                
                                 {viewMode === 'list' && (
                                     <div className="flex-1 flex items-center justify-between pr-4">
                                         <div>
-                                            <h4 className="font-bold text-slate-900 text-sm truncate max-w-[200px]">{item.name}</h4>
-                                            <span className="text-xs text-slate-400">{formatBytes(item.size)}</span>
+                                            <h4 className="font-bold text-slate-900 text-sm truncate max-w-[300px]">{item.name}</h4>
+                                            <div className="flex items-center gap-2 mt-1">
+                                                <span className="text-xs text-slate-400 font-medium bg-slate-100 px-1.5 rounded">{formatBytes(item.size)}</span>
+                                                {item.tags?.map(tag => (
+                                                    <span key={tag} className="text-[10px] text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 uppercase tracking-wide">{tag}</span>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <div className="text-right">
+                                            <span className={`text-xs font-bold uppercase px-2 py-1 rounded ${item.governance.status === 'approved' ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'}`}>
+                                                {item.governance.status}
+                                            </span>
                                         </div>
                                     </div>
                                 )}
@@ -331,93 +403,103 @@ export const MediaLibrary: React.FC = () => {
         {/* RIGHT DRAWER: Asset Details */}
         {selectedItem && (
             <div className={`w-96 bg-white border-l border-slate-200 shadow-2xl flex flex-col h-full absolute right-0 top-0 bottom-0 z-30 transform transition-transform duration-300 ${isDrawerOpen ? 'translate-x-0' : 'translate-x-full'}`}>
-                <div className="h-16 flex items-center justify-between px-5 border-b border-slate-100">
-                    <h3 className="font-bold text-slate-900 truncate pr-4">Asset Details</h3>
-                    <button onClick={() => setIsDrawerOpen(false)} className="text-slate-400 hover:text-slate-600 hover:bg-slate-100 p-1.5 rounded-full transition-colors">
+                <div className="h-16 flex items-center justify-between px-5 border-b border-slate-100 bg-white sticky top-0 z-10">
+                    <h3 className="font-bold text-slate-900 truncate pr-4 text-lg">Asset Details</h3>
+                    <button onClick={() => setIsDrawerOpen(false)} className="text-slate-400 hover:text-slate-600 hover:bg-slate-100 p-2 rounded-full transition-colors">
                         <X className="w-5 h-5" />
                     </button>
                 </div>
-                <div className="flex-1 overflow-y-auto custom-scrollbar p-5 space-y-6">
-                    <div className="rounded-xl overflow-hidden bg-slate-900 shadow-sm border border-slate-200 aspect-video flex items-center justify-center relative group">
+                
+                <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-8 bg-white">
+                    {/* Preview Hero */}
+                    <div className="rounded-2xl overflow-hidden bg-slate-50 border border-slate-100 shadow-sm aspect-video flex items-center justify-center relative group">
                         {selectedItem.type === 'image' ? (
                             <img src={selectedItem.url} className="max-w-full max-h-full object-contain" />
                         ) : (
                             <video src={selectedItem.url} controls className="w-full h-full object-contain" playsInline />
                         )}
                     </div>
+
+                    {/* Metadata Header */}
                     <div>
-                        <h4 className="font-bold text-slate-900 text-sm mb-1 break-words">{selectedItem.name}</h4>
-                        <div className="flex items-center gap-2 text-xs text-slate-500">
-                            <span>{selectedItem.type.toUpperCase()}</span>
+                        <h4 className="font-bold text-slate-900 text-lg mb-1 break-words leading-tight">{selectedItem.name}</h4>
+                        <div className="flex items-center gap-3 text-xs font-medium text-slate-500 mt-2">
+                            <span className="bg-slate-100 px-2 py-1 rounded text-slate-600 uppercase">{selectedItem.type}</span>
                             <span>•</span>
                             <span>{formatBytes(selectedItem.size)}</span>
+                            <span>•</span>
+                            <span>{new Date(selectedItem.createdAt).toLocaleDateString()}</span>
                         </div>
                     </div>
-                    {/* Platform Readiness & Variants */}
-                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-4">
-                        <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+
+                    {/* AI & Governance */}
+                    <div className="space-y-4">
+                        <h5 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                            <Shield className="w-3.5 h-3.5" /> Governance
+                        </h5>
+                        <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                            <div className="flex justify-between items-center mb-4">
+                                <span className="text-sm font-medium text-slate-600">Status</span>
+                                {selectedItem.governance.status === 'approved' && (
+                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-green-100 text-green-700 text-xs font-bold border border-green-200 uppercase tracking-wide">
+                                        <CheckCircle className="w-3.5 h-3.5" /> Approved
+                                    </span>
+                                )}
+                                {selectedItem.governance.status === 'pending' && (
+                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-100 text-amber-700 text-xs font-bold border border-amber-200 uppercase tracking-wide">
+                                        <Clock className="w-3.5 h-3.5" /> Pending Review
+                                    </span>
+                                )}
+                            </div>
+                            
+                            {selectedItem.governance.status === 'pending' && (
+                                <div className="flex gap-2">
+                                    <button onClick={handleApprove} className="flex-1 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-xs font-bold transition-colors shadow-sm">
+                                        Approve
+                                    </button>
+                                    <button onClick={handleReject} className="flex-1 py-2 bg-white border border-red-200 text-red-600 hover:bg-red-50 rounded-lg text-xs font-bold transition-colors">
+                                        Reject
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Platform Variants */}
+                    <div className="space-y-4">
+                        <h5 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
                             <Wand2 className="w-3.5 h-3.5" /> Platform Variants
-                        </h4>
-                        <div className="space-y-4">
+                        </h5>
+                        <div className="grid gap-3">
                             {Object.values(PLATFORM_RULES).map((rule: any) => {
                                 const status = selectedItem.platformCompatibility?.[rule.id];
                                 const isReady = status?.compatible;
                                 const existingVariant = selectedItem.variants?.find(v => v.platform === rule.id && !v.enhancementType);
-                                const isProcessing = isGeneratingVariant === rule.id;
                                 
                                 return (
-                                    <div key={rule.id} className="text-xs border-b border-slate-200 pb-3 last:border-0 last:pb-0">
-                                        <div className="flex items-center justify-between mb-2">
-                                            <div className="flex items-center gap-2">
-                                                <PlatformIcon platform={rule.id} size={14} />
-                                                <span className="font-medium text-slate-700">{rule.label}</span>
+                                    <div key={rule.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
+                                        <div className="flex items-center gap-3">
+                                            <div className="p-2 bg-white rounded-lg border border-slate-200 shadow-sm">
+                                                <PlatformIcon platform={rule.id} size={16} />
                                             </div>
-                                            {isReady ? (
-                                                <span className="text-green-600 font-bold flex items-center gap-1">
-                                                    <CheckCircle className="w-3 h-3" /> Compatible
+                                            <div>
+                                                <span className="block text-xs font-bold text-slate-700">{rule.label}</span>
+                                                <span className={`text-[10px] font-medium ${isReady ? 'text-green-600' : 'text-amber-600'}`}>
+                                                    {isReady ? 'Optimized' : 'Needs Resize'}
                                                 </span>
-                                            ) : (
-                                                <span className="text-amber-600 font-bold flex items-center gap-1">
-                                                    <AlertTriangle className="w-3 h-3" /> Optimization Needed
-                                                </span>
-                                            )}
+                                            </div>
                                         </div>
-
-                                        {/* Variant UI */}
-                                        {existingVariant ? (
-                                            <div className="flex gap-3 bg-white p-2 rounded-lg border border-slate-200">
-                                                <div className="w-12 h-12 bg-slate-100 rounded overflow-hidden shrink-0">
-                                                    <img src={existingVariant.thumbnailUrl} className="w-full h-full object-cover" />
-                                                </div>
-                                                <div className="flex-1 flex flex-col justify-center">
-                                                    <span className="font-bold text-slate-700">Variant Active</span>
-                                                    <span className="text-[10px] text-slate-400">{existingVariant.width}x{existingVariant.height} • {new Date(existingVariant.createdAt).toLocaleDateString()}</span>
-                                                </div>
-                                                <button 
-                                                    onClick={() => handleDeleteVariant(existingVariant.id)}
-                                                    className="text-red-400 hover:text-red-600 p-1 hover:bg-red-50 rounded"
-                                                    title="Delete Variant"
-                                                >
-                                                    <Trash2 className="w-4 h-4" />
-                                                </button>
-                                            </div>
-                                        ) : !isReady ? (
-                                            <div className="pl-6">
-                                                <div className="text-[10px] text-slate-500 mb-2">
-                                                    {status?.issues?.join(', ')}
-                                                </div>
-                                                <button 
-                                                    onClick={() => handleGenerateVariant(rule.id)}
-                                                    disabled={isProcessing}
-                                                    className="w-full py-2 bg-white border border-blue-200 text-blue-600 rounded-lg text-[11px] font-bold hover:bg-blue-50 transition-colors flex items-center justify-center gap-2 shadow-sm disabled:opacity-50"
-                                                >
-                                                    {isProcessing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wand2 className="w-3 h-3" />}
-                                                    {isProcessing ? 'Generating...' : 'Generate Optimized Variant'}
-                                                </button>
-                                            </div>
-                                        ) : (
-                                            <div className="pl-6 text-[10px] text-slate-400 italic">
-                                                Original asset is ready for use.
+                                        {!existingVariant && !isReady && (
+                                            <button 
+                                                onClick={() => handleGenerateVariant(rule.id)}
+                                                className="text-[10px] font-bold bg-white border border-blue-200 text-blue-600 px-3 py-1.5 rounded-lg hover:bg-blue-50 transition-colors shadow-sm"
+                                            >
+                                                Auto-Fix
+                                            </button>
+                                        )}
+                                        {existingVariant && (
+                                            <div className="w-8 h-8 rounded-lg overflow-hidden border border-slate-200">
+                                                <img src={existingVariant.thumbnailUrl} className="w-full h-full object-cover" />
                                             </div>
                                         )}
                                     </div>
@@ -425,17 +507,18 @@ export const MediaLibrary: React.FC = () => {
                             })}
                         </div>
                     </div>
-                    <div className="p-5 border-t border-slate-100 bg-slate-50 mt-auto grid grid-cols-2 gap-3">
-                        <button className="flex items-center justify-center gap-2 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-50 shadow-sm">
-                            <Download className="w-4 h-4" /> Download
-                        </button>
-                        <button 
-                            onClick={() => handleDelete(selectedItem.id)}
-                            className="flex items-center justify-center gap-2 py-2.5 bg-white border border-red-200 text-red-600 rounded-xl text-xs font-bold hover:bg-red-50 shadow-sm"
-                        >
-                            <Trash2 className="w-4 h-4" /> Delete
-                        </button>
-                    </div>
+                </div>
+
+                <div className="p-6 border-t border-slate-100 bg-slate-50 mt-auto grid grid-cols-2 gap-4">
+                    <button className="flex items-center justify-center gap-2 py-3 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-100 shadow-sm transition-colors">
+                        <Download className="w-4 h-4" /> Download
+                    </button>
+                    <button 
+                        onClick={() => handleDelete(selectedItem.id)}
+                        className="flex items-center justify-center gap-2 py-3 bg-white border border-red-200 text-red-600 rounded-xl text-xs font-bold hover:bg-red-50 shadow-sm transition-colors"
+                    >
+                        <Trash2 className="w-4 h-4" /> Delete
+                    </button>
                 </div>
             </div>
         )}
