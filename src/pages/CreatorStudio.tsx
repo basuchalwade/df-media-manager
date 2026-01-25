@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Sparkles, Send, RefreshCw, Check } from 'lucide-react';
 import { generatePostContent } from '../services/geminiService';
@@ -15,7 +14,12 @@ const CreatorStudio: React.FC = () => {
   const handleGenerate = async () => {
     if (!topic) return;
     setIsGenerating(true);
-    const result = await generatePostContent(topic, 'Twitter', tone);
+    // Added context parameter to match function signature
+    const result = await generatePostContent(topic, 'Twitter', tone, {
+      scheduledTime: 'Now',
+      platformConstraints: 'Standard Twitter constraints',
+      brandVoice: tone
+    });
     setContent(result);
     setIsGenerating(false);
   };

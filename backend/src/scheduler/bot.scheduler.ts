@@ -5,7 +5,7 @@ const prisma = new PrismaClient();
 const POLL_INTERVAL_MS = 60000; // 60 seconds
 
 export class BotScheduler {
-  private timer: NodeJS.Timeout | null = null;
+  private timer: ReturnType<typeof setInterval> | null = null;
 
   start() {
     console.log('[Scheduler] Starting bot scheduler...');
