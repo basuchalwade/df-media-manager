@@ -10,10 +10,14 @@ const Overview = () => {
 
   useEffect(() => {
     const load = async () => {
-      const s = await api.getStats();
-      const a = await api.getAnalytics();
-      setStats(s);
-      setChartData(a.history);
+      try {
+        const s = await api.getStats();
+        const a = await api.getAnalytics();
+        setStats(s);
+        setChartData(a.history);
+      } catch (e) {
+        console.error("Failed to load overview", e);
+      }
     };
     load();
     const interval = setInterval(load, 3000); // Live poll
@@ -30,7 +34,7 @@ const Overview = () => {
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard label="Total Reach" value={stats.totalReach.toLocaleString()} icon={Users} color="bg-blue-500" trend="+12%" />
+        <StatCard label="Total Reach" value={stats.totalReach?.toLocaleString() || '0'} icon={Users} color="bg-blue-500" trend="+12%" />
         <StatCard label="Engagement" value={`${stats.engagementRate}%`} icon={Activity} color="bg-green-500" trend="+4.2%" />
         <StatCard label="Active Bots" value={stats.activeBots} icon={TrendingUp} color="bg-purple-500" trend="Stable" />
         <StatCard label="Posts Sent" value={stats.totalPosts} icon={Share2} color="bg-orange-500" trend="+8" />
@@ -47,9 +51,9 @@ const Overview = () => {
                   <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
                 </linearGradient>
               </defs>
-              <XAxis dataKey="name" axisLine={false} tickLine={false} />
+              <XAxis dataKey="date" axisLine={false} tickLine={false} />
               <Tooltip />
-              <Area type="monotone" dataKey="value" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorReach)" />
+              <Area type="monotone" dataKey="followers" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorReach)" />
             </AreaChart>
           </ResponsiveContainer>
         </div>

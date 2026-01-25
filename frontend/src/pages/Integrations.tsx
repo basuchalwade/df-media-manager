@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
-import { Link, CheckCircle, ExternalLink, RefreshCw, AlertCircle, Plus } from 'lucide-react';
-import { store } from '../services/mockStore';
+import { CheckCircle, AlertCircle, RefreshCw, Plus } from 'lucide-react';
+import { api } from '../services/api';
 import { Platform, User } from '../types';
 import { PlatformIcon } from '../components/PlatformIcon';
 
@@ -14,14 +14,13 @@ export const Integrations: React.FC = () => {
   }, []);
 
   const loadUser = async () => {
-    const user = await store.getCurrentUser();
+    const user = await api.getCurrentUser();
     setCurrentUser(user);
   };
 
   const handleToggleConnection = async (platform: Platform) => {
     setLoadingMap(prev => ({ ...prev, [platform]: true }));
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    await store.togglePlatformConnection(platform);
+    await api.togglePlatformConnection(platform);
     await loadUser();
     setLoadingMap(prev => ({ ...prev, [platform]: false }));
   };
@@ -33,7 +32,7 @@ export const Integrations: React.FC = () => {
       <header>
         <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Integrations</h1>
         <p className="text-slate-500 font-medium mt-1">
-          Manage your connected social accounts and API gateways.
+          Manage your connected social accounts.
         </p>
       </header>
 
@@ -48,8 +47,8 @@ export const Integrations: React.FC = () => {
               key={platform} 
               className={`relative flex flex-col justify-between p-6 rounded-3xl border transition-all duration-300 group ${
                 isConnected 
-                  ? 'bg-white border-slate-200 shadow-[0_8px_30px_rgba(0,0,0,0.04)]' 
-                  : 'bg-white border-slate-100 opacity-90 hover:opacity-100 hover:shadow-md hover:border-slate-200'
+                  ? 'bg-white border-slate-200 shadow-sm' 
+                  : 'bg-white border-slate-100 opacity-90'
               }`}
             >
               <div>
@@ -65,11 +64,11 @@ export const Integrations: React.FC = () => {
                 {isConnected ? (
                   <div className="mt-1">
                      <p className="text-sm font-semibold text-blue-600">{connection.handle}</p>
-                     <p className="text-xs text-slate-400 mt-2 font-medium">Last synced {connection.lastSync}</p>
+                     <p className="text-xs text-slate-400 mt-2 font-medium">Synced {new Date(connection.lastSync!).toLocaleDateString()}</p>
                   </div>
                 ) : (
                   <p className="text-sm text-slate-500 mt-1 leading-relaxed">
-                    Connect to automate publishing and analytics.
+                    Connect to automate publishing.
                   </p>
                 )}
               </div>
@@ -99,19 +98,6 @@ export const Integrations: React.FC = () => {
             </div>
           );
         })}
-      </div>
-
-      <div className="bg-blue-50/50 border border-blue-100 rounded-2xl p-5 flex gap-4">
-         <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center shrink-0 text-blue-600">
-           <AlertCircle className="w-5 h-5" />
-         </div>
-         <div>
-           <h4 className="font-bold text-blue-900 text-sm">Enterprise Security</h4>
-           <p className="text-sm text-blue-800/80 mt-1 leading-relaxed max-w-2xl">
-             Connections are encrypted and tokenized. We do not store your passwords. 
-             Access is scoped strictly to the permissions required for posting and reading analytics.
-           </p>
-         </div>
       </div>
     </div>
   );

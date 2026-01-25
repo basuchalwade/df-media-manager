@@ -9,17 +9,18 @@ const BotManager = ({ onNavigate }: { onNavigate: any }) => {
 
   useEffect(() => {
     loadBots();
-    const interval = setInterval(loadBots, 3000); // Live sync with worker
+    const interval = setInterval(loadBots, 3000); 
     return () => clearInterval(interval);
   }, []);
 
   const loadBots = async () => {
-    const data = await api.getBots();
-    setBots(data);
+    try {
+        const data = await api.getBots();
+        setBots(data);
+    } catch(e) { console.error(e); }
   };
 
   const toggleBot = async (id: string) => {
-    // In full config, ID might be the type or a uuid. API handles it.
     await api.toggleBot(id); 
     loadBots();
   };
@@ -74,7 +75,7 @@ const BotManager = ({ onNavigate }: { onNavigate: any }) => {
 
               <div className="mt-6 flex gap-2">
                 <button 
-                    onClick={() => onNavigate('bot-activity', { botType: bot.type })}
+                    onClick={() => onNavigate && onNavigate('bot-activity', { botType: bot.type })}
                     className="flex-1 py-2 text-sm font-bold bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors flex items-center justify-center gap-2"
                 >
                   <Activity size={16} /> Logs
