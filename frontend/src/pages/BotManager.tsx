@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Bot, Power, Activity, Settings, AlertCircle } from 'lucide-react';
 import { store } from '../services/mockStore';
@@ -8,7 +7,7 @@ interface BotManagerProps {
   onNavigate?: (page: string, params?: any) => void;
 }
 
-const BotManager: React.FC<BotManagerProps> = ({ onNavigate }) => {
+export const BotManager: React.FC<BotManagerProps> = ({ onNavigate }) => {
   const [bots, setBots] = useState<BotConfig[]>([]);
 
   useEffect(() => {
@@ -17,7 +16,7 @@ const BotManager: React.FC<BotManagerProps> = ({ onNavigate }) => {
 
   const toggleBot = async (type: BotType) => {
     const updated = await store.toggleBot(type);
-    setBots(updated);
+    setBots(updated as BotConfig[]);
   };
 
   return (
@@ -83,5 +82,3 @@ const BotManager: React.FC<BotManagerProps> = ({ onNavigate }) => {
     </div>
   );
 };
-
-export default BotManager;

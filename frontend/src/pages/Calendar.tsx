@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { store } from '../services/mockStore';
 import { Post } from '../types';
@@ -10,7 +9,7 @@ interface CalendarProps {
   params?: any;
 }
 
-const Calendar: React.FC<CalendarProps> = ({ onNavigate, params }) => {
+export const Calendar: React.FC<CalendarProps> = ({ onNavigate, params }) => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [posts, setPosts] = useState<Post[]>([]);
 
@@ -85,5 +84,3 @@ const Calendar: React.FC<CalendarProps> = ({ onNavigate, params }) => {
     </div>
   );
 };
-
-export default Calendar;
