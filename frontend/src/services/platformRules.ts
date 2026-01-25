@@ -16,21 +16,21 @@ export const PLATFORM_RULES: Record<string, PlatformRule> = {
     label: 'X (Twitter)',
     maxSizeMB: 512,
     allowedFormats: ['image', 'video'],
-    aspectRatioRanges: [[0.5, 2.0]], // Flexible
+    aspectRatioRanges: [[0.5, 2.0]], 
   },
   [Platform.Instagram]: {
     id: Platform.Instagram,
     label: 'Instagram',
     maxSizeMB: 100,
     allowedFormats: ['image', 'video'],
-    aspectRatioRanges: [[0.8, 1.91]], // 4:5 to 1.91:1
+    aspectRatioRanges: [[0.8, 1.91]], 
   },
   [Platform.LinkedIn]: {
     id: Platform.LinkedIn,
     label: 'LinkedIn',
     maxSizeMB: 200,
     allowedFormats: ['image', 'video'],
-    aspectRatioRanges: [[0.5, 2.4]], // Flexible
+    aspectRatioRanges: [[0.5, 2.4]], 
   },
   [Platform.YouTube]: {
     id: Platform.YouTube,
@@ -38,7 +38,7 @@ export const PLATFORM_RULES: Record<string, PlatformRule> = {
     maxSizeMB: 2048,
     allowedFormats: ['video'],
     requiresVideo: true,
-    aspectRatioRanges: [[1.7, 1.8]], // ~16:9
+    aspectRatioRanges: [[1.7, 1.8]], 
   },
   [Platform.GoogleBusiness]: {
     id: Platform.GoogleBusiness,
