@@ -158,6 +158,14 @@ export type BotRules = FinderBotRules | GrowthBotRules | EngagementBotRules | Cr
 
 export type StrategyMode = 'Conservative' | 'Balanced' | 'Aggressive';
 
+export interface StrategyProfile {
+  mode: StrategyMode;
+  postFrequencyMultiplier: number;
+  engagementIntensity: number;
+  growthAggression: number;
+  riskTolerance: number; // 0-100
+}
+
 export interface AdaptiveConfig {
   mode: StrategyMode;
   autoOptimize: boolean;
@@ -174,6 +182,15 @@ export interface OptimizationSuggestion {
   impact: 'High' | 'Medium' | 'Low';
   applied: boolean;
   timestamp: string;
+}
+
+export interface LearningEntry {
+  id: string;
+  platform: Platform;
+  actionType: ActionType;
+  context: string; // e.g. "Tone: Witty" or "Topic: AI"
+  outcomeScore: number; // 0-100
+  timestamp: number;
 }
 
 export type LearningStrategy = 'Conservative' | 'Balanced' | 'Aggressive';
@@ -208,6 +225,12 @@ export interface GlobalPolicyConfig {
     timezone: string;
   };
   platformLimits?: any; 
+}
+
+export interface PolicyCheckResult {
+  allowed: boolean;
+  reason?: string;
+  type: 'POLICY' | 'CONFLICT' | 'PRIORITY' | 'PLATFORM' | 'OK';
 }
 
 export interface BotActionRequest {
@@ -592,27 +615,4 @@ export interface ValidationResult {
 export interface PageProps {
   onNavigate: (page: string, params?: any) => void;
   params?: any;
-}
-
-export interface PolicyCheckResult {
-  allowed: boolean;
-  reason?: string;
-  type: 'POLICY' | 'CONFLICT' | 'PRIORITY' | 'PLATFORM' | 'OK';
-}
-
-export interface LearningEntry {
-  id: string;
-  platform: Platform;
-  actionType: ActionType;
-  context: string;
-  outcomeScore: number;
-  timestamp: number;
-}
-
-export interface StrategyProfile {
-  mode: StrategyMode;
-  postFrequencyMultiplier: number;
-  engagementIntensity: number;
-  growthAggression: number;
-  riskTolerance: number;
 }

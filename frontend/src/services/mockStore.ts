@@ -6,49 +6,10 @@ import { evaluateCompatibility } from './platformCompatibility';
 
 // Initial Data Constants
 const INITIAL_BOTS: BotConfig[] = [
-  { 
-    type: BotType.Creator, 
-    enabled: true, 
-    status: 'Idle', 
-    intervalMinutes: 60, 
-    stats: { currentDailyActions: 5, maxDailyActions: 20, consecutiveErrors: 0, cooldownEndsAt: undefined, itemsCreated: 0 }, 
-    config: { contentTopics: ['Tech'], safetyLevel: 'Moderate' }, 
-    logs: [] 
-  },
-  { 
-    type: BotType.Engagement, 
-    enabled: true, 
-    status: 'Running', 
-    intervalMinutes: 30, 
-    stats: { currentDailyActions: 42, maxDailyActions: 100, consecutiveErrors: 0, cooldownEndsAt: undefined, itemsCreated: 0 }, 
-    config: { 
-      rules: { 
-        replyTone: 'casual', 
-        emojiLevel: 50, 
-        maxRepliesPerHour: 20, 
-        skipNegativeSentiment: true 
-      }
-    }, 
-    logs: [] 
-  },
-  { 
-    type: BotType.Finder, 
-    enabled: false, 
-    status: 'Idle', 
-    intervalMinutes: 120, 
-    stats: { currentDailyActions: 0, maxDailyActions: 50, consecutiveErrors: 0, cooldownEndsAt: undefined, itemsCreated: 0 }, 
-    config: { trackKeywords: ['AI'] }, 
-    logs: [] 
-  },
-  { 
-    type: BotType.Growth, 
-    enabled: false, 
-    status: 'Idle', 
-    intervalMinutes: 240, 
-    stats: { currentDailyActions: 0, maxDailyActions: 30, consecutiveErrors: 0, cooldownEndsAt: undefined, itemsCreated: 0 }, 
-    config: { growthTags: ['Startup Founders'] }, 
-    logs: [] 
-  },
+  { type: BotType.Creator, enabled: true, status: 'Idle', intervalMinutes: 60, stats: { currentDailyActions: 5, maxDailyActions: 20, consecutiveErrors: 0, cooldownEndsAt: undefined, itemsCreated: 0 }, config: { contentTopics: ['Tech'], safetyLevel: 'Moderate' }, logs: [] },
+  { type: BotType.Engagement, enabled: true, status: 'Running', intervalMinutes: 30, stats: { currentDailyActions: 42, maxDailyActions: 100, consecutiveErrors: 0, cooldownEndsAt: undefined, itemsCreated: 0 }, config: { rules: { replyTone: 'casual', emojiLevel: 50, maxRepliesPerHour: 20, skipNegativeSentiment: true } as EngagementBotRules }, logs: [] },
+  { type: BotType.Finder, enabled: false, status: 'Idle', intervalMinutes: 120, stats: { currentDailyActions: 0, maxDailyActions: 50, consecutiveErrors: 0, cooldownEndsAt: undefined, itemsCreated: 0 }, config: { trackKeywords: ['AI'] }, logs: [] },
+  { type: BotType.Growth, enabled: false, status: 'Idle', intervalMinutes: 240, stats: { currentDailyActions: 0, maxDailyActions: 30, consecutiveErrors: 0, cooldownEndsAt: undefined, itemsCreated: 0 }, config: { growthTags: ['Startup Founders'] }, logs: [] },
 ];
 
 const INITIAL_MEDIA: MediaItem[] = [
@@ -337,6 +298,25 @@ class MockStore {
       const activeBots = this.bots.filter(b => b.enabled).length;
       return { totalPosts: this.posts.length, totalReach: 15400, engagementRate: 4.2, activeBots };
   }
+  
+  // Method missing in interface but used in pages
+  runBotForecast = async () => ({ timeline: [], risks: [], summary: { totalCycles: 0, successful: 0, skipped: 0 } });
+  
+  getGlobalPolicy() {
+      return { emergencyStop: false, quietHours: { enabled: true, startTime: '22:00', endTime: '06:00', timezone: 'UTC' }, platformLimits: {} };
+  }
+  updateGlobalPolicy(p: any) {}
+  getDailyGlobalActions() { return {}; }
+  getPlatforms() { return []; }
+  togglePlatformEnabled(id: any) {}
+  setPlatformOutage(id: any, val: boolean) {}
+  getAdaptiveConfig() { return { mode: 'Balanced', autoOptimize: false, lastOptimization: new Date().toISOString() }; }
+  setAdaptiveConfig(c: any) {}
+  getOptimizationSuggestions() { return []; }
+  applyLearningEvent(id: any, e: any) {}
+  ignoreLearningEvent(id: any, e: any) {}
+  lockLearningField(id: any, f: any) {}
+  simulateBot(type: BotType) {}
 }
 
 export const store = new MockStore();
