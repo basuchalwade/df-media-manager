@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { Users, Activity, TrendingUp, Share2 } from 'lucide-react';
+import { Users, Activity, TrendingUp, Share2, ArrowUp, ArrowDown } from 'lucide-react';
 import { AreaChart, Area, XAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { store } from '../services/mockStore';
 
@@ -28,10 +28,10 @@ export const Overview = () => {
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard label="Total Reach" value={stats.totalReach.toLocaleString()} icon={Users} color="bg-blue-500" />
-        <StatCard label="Engagement" value={`${stats.engagementRate}%`} icon={Activity} color="bg-green-500" />
-        <StatCard label="Active Bots" value={stats.activeBots} icon={TrendingUp} color="bg-purple-500" />
-        <StatCard label="Posts Sent" value={stats.totalPosts} icon={Share2} color="bg-orange-500" />
+        <StatCard label="Total Reach" value={stats.totalReach.toLocaleString()} icon={Users} color="bg-blue-500" trend="+12%" />
+        <StatCard label="Engagement" value={`${stats.engagementRate}%`} icon={Activity} color="bg-green-500" trend="+4.2%" />
+        <StatCard label="Active Bots" value={stats.activeBots} icon={TrendingUp} color="bg-purple-500" trend="Stable" />
+        <StatCard label="Posts Sent" value={stats.totalPosts} icon={Share2} color="bg-orange-500" trend="+8" />
       </div>
 
       <div className="bg-white p-6 rounded-[32px] shadow-sm border border-gray-100">
@@ -39,9 +39,15 @@ export const Overview = () => {
         <div className="h-[300px]">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={chartData}>
+              <defs>
+                <linearGradient id="colorReach" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2}/>
+                  <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                </linearGradient>
+              </defs>
               <XAxis dataKey="name" axisLine={false} tickLine={false} />
               <Tooltip />
-              <Area type="monotone" dataKey="reach" stroke="#3b82f6" strokeWidth={3} fill="#eff6ff" />
+              <Area type="monotone" dataKey="reach" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorReach)" />
             </AreaChart>
           </ResponsiveContainer>
         </div>
@@ -50,7 +56,7 @@ export const Overview = () => {
   );
 };
 
-const StatCard = ({ label, value, icon: Icon, color }: any) => (
+const StatCard = ({ label, value, icon: Icon, color, trend }: any) => (
   <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
     <div className="flex justify-between items-start">
       <div>
@@ -61,5 +67,10 @@ const StatCard = ({ label, value, icon: Icon, color }: any) => (
         <Icon size={20} />
       </div>
     </div>
+    {trend && (
+      <div className="mt-4 flex items-center text-xs font-medium text-green-600">
+        <ArrowUp size={12} className="mr-1" /> {trend} this week
+      </div>
+    )}
   </div>
 );
