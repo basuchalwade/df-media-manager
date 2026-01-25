@@ -110,6 +110,37 @@ export interface Post {
   metrics?: { likes: number; shares: number; comments: number };
 }
 
+export enum ActivityStatus {
+  STARTED = 'STARTED',
+  SUCCESS = 'SUCCESS',
+  FAILED = 'FAILED',
+  SKIPPED = 'SKIPPED'
+}
+
+export enum ActionType {
+  POST = 'POST',
+  LIKE = 'LIKE',
+  REPLY = 'REPLY',
+  FOLLOW = 'FOLLOW',
+  UNFOLLOW = 'UNFOLLOW',
+  ANALYZE = 'ANALYZE',
+  OPTIMIZE = 'OPTIMIZE'
+}
+
+export interface BotActivity {
+  id: string;
+  botType: BotType;
+  actionType: ActionType | string;
+  platform: Platform | string;
+  status: ActivityStatus;
+  message: string;
+  error?: string;
+  metadata?: any;
+  createdAt: string;
+  finishedAt?: string;
+}
+
+// Kept for backward compatibility but unused
 export interface BotLog {
   id: string;
   timestamp: string;
@@ -125,9 +156,48 @@ export interface BotConfig {
   intervalMinutes: number;
   config: any;
   stats: { currentDailyActions: number; maxDailyActions: number; consecutiveErrors: number };
-  logs: BotLog[];
+  logs: BotActivity[];
   lastRun?: string;
   learning?: any;
+}
+
+// Campaign Types
+export enum CampaignObjective { Reach = 'Reach', Engagement = 'Engagement', Traffic = 'Traffic', Conversions = 'Conversions' }
+export enum CampaignStatus { Active = 'Active', Draft = 'Draft', Paused = 'Paused', Completed = 'Completed' }
+
+export interface CampaignRecommendation {
+  id: string;
+  type: 'budget' | 'platform' | 'bot_config';
+  title: string;
+  description: string;
+  impact: 'High' | 'Medium' | 'Low';
+  actionLabel: string;
+  status: 'pending' | 'applied' | 'dismissed';
+}
+
+export type PacingStatus = 'UNDER' | 'OPTIMAL' | 'OVER';
+
+export interface BudgetPacing {
+  expectedSpend: number;
+  actualSpend: number;
+  pacingStatus: PacingStatus;
+  burnRate: number; // % of budget used per day
+  daysRemaining: number;
+}
+
+export interface BotAttribution {
+  botId: BotType;
+  spend: number;
+  impactScore: number; // 0-100
+  liftPercentage: number;
+  primaryContribution: string; // e.g. "Reach", "Clicks"
+}
+
+export interface CampaignIntelligenceData {
+  pacing: BudgetPacing;
+  attribution: BotAttribution[];
+  kpiMapping: Record<string, string>; // e.g. "Primary Metric": "Impressions"
+  strategySummary: string;
 }
 
 export interface Campaign {
@@ -138,13 +208,18 @@ export interface Campaign {
   platforms: Platform[];
   botIds: BotType[];
   startDate: string;
+  endDate?: string;
   budget: { total: number; daily: number; spent: number; currency: string };
-  metrics: any;
-  aiRecommendations: any[];
+  metrics: {
+    impressions: number;
+    clicks: number;
+    conversions: number;
+    costPerResult: number;
+    roas?: number;
+  };
+  aiRecommendations: CampaignRecommendation[];
+  intelligence?: CampaignIntelligenceData;
 }
-
-export enum CampaignObjective { Reach = 'Reach', Engagement = 'Engagement', Traffic = 'Traffic', Conversions = 'Conversions' }
-export enum CampaignStatus { Active = 'Active', Draft = 'Draft', Paused = 'Paused', Completed = 'Completed' }
 
 export interface DashboardStats {
   totalPosts: number;
@@ -216,36 +291,6 @@ export interface UserSettings {
     globalSafetyLevel: 'Conservative' | 'Moderate' | 'Aggressive';
     defaultWorkHours: { start: string; end: string };
   };
-}
-
-export enum ActivityStatus {
-  STARTED = 'STARTED',
-  SUCCESS = 'SUCCESS',
-  FAILED = 'FAILED',
-  SKIPPED = 'SKIPPED'
-}
-
-export enum ActionType {
-  POST = 'POST',
-  LIKE = 'LIKE',
-  REPLY = 'REPLY',
-  FOLLOW = 'FOLLOW',
-  UNFOLLOW = 'UNFOLLOW',
-  ANALYZE = 'ANALYZE',
-  OPTIMIZE = 'OPTIMIZE'
-}
-
-export interface BotActivity {
-  id: string;
-  botType: BotType;
-  actionType: ActionType | string;
-  platform: Platform | string;
-  status: ActivityStatus;
-  message: string;
-  error?: string;
-  metadata?: any;
-  createdAt: string;
-  finishedAt?: string;
 }
 
 export interface AnalyticsDataPoint {

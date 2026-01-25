@@ -42,7 +42,7 @@ const App: React.FC = () => {
         <Route path="creator" element={<CreatorStudio onNavigate={handleNavigate} params={navParams} />} />
         <Route path="calendar" element={<Calendar onNavigate={handleNavigate} params={navParams} />} />
         <Route path="bots" element={<BotManager onNavigate={handleNavigate} />} />
-        <Route path="bot-activity" element={<BotActivityLog botType={navParams?.botType || BotType.Creator} onBack={() => {}} />} />
+        <Route path="bot-activity" element={<BotActivityLog botType={navParams?.botType || BotType.Creator} onBack={() => handleNavigate('bots')} />} />
         <Route path="media" element={<MediaLibrary />} />
         <Route path="analytics" element={<Analytics />} />
         <Route path="integrations" element={<Integrations />} />

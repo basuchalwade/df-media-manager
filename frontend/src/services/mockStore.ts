@@ -1,5 +1,5 @@
 
-import { BotConfig, BotType, DashboardStats, MediaItem, Post, PostStatus, Platform, Campaign, CampaignObjective, CampaignStatus, UserSettings, PlatformAnalytics, EnhancementType, MediaVariant } from "../types";
+import { BotConfig, BotType, DashboardStats, MediaItem, Post, PostStatus, Platform, Campaign, CampaignObjective, CampaignStatus, UserSettings, PlatformAnalytics, EnhancementType, MediaVariant, User, UserRole, UserStatus, BotActivity } from "../types";
 
 // Initial Mock Data
 const INITIAL_BOTS: BotConfig[] = [
@@ -19,111 +19,182 @@ const INITIAL_POSTS: Post[] = [
 ];
 
 const INITIAL_CAMPAIGNS: Campaign[] = [
-  { id: 'c1', name: 'Q3 Launch', objective: CampaignObjective.Traffic, status: CampaignStatus.Active, platforms: [Platform.LinkedIn], botIds: [BotType.Creator], startDate: new Date().toISOString(), budget: { total: 5000, daily: 150, spent: 450, currency: 'USD' }, metrics: { impressions: 15000, clicks: 450, conversions: 12, costPerResult: 15, roas: 3.2 }, aiRecommendations: [] }
+  { 
+      id: 'c1', 
+      name: 'Q3 Launch', 
+      objective: CampaignObjective.Traffic, 
+      status: CampaignStatus.Active, 
+      platforms: [Platform.LinkedIn], 
+      botIds: [BotType.Creator], 
+      startDate: new Date().toISOString(), 
+      budget: { total: 5000, daily: 150, spent: 450, currency: 'USD' }, 
+      metrics: { impressions: 15000, clicks: 450, conversions: 12, costPerResult: 15, roas: 3.2 }, 
+      aiRecommendations: [],
+      intelligence: {
+          pacing: { expectedSpend: 500, actualSpend: 450, pacingStatus: 'OPTIMAL', burnRate: 90, daysRemaining: 20 },
+          attribution: [{ botId: BotType.Creator, spend: 400, impactScore: 85, liftPercentage: 12, primaryContribution: 'Impressions' }],
+          kpiMapping: { "Primary Metric": "Link Clicks" },
+          strategySummary: "Campaign is pacing well. Creator Bot is driving significant traffic."
+      }
+  }
+];
+
+const INITIAL_USERS: User[] = [
+    {
+        id: '1',
+        name: 'Admin User',
+        email: 'admin@contentcaster.io',
+        role: UserRole.Admin,
+        status: UserStatus.Active,
+        lastActive: 'Now',
+        connectedAccounts: {
+            [Platform.Twitter]: { connected: true, handle: '@admin', lastSync: '2h ago' }
+        }
+    }
 ];
 
 class MockStore {
-  constructor() {
-    if (!localStorage.getItem('cc_posts')) localStorage.setItem('cc_posts', JSON.stringify(INITIAL_POSTS));
-    if (!localStorage.getItem('cc_bots')) localStorage.setItem('cc_bots', JSON.stringify(INITIAL_BOTS));
-    if (!localStorage.getItem('cc_media')) localStorage.setItem('cc_media', JSON.stringify(INITIAL_MEDIA));
-    if (!localStorage.getItem('cc_campaigns')) localStorage.setItem('cc_campaigns', JSON.stringify(INITIAL_CAMPAIGNS));
-  }
-
-  // --- Helpers ---
-  private get<T>(key: string): T { return JSON.parse(localStorage.getItem(key) || '[]'); }
-  private set(key: string, val: any) { localStorage.setItem(key, JSON.stringify(val)); }
-
-  // --- API ---
-  async getBots() { return this.get<BotConfig[]>('cc_bots'); }
-  async toggleBot(type: BotType) {
-    const bots = await this.getBots();
-    const updated = bots.map(b => b.type === type ? { ...b, enabled: !b.enabled, status: !b.enabled ? 'Running' : 'Idle' } : b);
-    this.set('cc_bots', updated);
-    return updated;
-  }
-  async updateBot(bot: BotConfig) {
-    const bots = await this.getBots();
-    const updated = bots.map(b => b.type === bot.type ? bot : b);
-    this.set('cc_bots', updated);
-    return updated;
-  }
-  async getBotActivity(type: BotType) {
-    const bots = await this.getBots();
-    return bots.find(b => b.type === type)?.logs || [];
-  }
+  private posts: Post[] = INITIAL_POSTS;
+  private bots: BotConfig[] = INITIAL_BOTS;
+  private media: MediaItem[] = INITIAL_MEDIA;
+  private campaigns: Campaign[] = INITIAL_CAMPAIGNS;
+  private users: User[] = INITIAL_USERS;
   
-  async getPosts() { return this.get<Post[]>('cc_posts'); }
-  async addPost(post: Post) {
-    const posts = await this.getPosts();
-    this.set('cc_posts', [post, ...posts]);
-    return post;
-  }
-  async updatePost(post: Post) {
-    const posts = await this.getPosts();
-    const updated = posts.map(p => p.id === post.id ? post : p);
-    this.set('cc_posts', updated);
-    return post;
-  }
-  async deletePost(id: string) {
-    const posts = await this.getPosts();
-    this.set('cc_posts', posts.filter(p => p.id !== id));
+  constructor() {
+    this.loadFromStorage();
   }
 
-  async getMedia() { return this.get<MediaItem[]>('cc_media'); }
+  private loadFromStorage() {
+    const savedPosts = localStorage.getItem('cc_posts');
+    if (savedPosts) this.posts = JSON.parse(savedPosts);
+    
+    const savedBots = localStorage.getItem('cc_bots');
+    if (savedBots) this.bots = JSON.parse(savedBots);
+
+    const savedMedia = localStorage.getItem('cc_media');
+    if (savedMedia) this.media = JSON.parse(savedMedia);
+
+    const savedCampaigns = localStorage.getItem('cc_campaigns');
+    if (savedCampaigns) this.campaigns = JSON.parse(savedCampaigns);
+
+    const savedUsers = localStorage.getItem('cc_users');
+    if (savedUsers) this.users = JSON.parse(savedUsers);
+  }
+
+  private save() {
+    localStorage.setItem('cc_posts', JSON.stringify(this.posts));
+    localStorage.setItem('cc_bots', JSON.stringify(this.bots));
+    localStorage.setItem('cc_media', JSON.stringify(this.media));
+    localStorage.setItem('cc_campaigns', JSON.stringify(this.campaigns));
+    localStorage.setItem('cc_users', JSON.stringify(this.users));
+  }
+
+  // --- Posts ---
+  async getPosts() { return [...this.posts]; }
+  
+  async addPost(post: Post) {
+    this.posts.unshift(post);
+    this.save();
+    return post;
+  }
+
+  async updatePost(updated: Post) {
+    this.posts = this.posts.map(p => p.id === updated.id ? updated : p);
+    this.save();
+    return updated;
+  }
+
+  async deletePost(id: string) {
+    this.posts = this.posts.filter(p => p.id !== id);
+    this.save();
+  }
+
+  // --- Bots ---
+  async getBots() { return [...this.bots]; }
+
+  async toggleBot(type: BotType) {
+    this.bots = this.bots.map(b => b.type === type ? { ...b, enabled: !b.enabled } : b);
+    this.save();
+    return this.bots;
+  }
+
+  async getBotActivity(type: BotType): Promise<BotActivity[]> {
+    const bot = this.bots.find(b => b.type === type);
+    return bot?.logs || [];
+  }
+
+  // --- Media ---
+  async getMedia() { return [...this.media]; }
+  
   async uploadMedia(file: File) {
-    const url = URL.createObjectURL(file);
-    const item: MediaItem = { 
-        id: Date.now().toString(), 
-        name: file.name, 
-        type: file.type.startsWith('video') ? 'video' : 'image', 
-        url, 
-        size: file.size, 
-        createdAt: new Date().toISOString(), 
-        governance: { status: 'approved' },
-        processingStatus: 'ready'
+    const mockUrl = URL.createObjectURL(file);
+    const item: MediaItem = {
+      id: Date.now().toString(),
+      name: file.name,
+      type: file.type.startsWith('video') ? 'video' : 'image',
+      url: mockUrl,
+      size: file.size,
+      createdAt: new Date().toISOString(),
+      governance: { status: 'approved' },
+      processingStatus: 'ready'
     };
-    const media = await this.getMedia();
-    this.set('cc_media', [item, ...media]);
+    this.media.unshift(item);
+    this.save();
     return item;
   }
+
   async deleteMedia(id: string) {
-    const media = await this.getMedia();
-    this.set('cc_media', media.filter(m => m.id !== id));
+    this.media = this.media.filter(m => m.id !== id);
+    this.save();
   }
-  
-  async getCampaigns() { return this.get<Campaign[]>('cc_campaigns'); }
+
+  // --- Campaigns ---
+  async getCampaigns() { return [...this.campaigns]; }
   async addCampaign(camp: Campaign) {
-    const list = await this.getCampaigns();
-    this.set('cc_campaigns', [camp, ...list]);
+    this.campaigns.unshift(camp);
+    this.save();
     return camp;
+  }
+
+  async applyCampaignRecommendation(campaignId: string, recId: string) {
+    const campaign = this.campaigns.find(c => c.id === campaignId);
+    if (campaign) {
+        const rec = campaign.aiRecommendations.find(r => r.id === recId);
+        if (rec) rec.status = 'applied';
+        this.save();
+    }
+  }
+
+  async dismissCampaignRecommendation(campaignId: string, recId: string) {
+    const campaign = this.campaigns.find(c => c.id === campaignId);
+    if (campaign) {
+        const rec = campaign.aiRecommendations.find(r => r.id === recId);
+        if (rec) rec.status = 'dismissed';
+        this.save();
+    }
   }
 
   // --- Media Governance & Variants ---
   async approveMedia(id: string, approvedBy: string) {
-    const media = await this.getMedia();
-    const updated = media.map(m => m.id === id ? { ...m, governance: { status: 'approved', approvedBy, approvedAt: new Date().toISOString() } } : m);
-    this.set('cc_media', updated);
-    return updated;
+    this.media = this.media.map(m => m.id === id ? { ...m, governance: { status: 'approved', approvedBy, approvedAt: new Date().toISOString() } } : m);
+    this.save();
+    return this.media;
   }
 
   async rejectMedia(id: string, reason: string) {
-    const media = await this.getMedia();
-    const updated = media.map(m => m.id === id ? { ...m, governance: { status: 'rejected', rejectionReason: reason } } : m);
-    this.set('cc_media', updated);
-    return updated;
+    this.media = this.media.map(m => m.id === id ? { ...m, governance: { status: 'rejected', rejectionReason: reason } } : m);
+    this.save();
+    return this.media;
   }
 
   async resetMedia(id: string) {
-     const media = await this.getMedia();
-     const updated = media.map(m => m.id === id ? { ...m, governance: { status: 'pending' } } : m);
-     this.set('cc_media', updated);
-     return updated;
+     this.media = this.media.map(m => m.id === id ? { ...m, governance: { status: 'pending' } } : m);
+     this.save();
+     return this.media;
   }
 
   async createVariant(id: string, platform: string): Promise<void> {
-    const media = await this.getMedia();
-    const updated = media.map(m => {
+    this.media = this.media.map(m => {
         if (m.id === id) {
             const variant: MediaVariant = {
                 id: `v-${Date.now()}`,
@@ -141,12 +212,11 @@ class MockStore {
         }
         return m;
     });
-    this.set('cc_media', updated);
+    this.save();
   }
 
   async createEnhancedVariant(id: string, type: EnhancementType): Promise<void> {
-      const media = await this.getMedia();
-      const updated = media.map(m => {
+      this.media = this.media.map(m => {
           if (m.id === id) {
               const variant: MediaVariant = {
                   id: `v-enh-${Date.now()}`,
@@ -165,21 +235,71 @@ class MockStore {
           }
           return m;
       });
-      this.set('cc_media', updated);
+      this.save();
   }
 
   async deleteVariant(parentId: string, variantId: string): Promise<void> {
-      const media = await this.getMedia();
-      const updated = media.map(m => {
+      this.media = this.media.map(m => {
           if (m.id === parentId) {
               return { ...m, variants: (m.variants || []).filter(v => v.id !== variantId) };
           }
           return m;
       });
-      this.set('cc_media', updated);
+      this.save();
   }
 
-  // --- Settings ---
+  // --- Users & Settings ---
+  async getUsers() { return [...this.users]; }
+  
+  async addUser(user: Partial<User>) {
+      const newUser: User = {
+          id: Date.now().toString(),
+          name: user.name || 'New User',
+          email: user.email || '',
+          role: user.role || UserRole.Viewer,
+          status: user.status || UserStatus.Invited,
+          lastActive: 'Never',
+          connectedAccounts: {},
+          ...user
+      };
+      this.users.push(newUser);
+      this.save();
+      return this.users;
+  }
+
+  async updateUser(id: string, updates: Partial<User>) {
+      this.users = this.users.map(u => u.id === id ? { ...u, ...updates } : u);
+      this.save();
+      return this.users;
+  }
+
+  async togglePlatformConnection(platform: Platform) {
+      // Toggle for current user (ID 1)
+      this.users = this.users.map(u => {
+          if (u.id === '1') {
+              const isConnected = u.connectedAccounts[platform]?.connected;
+              return {
+                  ...u,
+                  connectedAccounts: {
+                      ...u.connectedAccounts,
+                      [platform]: {
+                          connected: !isConnected,
+                          handle: !isConnected ? `@demo_${platform.toLowerCase()}` : undefined,
+                          lastSync: !isConnected ? 'Just now' : undefined
+                      }
+                  }
+              };
+          }
+          return u;
+      });
+      this.save();
+      return this.users.find(u => u.id === '1');
+  }
+
+  async getCurrentUser() {
+    return this.users.find(u => u.id === '1') || INITIAL_USERS[0];
+  }
+
   async getSettings(): Promise<UserSettings> {
     const defaultSettings: UserSettings = {
       demoMode: false,
@@ -222,7 +342,6 @@ class MockStore {
     };
   }
 
-  // --- Stats & User ---
   async getStats() {
     const posts = await this.getPosts();
     const bots = await this.getBots();
@@ -234,19 +353,12 @@ class MockStore {
     };
   }
 
-  async getCurrentUser() {
-    return { 
-        id: '1', 
-        name: 'Admin', 
-        email: 'admin@contentcaster.io', 
-        role: 'Admin' as any, 
-        status: 'Active' as any, 
-        lastActive: 'Now', 
-        connectedAccounts: { 
-            [Platform.Twitter]: { connected: true, handle: '@admin' } 
-        } 
-    };
+  // Helpers
+  private get<T>(key: string): T | null { 
+      const item = localStorage.getItem(key);
+      return item ? JSON.parse(item) : null; 
   }
+  private set(key: string, val: any) { localStorage.setItem(key, JSON.stringify(val)); }
 }
 
 export const store = new MockStore();
