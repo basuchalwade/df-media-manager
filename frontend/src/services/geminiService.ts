@@ -2,8 +2,7 @@
 /**
  * SIMULATION MODE
  * 
- * The real Google GenAI SDK has been removed to resolve dependency issues.
- * All functions below return mocked data to simulate AI behavior.
+ * Purely mocked service to simulate AI behavior for the frontend demo.
  */
 
 export const generatePostContent = async (
@@ -17,7 +16,6 @@ export const generatePostContent = async (
     safetyLevel?: string;
   }
 ): Promise<string> => {
-  // Simulation Delay
   await new Promise(resolve => setTimeout(resolve, 1500));
   
   return `[SIMULATION MODE] 
@@ -49,7 +47,6 @@ export const generateHashtags = async (topic: string, content: string): Promise<
 export const validateContentSafety = async (content: string, platforms: string[]): Promise<{ safe: boolean; issues: string[] }> => {
   await new Promise(resolve => setTimeout(resolve, 500));
   
-  // Simple mock logic: flag specific keywords for testing
   if (content.toLowerCase().includes('unsafe') || content.toLowerCase().includes('fail')) {
       return { 
           safe: false, 

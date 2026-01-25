@@ -8,7 +8,6 @@ export const getEnhancementSuggestions = (media: MediaItem): EnhancementType[] =
   const { width, height } = media.metadata;
   const isImage = media.type === 'image';
   
-  // Deterministic heuristics
   const seed = media.id.charCodeAt(media.id.length - 1);
 
   if (isImage) {

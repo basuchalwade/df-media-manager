@@ -1,19 +1,59 @@
 
-import { BotConfig, BotType, DashboardStats, MediaItem, Post, PostStatus, Platform, Campaign, CampaignObjective, CampaignStatus, UserSettings, PlatformAnalytics, EnhancementType, MediaVariant, User, UserRole, UserStatus, BotActivity } from "../types";
+import { BotConfig, BotType, DashboardStats, MediaItem, Post, PostStatus, Platform, Campaign, CampaignObjective, CampaignStatus, UserSettings, PlatformAnalytics, EnhancementType, MediaVariant, User, UserRole, UserStatus, BotActivity, MediaMetadata, PlatformCompatibility, ActivityStatus, EngagementBotRules } from "../types";
 import { logAudit } from './auditStore';
 import { enrichCampaignWithIntelligence } from './campaignIntelligence';
+import { evaluateCompatibility } from './platformCompatibility';
 
-// Initial Mock Data
+// Initial Data Constants
 const INITIAL_BOTS: BotConfig[] = [
-  { type: BotType.Creator, enabled: true, status: 'Idle', intervalMinutes: 60, stats: { currentDailyActions: 5, maxDailyActions: 20, consecutiveErrors: 0 }, config: { topics: ['Tech'], safetyLevel: 'Moderate' }, logs: [] },
-  { type: BotType.Engagement, enabled: true, status: 'Running', intervalMinutes: 30, stats: { currentDailyActions: 42, maxDailyActions: 100, consecutiveErrors: 0 }, config: { replyTone: 'Casual' }, logs: [] },
-  { type: BotType.Finder, enabled: false, status: 'Idle', intervalMinutes: 120, stats: { currentDailyActions: 0, maxDailyActions: 50, consecutiveErrors: 0 }, config: { keywords: ['AI'] }, logs: [] },
-  { type: BotType.Growth, enabled: false, status: 'Idle', intervalMinutes: 240, stats: { currentDailyActions: 0, maxDailyActions: 30, consecutiveErrors: 0 }, config: { target: 'Startup Founders' }, logs: [] },
+  { 
+    type: BotType.Creator, 
+    enabled: true, 
+    status: 'Idle', 
+    intervalMinutes: 60, 
+    stats: { currentDailyActions: 5, maxDailyActions: 20, consecutiveErrors: 0, cooldownEndsAt: undefined, itemsCreated: 0 }, 
+    config: { contentTopics: ['Tech'], safetyLevel: 'Moderate' }, 
+    logs: [] 
+  },
+  { 
+    type: BotType.Engagement, 
+    enabled: true, 
+    status: 'Running', 
+    intervalMinutes: 30, 
+    stats: { currentDailyActions: 42, maxDailyActions: 100, consecutiveErrors: 0, cooldownEndsAt: undefined, itemsCreated: 0 }, 
+    config: { 
+      rules: { 
+        replyTone: 'casual', 
+        emojiLevel: 50, 
+        maxRepliesPerHour: 20, 
+        skipNegativeSentiment: true 
+      }
+    }, 
+    logs: [] 
+  },
+  { 
+    type: BotType.Finder, 
+    enabled: false, 
+    status: 'Idle', 
+    intervalMinutes: 120, 
+    stats: { currentDailyActions: 0, maxDailyActions: 50, consecutiveErrors: 0, cooldownEndsAt: undefined, itemsCreated: 0 }, 
+    config: { trackKeywords: ['AI'] }, 
+    logs: [] 
+  },
+  { 
+    type: BotType.Growth, 
+    enabled: false, 
+    status: 'Idle', 
+    intervalMinutes: 240, 
+    stats: { currentDailyActions: 0, maxDailyActions: 30, consecutiveErrors: 0, cooldownEndsAt: undefined, itemsCreated: 0 }, 
+    config: { growthTags: ['Startup Founders'] }, 
+    logs: [] 
+  },
 ];
 
 const INITIAL_MEDIA: MediaItem[] = [
-  { id: '1', name: 'product-launch.jpg', type: 'image', url: 'https://images.unsplash.com/photo-1611162617474-5b21e879e113?w=500&q=80', size: 2400000, createdAt: new Date().toISOString(), governance: { status: 'approved' }, processingStatus: 'ready', platformCompatibility: { 'Twitter': { compatible: true, issues: [] } } },
-  { id: '2', name: 'team.jpg', type: 'image', url: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=500&q=80', size: 1200000, createdAt: new Date().toISOString(), governance: { status: 'pending' }, processingStatus: 'ready' },
+  { id: '1', name: 'product-launch.jpg', type: 'image', url: 'https://images.unsplash.com/photo-1611162617474-5b21e879e113?w=500&q=80', size: 2400000, createdAt: new Date().toISOString(), governance: { status: 'approved', approvedBy: 'Admin' }, processingStatus: 'ready', tags: ['launch', 'product'], usageCount: 2, performanceScore: 85, performanceTrend: 'up', metadata: { width: 1080, height: 1080, sizeMB: 2.4, format: 'image/jpeg', aspectRatio: 1, duration: 0 } },
+  { id: '2', name: 'team.jpg', type: 'image', url: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=500&q=80', size: 1200000, createdAt: new Date().toISOString(), governance: { status: 'pending' }, processingStatus: 'ready', tags: ['team', 'culture'], usageCount: 0, performanceScore: 60, performanceTrend: 'stable', metadata: { width: 800, height: 600, sizeMB: 1.2, format: 'image/jpeg', aspectRatio: 1.33, duration: 0 } },
 ];
 
 const INITIAL_POSTS: Post[] = [
@@ -57,9 +97,11 @@ class MockStore {
   private campaigns: Campaign[] = INITIAL_CAMPAIGNS;
   private users: User[] = INITIAL_USERS;
   private settings: UserSettings | null = null;
+  private simulationTimer: any = null;
   
   constructor() {
     this.loadFromStorage();
+    this.startSimulation();
   }
 
   private loadFromStorage() {
@@ -86,6 +128,34 @@ class MockStore {
     if (this.settings) localStorage.setItem('cc_settings', JSON.stringify(this.settings));
   }
 
+  private startSimulation() {
+      if (this.simulationTimer) clearInterval(this.simulationTimer);
+      this.simulationTimer = setInterval(() => {
+          this.bots = this.bots.map(bot => {
+              if (bot.enabled && bot.status === 'Running') {
+                  const chance = Math.random();
+                  if (chance > 0.7) {
+                      const newLog: BotActivity = {
+                          id: Date.now().toString(),
+                          botType: bot.type,
+                          actionType: 'ANALYZE',
+                          platform: 'System',
+                          status: ActivityStatus.SUCCESS,
+                          message: `Executed periodic check. Processed ${Math.floor(Math.random() * 10)} items.`,
+                          createdAt: new Date().toISOString()
+                      };
+                      const logs = [newLog, ...bot.logs].slice(0, 50);
+                      return { ...bot, logs, lastRun: new Date().toISOString() };
+                  }
+              }
+              return bot;
+          });
+          this.save();
+      }, 5000);
+  }
+
+  // --- Methods ---
+
   async getPosts() { return [...this.posts]; }
   async addPost(post: Post) { this.posts.unshift(post); this.save(); return post; }
   async updatePost(updated: Post) { this.posts = this.posts.map(p => p.id === updated.id ? updated : p); this.save(); return updated; }
@@ -106,16 +176,31 @@ class MockStore {
       url: mockUrl,
       size: file.size,
       createdAt: new Date().toISOString(),
-      governance: { status: 'approved' },
-      processingStatus: 'ready'
+      governance: { status: 'approved' }, // Auto-approve in mock for usability
+      processingStatus: 'ready',
+      metadata: { width: 1000, height: 1000, sizeMB: 1, format: file.type, duration: 0, aspectRatio: 1 },
+      platformCompatibility: {}
     };
+    // Calculate compatibility
+    item.platformCompatibility = evaluateCompatibility(item);
     this.media.unshift(item);
     this.save();
+    logAudit({ id: Date.now().toString(), mediaId: item.id, action: 'UPLOAD', actor: 'User', timestamp: new Date().toISOString() });
     return item;
   }
   async deleteMedia(id: string) { this.media = this.media.filter(m => m.id !== id); this.save(); }
-  async approveMedia(id: string, user: string) { this.media = this.media.map(m => m.id === id ? { ...m, governance: { status: 'approved', approvedBy: user } } : m); this.save(); logAudit({ id: Date.now().toString(), mediaId: id, action: 'APPROVED', actor: user, timestamp: new Date().toISOString() }); return this.media; }
-  async rejectMedia(id: string, reason: string) { this.media = this.media.map(m => m.id === id ? { ...m, governance: { status: 'rejected', rejectionReason: reason } } : m); this.save(); logAudit({ id: Date.now().toString(), mediaId: id, action: 'RESTRICTED', actor: 'Admin', timestamp: new Date().toISOString() }); return this.media; }
+  async approveMedia(id: string, user: string) { 
+      this.media = this.media.map(m => m.id === id ? { ...m, governance: { status: 'approved', approvedBy: user } } : m); 
+      this.save(); 
+      logAudit({ id: Date.now().toString(), mediaId: id, action: 'APPROVED', actor: user, timestamp: new Date().toISOString() }); 
+      return this.media; 
+  }
+  async rejectMedia(id: string, reason: string) { 
+      this.media = this.media.map(m => m.id === id ? { ...m, governance: { status: 'rejected', rejectionReason: reason } } : m); 
+      this.save(); 
+      logAudit({ id: Date.now().toString(), mediaId: id, action: 'RESTRICTED', actor: 'Admin', timestamp: new Date().toISOString() }); 
+      return this.media; 
+  }
   async resetMedia(id: string) { this.media = this.media.map(m => m.id === id ? { ...m, governance: { status: 'pending' } } : m); this.save(); return this.media; }
   
   async createVariant(id: string, platform: string): Promise<void> {

@@ -46,8 +46,6 @@ export interface BotActivity {
   finishedAt?: string;
 }
 
-// --- Campaign Types ---
-
 export enum CampaignObjective {
   Reach = 'Reach',
   Engagement = 'Engagement',
@@ -123,8 +121,7 @@ export interface Campaign {
   intelligence?: CampaignIntelligenceData;
 }
 
-// --- Bot Rules (Added) ---
-
+// Bot Rules
 export interface FinderBotRules {
   keywordSources: string[];
   languages: string[];
@@ -141,7 +138,7 @@ export interface GrowthBotRules {
 
 export interface EngagementBotRules {
   replyTone: "formal" | "casual" | "witty" | "empathetic";
-  emojiLevel: number; // 0-100
+  emojiLevel: number;
   maxRepliesPerHour: number;
   skipNegativeSentiment: boolean;
 }
@@ -159,17 +156,7 @@ export interface CreatorBotRules {
 
 export type BotRules = FinderBotRules | GrowthBotRules | EngagementBotRules | CreatorBotRules;
 
-// --- Adaptive Strategy Types (Added) ---
-
 export type StrategyMode = 'Conservative' | 'Balanced' | 'Aggressive';
-
-export interface StrategyProfile {
-  mode: StrategyMode;
-  postFrequencyMultiplier: number;
-  engagementIntensity: number;
-  growthAggression: number;
-  riskTolerance: number; // 0-100
-}
 
 export interface AdaptiveConfig {
   mode: StrategyMode;
@@ -189,64 +176,45 @@ export interface OptimizationSuggestion {
   timestamp: string;
 }
 
-export interface LearningEntry {
-  id: string;
-  platform: Platform;
-  actionType: ActionType;
-  context: string; // e.g. "Tone: Witty" or "Topic: AI"
-  outcomeScore: number; // 0-100
-  timestamp: number;
-}
-
-// --- Self-Optimizing Learning Types (Added) ---
-
 export type LearningStrategy = 'Conservative' | 'Balanced' | 'Aggressive';
 
 export interface BotLearningConfig {
   enabled: boolean;
   strategy: LearningStrategy;
-  maxChangePerDay: number; // percentage (e.g. 10 for 10%)
-  lockedFields: string[]; // keys of config fields to ignore
+  maxChangePerDay: number;
+  lockedFields: string[];
 }
 
 export interface OptimizationEvent {
   id: string;
   timestamp: string;
-  botId: string; // BotType
+  botId: string;
   field: string;
   oldValue: string | number | boolean;
   newValue: string | number | boolean;
   reason: string;
-  confidence: number; // 0-1
+  confidence: number;
   metricsUsed: string[];
   status: 'pending' | 'applied' | 'rejected' | 'simulated';
   appliedAt?: string;
 }
 
-// --- Orchestration & Policy Types (Added) ---
-
 export interface GlobalPolicyConfig {
   emergencyStop: boolean;
   quietHours: {
     enabled: boolean;
-    startTime: string; // HH:MM (24h format)
-    endTime: string;   // HH:MM (24h format)
+    startTime: string;
+    endTime: string;
     timezone: string;
   };
   platformLimits?: any; 
-}
-
-export interface PolicyCheckResult {
-  allowed: boolean;
-  reason?: string;
-  type: 'POLICY' | 'CONFLICT' | 'PRIORITY' | 'PLATFORM' | 'OK';
 }
 
 export interface BotActionRequest {
   botType: BotType;
   platform: Platform;
   actionType: ActionType;
-  targetId?: string; // Optional target identifier (user ID, post ID)
+  targetId?: string;
   timestamp: string;
 }
 
@@ -260,11 +228,9 @@ export interface OrchestrationLogEntry {
   reason: string;
 }
 
-// --- Live Telemetry (Added) ---
-
 export interface BotExecutionEvent {
   id: string;
-  botId: string; // Usually mapped to BotType
+  botId: string;
   botType: BotType;
   timestamp: number;
   platform: Platform;
@@ -275,38 +241,6 @@ export interface BotExecutionEvent {
   reason?: string;
   riskLevel: 'low' | 'medium' | 'high';
 }
-
-// --- Simulation Types ---
-
-export interface AssetDecision {
-  assetId: string;
-  assetName: string;
-  status: 'accepted' | 'rejected';
-  reason?: string;
-  score?: number;
-}
-
-export interface SimulationCycle {
-  id: string;
-  timestamp: string; // Virtual time
-  action: string;
-  asset?: MediaItem;
-  decisionTrace: AssetDecision[];
-  outcome: 'Posted' | 'Skipped' | 'Failed';
-  message: string;
-}
-
-export interface SimulationReport {
-  timeline: SimulationCycle[];
-  risks: string[];
-  summary: {
-    totalCycles: number;
-    successful: number;
-    skipped: number;
-  };
-}
-
-// --- Bot Configuration ---
 
 export interface AIStrategyConfig {
   creativityLevel: 'Low' | 'Medium' | 'High';
@@ -322,7 +256,6 @@ export interface CalendarConfig {
 }
 
 export interface BotSpecificConfig {
-  // Legacy fields
   contentTopics?: string[];
   targetPlatforms?: Platform[];
   generationMode?: 'AI' | 'Drafts';
@@ -347,23 +280,12 @@ export interface BotSpecificConfig {
   stopOnConsecutiveErrors?: number;
   aiStrategy?: AIStrategyConfig;
   calendarConfig?: CalendarConfig;
-  
-  // New Typed Rules Container
   rules?: BotRules; 
 }
 
 export type BotStatus = 'Idle' | 'Running' | 'Cooldown' | 'LimitReached' | 'Error';
-export type LogLevel = 'Info' | 'Warning' | 'Error' | 'Success';
-
-export interface BotLogEntry {
-  id: string;
-  timestamp: string;
-  level: LogLevel;
-  message: string;
-}
 
 export interface BotConfig {
-  id?: string;
   type: BotType;
   enabled: boolean;
   intervalMinutes: number;
@@ -378,12 +300,154 @@ export interface BotConfig {
     cooldownEndsAt?: string;
     itemsCreated?: number;
   };
-  // Phase 9: Self-Optimization
   learning?: BotLearningConfig;
   optimizationHistory?: OptimizationEvent[];
 }
 
-// --- Media Types (Updated) ---
+export interface DashboardStats {
+  totalPosts: number;
+  totalReach: number;
+  engagementRate: number;
+  activeBots: number;
+}
+
+export interface UserSettings {
+  demoMode: boolean;
+  geminiApiKey: string;
+  general: {
+    language: string;
+    dateFormat: 'MM/DD/YYYY' | 'DD/MM/YYYY' | 'YYYY-MM-DD';
+    startOfWeek: 'Sunday' | 'Monday';
+  };
+  workspace: {
+    timezone: string;
+    defaultTone: string;
+  };
+  notifications: {
+    channels: {
+      email: boolean;
+      inApp: boolean;
+      slack: boolean;
+    };
+    alerts: {
+      botActivity: boolean;
+      failures: boolean;
+      approvals: boolean;
+    };
+  };
+  security: {
+    twoFactorEnabled: boolean;
+    sessionTimeout: string;
+  };
+  automation: {
+    globalSafetyLevel: 'Conservative' | 'Moderate' | 'Aggressive';
+    defaultWorkHours: { start: string; end: string };
+  };
+}
+
+export interface AnalyticsDataPoint {
+  date: string;
+  followers: number;
+  impressions: number;
+  engagement: number;
+}
+
+export interface PlatformAnalytics {
+  platform: Platform | 'All';
+  summary: {
+    followers: number;
+    followersGrowth: number;
+    impressions: number;
+    impressionsGrowth: number;
+    engagementRate: number;
+    engagementGrowth: number;
+    globalPolicyStatus?: {
+        limitReached: boolean;
+        actionsRemaining: number;
+    }
+  };
+  history: AnalyticsDataPoint[];
+}
+
+export enum UserRole {
+  Admin = 'Admin',
+  Monitor = 'Monitor',
+  Viewer = 'Viewer',
+}
+
+export enum UserStatus {
+  Active = 'Active',
+  Suspended = 'Suspended',
+  Invited = 'Invited',
+}
+
+export interface UserConnection {
+  connected: boolean;
+  handle?: string;
+  lastSync?: string;
+}
+
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: UserRole;
+  status: UserStatus;
+  lastActive: string;
+  avatar?: string;
+  connectedAccounts: {
+    [key in Platform]?: UserConnection;
+  };
+}
+
+export type AuditAction =
+  | 'UPLOAD'
+  | 'APPROVED'
+  | 'RESTRICTED'
+  | 'RESET_TO_DRAFT'
+  | 'AI_FLAGGED'
+  | 'AI_CLEARED'
+  | 'VARIANT_GENERATED'
+  | 'VARIANT_DELETED'
+  | 'ENHANCEMENT_APPLIED';
+
+export interface MediaAuditEvent {
+  id: string;
+  mediaId: string;
+  action: AuditAction | string;
+  actor: string;
+  timestamp: string;
+  reason?: string;
+}
+
+export interface MediaGovernance {
+  status: 'pending' | 'approved' | 'rejected';
+  approvedBy?: string;
+  approvedAt?: string;
+  rejectionReason?: string;
+  notes?: string;
+}
+
+export interface MediaAIMetadata {
+  generated: boolean;
+  tool?: string;
+  disclosureRequired: boolean;
+  originalPrompt?: string;
+}
+
+export interface MediaMetadata {
+  width: number;
+  height: number;
+  duration?: number;
+  sizeMB: number;
+  format: string;
+  aspectRatio: number;
+}
+
+export interface PlatformCompatibility {
+  compatible: boolean;
+  issues: string[];
+}
 
 export type EnhancementType =
   | 'auto_brightness'
@@ -407,11 +471,6 @@ export interface PostPerformance {
   collectedAt: string;
 }
 
-export interface PlatformCompatibility {
-  compatible: boolean;
-  issues: string[];
-}
-
 export interface MediaVariant {
   id: string;
   parentId: string;
@@ -427,30 +486,6 @@ export interface MediaVariant {
   enhancementScore?: number;
   performanceScore?: number;
   performanceTrend?: 'up' | 'down' | 'stable';
-}
-
-export interface MediaMetadata {
-  width: number;
-  height: number;
-  duration?: number;
-  sizeMB: number;
-  format: string;
-  aspectRatio: number;
-}
-
-export interface MediaAIMetadata {
-  generated: boolean;
-  tool?: string;
-  disclosureRequired: boolean;
-  originalPrompt?: string;
-}
-
-export interface MediaGovernance {
-  status: 'pending' | 'approved' | 'rejected';
-  approvedBy?: string;
-  approvedAt?: string;
-  rejectionReason?: string;
-  notes?: string;
 }
 
 export interface MediaItem {
@@ -476,37 +511,15 @@ export interface MediaItem {
   dimensions?: string; 
 }
 
-export type AuditAction =
-  | 'UPLOAD'
-  | 'APPROVED'
-  | 'RESTRICTED'
-  | 'RESET_TO_DRAFT'
-  | 'AI_FLAGGED'
-  | 'AI_CLEARED'
-  | 'VARIANT_GENERATED'
-  | 'VARIANT_DELETED'
-  | 'ENHANCEMENT_APPLIED';
-
-export interface MediaAuditEvent {
-  id: string;
-  mediaId: string;
-  action: AuditAction | string;
-  actor: string;
-  timestamp: string;
-  reason?: string;
-}
-
-// --- Post Types (Updated) ---
-
 export enum PostStatus {
   Draft = 'Draft',
-  Scheduled = 'Scheduled',
-  Published = 'Published',
-  Failed = 'Failed',
   NeedsReview = 'Needs Review',
   Approved = 'Approved',
+  Scheduled = 'Scheduled',
+  Processing = 'Processing',
+  Published = 'Published',
+  Failed = 'Failed',
   Archived = 'Archived',
-  Processing = 'Processing'
 }
 
 export interface PostVariant {
@@ -556,114 +569,12 @@ export interface Post {
   mediaType?: 'image' | 'video';
 }
 
-// --- User & Settings ---
-
-export enum UserRole {
-  Admin = 'Admin',
-  Monitor = 'Monitor',
-  Viewer = 'Viewer',
-}
-
-export enum UserStatus {
-  Active = 'Active',
-  Suspended = 'Suspended',
-  Invited = 'Invited',
-}
-
-export interface UserConnection {
-  connected: boolean;
-  handle?: string;
-  lastSync?: string;
-}
-
-export interface User {
-  id: string;
-  name: string;
-  email: string;
-  role: UserRole;
-  status: UserStatus;
-  lastActive: string;
-  avatar?: string;
-  connectedAccounts: {
-    [key in Platform]?: UserConnection;
-  };
-}
-
-export interface UserSettings {
-  demoMode: boolean;
-  geminiApiKey: string;
-  general: {
-    language: string;
-    dateFormat: 'MM/DD/YYYY' | 'DD/MM/YYYY' | 'YYYY-MM-DD';
-    startOfWeek: 'Sunday' | 'Monday';
-  };
-  workspace: {
-    timezone: string;
-    defaultTone: string;
-  };
-  notifications: {
-    channels: {
-      email: boolean;
-      inApp: boolean;
-      slack: boolean;
-    };
-    alerts: {
-      botActivity: boolean;
-      failures: boolean;
-      approvals: boolean;
-    };
-  };
-  security: {
-    twoFactorEnabled: boolean;
-    sessionTimeout: string;
-  };
-  automation: {
-    globalSafetyLevel: 'Conservative' | 'Moderate' | 'Aggressive';
-    defaultWorkHours: { start: string; end: string };
-  };
-}
-
-// --- Analytics ---
-
-export interface AnalyticsDataPoint {
-  date: string;
-  followers: number;
-  impressions: number;
-  engagement: number;
-}
-
-export interface PlatformAnalytics {
-  platform: Platform | 'All';
-  summary: {
-    followers: number;
-    followersGrowth: number;
-    impressions: number;
-    impressionsGrowth: number;
-    engagementRate: number;
-    engagementGrowth: number;
-    globalPolicyStatus?: {
-        limitReached: boolean;
-        actionsRemaining: number;
-    }
-  };
-  history: AnalyticsDataPoint[];
-}
-
-export interface DashboardStats {
-  totalPosts: number;
-  totalReach: number;
-  engagementRate: number;
-  activeBots: number;
-}
-
-// --- Platform Config ---
-
 export interface PlatformConfig {
   id: Platform;
   name: string;
-  enabled: boolean;   // Admin switch to allow/disallow platform globally
-  connected: boolean; // Integration status
-  outage: boolean;    // Simulate API outage
+  enabled: boolean;
+  connected: boolean;
+  outage: boolean;
   supports: {
     [key in ActionType]?: boolean;
   };
@@ -681,4 +592,27 @@ export interface ValidationResult {
 export interface PageProps {
   onNavigate: (page: string, params?: any) => void;
   params?: any;
+}
+
+export interface PolicyCheckResult {
+  allowed: boolean;
+  reason?: string;
+  type: 'POLICY' | 'CONFLICT' | 'PRIORITY' | 'PLATFORM' | 'OK';
+}
+
+export interface LearningEntry {
+  id: string;
+  platform: Platform;
+  actionType: ActionType;
+  context: string;
+  outcomeScore: number;
+  timestamp: number;
+}
+
+export interface StrategyProfile {
+  mode: StrategyMode;
+  postFrequencyMultiplier: number;
+  engagementIntensity: number;
+  growthAggression: number;
+  riskTolerance: number;
 }
