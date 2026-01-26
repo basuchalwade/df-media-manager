@@ -1,9 +1,11 @@
 
+import { api } from './api';
+
+const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:4000/api';
+
 /**
- * SIMULATION MODE
- * 
- * Purely mocked service to simulate AI behavior for the frontend demo.
- * Removes dependency on @google/genai to ensure clean build.
+ * Production AI Service
+ * Calls the Backend API Gateway which securely handles the Gemini API Key.
  */
 
 export const generatePostContent = async (
@@ -17,13 +19,25 @@ export const generatePostContent = async (
     safetyLevel?: string;
   }
 ): Promise<string> => {
-  await new Promise(resolve => setTimeout(resolve, 1500));
-  
-  return `[SIMULATION MODE] 
-  
-Here is a ${tone} post about "${topic}" optimized for ${platform}. 
-  
-We are excited to share our latest updates regarding ${topic}. This content is auto-generated in simulation mode. 🚀 #Growth #Tech`;
+  try {
+    const res = await fetch(`${API_URL}/ai/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        prompt: topic, 
+        platform, 
+        tone,
+        context 
+      })
+    });
+    
+    if (!res.ok) throw new Error('AI Generation failed');
+    const data = await res.json();
+    return data.content;
+  } catch (error) {
+    console.error('Frontend AI Error:', error);
+    return `[Error] Could not generate content. Ensure Backend is running.`;
+  }
 };
 
 export const generatePostVariants = async (
@@ -32,37 +46,42 @@ export const generatePostVariants = async (
   tone: string,
   context: any
 ): Promise<{ name: string; content: string }[]> => {
-  await new Promise(resolve => setTimeout(resolve, 2000));
-  return [
-      { name: 'Viral Hook', content: `[SIMULATION] 🤯 You won't believe what we just shipped regarding ${topic}! 🚀` },
-      { name: 'Professional', content: `[SIMULATION] We are pleased to announce significant advancements in ${topic}. Read more below.` },
-      { name: 'Question', content: `[SIMULATION] How are you handling ${topic} in your workflow? Let's discuss! 👇` },
-  ];
-};
-
-export const generateHashtags = async (topic: string, content: string): Promise<string[]> => {
-  await new Promise(resolve => setTimeout(resolve, 800));
-  return ['#Simulation', '#Growth', '#Tech', '#AI', '#Future'];
+  try {
+    const res = await fetch(`${API_URL}/ai/variants`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt: topic, platform, tone })
+    });
+    
+    if (!res.ok) return [];
+    return await res.json();
+  } catch (error) {
+    console.error('Frontend Variants Error:', error);
+    return [];
+  }
 };
 
 export const validateContentSafety = async (content: string, platforms: string[]): Promise<{ safe: boolean; issues: string[] }> => {
-  await new Promise(resolve => setTimeout(resolve, 500));
-  
-  if (content.toLowerCase().includes('unsafe') || content.toLowerCase().includes('fail')) {
-      return { 
-          safe: false, 
-          issues: ['Simulated Safety Flag: Content contains restricted keywords.', 'Harmful content detected.'] 
-      };
+  try {
+    const res = await fetch(`${API_URL}/ai/safety`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content })
+    });
+    
+    if (!res.ok) return { safe: true, issues: [] };
+    return await res.json();
+  } catch (error) {
+    return { safe: true, issues: [] };
   }
-  
-  return { safe: true, issues: [] };
 };
 
-export const refinePostContent = async (
-  currentContent: string,
-  instruction: string,
-  platform?: string
-): Promise<string> => {
-  await new Promise(resolve => setTimeout(resolve, 1000));
-  return `[OPTIMIZED] ${currentContent} \n\n(Refined for ${platform || 'General'} based on instruction: "${instruction}")`;
+// Kept simple for now, can be routed to generate endpoint with specific prompt
+export const generateHashtags = async (topic: string, content: string): Promise<string[]> => {
+  // Simple heuristic fallback if backend route not dedicated
+  return ['#ContentCaster', '#Growth', '#Tech'];
+};
+
+export const refinePostContent = async (current: string, instruction: string, platform?: string): Promise<string> => {
+  return generatePostContent(`Rewrite this: "${current}". Instruction: ${instruction}`, platform || 'General', 'Professional', {});
 };

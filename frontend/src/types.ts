@@ -85,15 +85,15 @@ export interface BudgetPacing {
 export interface BotAttribution {
   botId: BotType;
   spend: number;
-  impactScore: number;
+  impactScore: number; 
   liftPercentage: number;
-  primaryContribution: string;
+  primaryContribution: string; 
 }
 
 export interface CampaignIntelligenceData {
   pacing: BudgetPacing;
   attribution: BotAttribution[];
-  kpiMapping: Record<string, string>;
+  kpiMapping: Record<string, string>; 
   strategySummary: string;
 }
 
@@ -103,7 +103,7 @@ export interface Campaign {
   objective: CampaignObjective;
   status: CampaignStatus;
   platforms: Platform[];
-  botIds: BotType[];
+  botIds: BotType[]; 
   startDate: string;
   endDate?: string;
   budget: {
@@ -121,10 +121,9 @@ export interface Campaign {
   };
   aiRecommendations: CampaignRecommendation[];
   intelligence?: CampaignIntelligenceData;
-  progress: number; // Added for compatibility with simple mock
 }
 
-// --- Bot Specific Rules ---
+// --- Bot Rules ---
 
 export interface FinderBotRules {
   keywordSources: string[];
@@ -160,19 +159,48 @@ export interface CreatorBotRules {
 
 export type BotRules = FinderBotRules | GrowthBotRules | EngagementBotRules | CreatorBotRules;
 
+// --- CENTRALIZED PLATFORM REGISTRY TYPE ---
+
+export interface PlatformValidationRules {
+  charLimit: number;
+  videoRequired?: boolean;
+  mediaRequired?: boolean;
+  maxMediaSizeMB?: number;
+  aspectRatioRanges?: Array<[number, number]>;
+  allowedFormats?: ('image' | 'video')[];
+}
+
 export interface PlatformConfig {
   id: Platform;
   name: string;
-  enabled: boolean;
-  connected: boolean;
-  outage: boolean;
+  
+  // State
+  enabled: boolean;   
+  connected: boolean; 
+  outage: boolean;    
+  
+  // Capabilities
   supports: {
     [key in ActionType]?: boolean;
   };
+  
+  // Operational Limits
   rateLimits: {
     [key in ActionType]?: number;
   };
+
+  // Content Rules (Consolidated)
+  validation: PlatformValidationRules;
+
+  // UI
+  ui: {
+    color: string;      
+    borderColor: string;
+    iconColor: string;
+  };
 }
+
+// --- Strategy Types ---
 
 export type StrategyMode = 'Conservative' | 'Balanced' | 'Aggressive';
 
@@ -181,7 +209,7 @@ export interface StrategyProfile {
   postFrequencyMultiplier: number;
   engagementIntensity: number;
   growthAggression: number;
-  riskTolerance: number;
+  riskTolerance: number; 
 }
 
 export interface AdaptiveConfig {
@@ -206,40 +234,44 @@ export interface LearningEntry {
   id: string;
   platform: Platform;
   actionType: ActionType;
-  context: string;
-  outcomeScore: number;
+  context: string; 
+  outcomeScore: number; 
   timestamp: number;
 }
+
+// --- Learning Types ---
 
 export type LearningStrategy = 'Conservative' | 'Balanced' | 'Aggressive';
 
 export interface BotLearningConfig {
   enabled: boolean;
   strategy: LearningStrategy;
-  maxChangePerDay: number;
-  lockedFields: string[];
+  maxChangePerDay: number; 
+  lockedFields: string[]; 
 }
 
 export interface OptimizationEvent {
   id: string;
   timestamp: string;
-  botId: string;
+  botId: string; 
   field: string;
   oldValue: string | number | boolean;
   newValue: string | number | boolean;
   reason: string;
-  confidence: number;
+  confidence: number; 
   metricsUsed: string[];
   status: 'pending' | 'applied' | 'rejected' | 'simulated';
   appliedAt?: string;
 }
 
+// --- Policy Types ---
+
 export interface GlobalPolicyConfig {
   emergencyStop: boolean;
   quietHours: {
     enabled: boolean;
-    startTime: string;
-    endTime: string;
+    startTime: string; 
+    endTime: string;   
     timezone: string;
   };
   platformLimits?: any; 
@@ -255,7 +287,7 @@ export interface BotActionRequest {
   botType: BotType;
   platform: Platform;
   actionType: ActionType;
-  targetId?: string;
+  targetId?: string; 
   timestamp: string;
 }
 
@@ -269,9 +301,11 @@ export interface OrchestrationLogEntry {
   reason: string;
 }
 
+// --- Telemetry ---
+
 export interface BotExecutionEvent {
   id: string;
-  botId: string;
+  botId: string; 
   botType: BotType;
   timestamp: number;
   platform: Platform;
@@ -281,6 +315,36 @@ export interface BotExecutionEvent {
   assetName?: string;
   reason?: string;
   riskLevel: 'low' | 'medium' | 'high';
+}
+
+// --- Simulation ---
+
+export interface AssetDecision {
+  assetId: string;
+  assetName: string;
+  status: 'accepted' | 'rejected';
+  reason?: string;
+  score?: number;
+}
+
+export interface SimulationCycle {
+  id: string;
+  timestamp: string; 
+  action: string;
+  asset?: MediaItem;
+  decisionTrace: AssetDecision[];
+  outcome: 'Posted' | 'Skipped' | 'Failed';
+  message: string;
+}
+
+export interface SimulationReport {
+  timeline: SimulationCycle[];
+  risks: string[];
+  summary: {
+    totalCycles: number;
+    successful: number;
+    skipped: number;
+  };
 }
 
 export enum PostStatus {
@@ -313,7 +377,7 @@ export interface Post {
   scheduledFor: string;
   status: PostStatus;
   mediaUrl?: string;
-  mediaId?: string;
+  mediaId?: string; 
   mediaType?: 'image' | 'video';
   generatedByAi: boolean;
   author?: 'User' | BotType;
@@ -338,7 +402,6 @@ export interface Post {
     shares: number;
     comments: number;
   };
-  date: Date; // Compat
 }
 
 export interface AIStrategyConfig {
@@ -379,10 +442,11 @@ export interface BotSpecificConfig {
   stopOnConsecutiveErrors?: number;
   aiStrategy?: AIStrategyConfig;
   calendarConfig?: CalendarConfig;
+  
   rules?: BotRules; 
 }
 
-export type BotStatus = 'Idle' | 'Running' | 'Cooldown' | 'LimitReached' | 'Error' | 'Paused';
+export type BotStatus = 'Idle' | 'Running' | 'Cooldown' | 'LimitReached' | 'Error';
 export type LogLevel = 'Info' | 'Warning' | 'Error' | 'Success';
 
 export interface BotLogEntry {
@@ -393,7 +457,6 @@ export interface BotLogEntry {
 }
 
 export interface BotConfig {
-  // id: string; // Removed to match root type, use 'type' as ID
   type: BotType;
   enabled: boolean;
   intervalMinutes: number;
@@ -508,6 +571,8 @@ export interface User {
   };
 }
 
+// --- Media Library ---
+
 export type AuditAction =
   | 'UPLOAD'
   | 'APPROVED'
@@ -546,7 +611,7 @@ export interface MediaAIMetadata {
 export interface MediaMetadata {
   width: number;
   height: number;
-  duration?: number;
+  duration?: number; 
   sizeMB: number;
   format: string;
   aspectRatio: number;
@@ -601,7 +666,7 @@ export interface MediaItem {
   name: string;
   type: 'image' | 'video';
   url: string;
-  thumbnailUrl?: string;
+  thumbnailUrl?: string; 
   size: number;
   createdAt: string;
   dimensions?: string;
@@ -624,8 +689,6 @@ export interface MediaItem {
 
   performanceScore?: number;
   performanceTrend?: 'up' | 'down' | 'stable';
-  platform?: Platform; // Compat
-  campaignId?: string; // Compat
 }
 
 export interface PageProps {

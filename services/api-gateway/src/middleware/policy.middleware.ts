@@ -1,4 +1,3 @@
-
 import { Request, Response, NextFunction } from 'express';
 import { PrismaClient } from '@prisma/client';
 
@@ -25,7 +24,7 @@ declare global {
   }
 }
 
-export const policyGateway = async (req: Request, res: Response, next: NextFunction) => {
+export const policyGateway = async (req: any, res: any, next: NextFunction) => {
   // 1. Identity & Context Extraction (Auth Middleware should run before this)
   const user = (req as any).user;
   

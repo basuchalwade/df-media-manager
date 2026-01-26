@@ -1,20 +1,21 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Cast, ArrowRight } from 'lucide-react';
 
-const Login = () => {
+interface LoginProps {
+  onLoginSuccess: () => void;
+}
+
+const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    
-    // Simulate API call to auth service
     setTimeout(() => {
-      // In a real app, this would be a POST to /auth/login
       localStorage.setItem('isAuthenticated', 'true');
+      onLoginSuccess();
       navigate('/overview');
     }, 1000);
   };
@@ -33,11 +34,11 @@ const Login = () => {
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
             <label className="block text-xs font-bold text-gray-500 uppercase mb-1 ml-1">Email</label>
-            <input type="email" defaultValue="admin@contentcaster.io" className="w-full p-3 bg-gray-50 rounded-xl border border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all" required />
+            <input type="email" placeholder="name@company.com" className="w-full p-3 bg-gray-50 rounded-xl border border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all" required />
           </div>
           <div>
             <label className="block text-xs font-bold text-gray-500 uppercase mb-1 ml-1">Password</label>
-            <input type="password" defaultValue="password" className="w-full p-3 bg-gray-50 rounded-xl border border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all" required />
+            <input type="password" placeholder="••••••••" className="w-full p-3 bg-gray-50 rounded-xl border border-transparent focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all" required />
           </div>
           <button 
             type="submit" 

@@ -1,15 +1,26 @@
-
 import { Request, Response } from 'express';
 import { mockDb } from '../data/mockDb';
 import { v4 as uuidv4 } from 'uuid';
 
-export const getBots = (req: Request, res: Response) => {
+export const getBots = (req: any, res: any) => {
   res.json(mockDb.bots);
 };
 
-export const toggleBot = (req: Request, res: Response) => {
+export const updateBot = (req: any, res: any) => {
   const { id } = req.params;
-  // Try finding by ID first, then by Type (frontend compatibility)
+  // Find by ID or Type
+  const botIndex = mockDb.bots.findIndex(b => b.id === id || b.type === decodeURIComponent(id));
+  
+  if (botIndex !== -1) {
+    mockDb.bots[botIndex] = { ...mockDb.bots[botIndex], ...req.body };
+    res.json(mockDb.bots);
+  } else {
+    res.status(404).json({ error: 'Bot not found' });
+  }
+};
+
+export const toggleBot = (req: any, res: any) => {
+  const { id } = req.params;
   const bot = mockDb.bots.find(b => b.id === id) || mockDb.bots.find(b => b.type === decodeURIComponent(id));
   
   if (bot) {
@@ -21,7 +32,28 @@ export const toggleBot = (req: Request, res: Response) => {
   }
 };
 
-export const logActivity = (req: Request, res: Response) => {
+export const runSimulation = (req: any, res: any) => {
+  const { id } = req.params;
+  const bot = mockDb.bots.find(b => b.id === id) || mockDb.bots.find(b => b.type === decodeURIComponent(id));
+  
+  if (bot) {
+    const activity = {
+      id: uuidv4(),
+      botType: bot.type,
+      actionType: 'SIMULATE',
+      platform: 'System',
+      status: 'SUCCESS',
+      message: 'Simulation triggered manually.',
+      createdAt: new Date().toISOString()
+    };
+    bot.logs.unshift(activity);
+    res.json({ status: 'queued', message: 'Simulation run queued successfully' });
+  } else {
+    res.status(404).json({ error: 'Bot not found' });
+  }
+};
+
+export const logActivity = (req: any, res: any) => {
   const { id } = req.params;
   const bot = mockDb.bots.find(b => b.id === id) || mockDb.bots.find(b => b.type === decodeURIComponent(id));
   
@@ -45,7 +77,7 @@ export const logActivity = (req: Request, res: Response) => {
   }
 };
 
-export const getActivity = (req: Request, res: Response) => {
+export const getBotActivity = (req: any, res: any) => {
     const { id } = req.params;
     const bot = mockDb.bots.find(b => b.id === id) || mockDb.bots.find(b => b.type === decodeURIComponent(id));
     res.json(bot ? bot.logs : []);

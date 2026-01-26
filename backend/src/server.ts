@@ -1,4 +1,3 @@
-
 import express from 'express';
 import cors from 'cors';
 import v1Routes from './routes/v1';
@@ -7,8 +6,8 @@ import { mockDb } from './db/mockDb';
 const app = express();
 const PORT = process.env.PORT || 8000;
 
-app.use(cors());
-app.use(express.json());
+app.use(cors() as any);
+app.use(express.json() as any);
 
 // Mount API Routes
 app.use('/api', v1Routes);

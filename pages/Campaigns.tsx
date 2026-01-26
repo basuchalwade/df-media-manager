@@ -366,7 +366,7 @@ const CreateCampaignModal: React.FC<{ onClose: () => void, onCreate: (data: any)
                 <div className="p-6 space-y-6">
                     <div>
                         <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Campaign Name</label>
-                        <input value={name} onChange={e => setName(e.target.value)} className="w-full border border-slate-200 rounded-lg px-4 py-2 font-medium" placeholder="e.g. Summer Sale 2024" />
+                        <input value={name} onChange={e => setName(e.target.value)} className="w-full border border-slate-200 rounded-lg px-4 py-2 font-medium bg-white text-gray-900" placeholder="e.g. Summer Sale 2024" />
                     </div>
                     <div>
                         <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Objective</label>
@@ -378,7 +378,7 @@ const CreateCampaignModal: React.FC<{ onClose: () => void, onCreate: (data: any)
                     </div>
                     <div>
                         <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Daily Budget ($)</label>
-                        <input type="number" value={budget} onChange={e => setBudget(Number(e.target.value))} className="w-full border border-slate-200 rounded-lg px-4 py-2 font-medium" />
+                        <input type="number" value={budget} onChange={e => setBudget(Number(e.target.value))} className="w-full border border-slate-200 rounded-lg px-4 py-2 font-medium bg-white text-gray-900" />
                     </div>
                     <div>
                         <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Target Platforms</label>

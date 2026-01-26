@@ -1,13 +1,18 @@
-
-import React, { useState } from 'react';
-import { Bot, Power, Activity, Settings, Zap } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Bot, Power, Activity, Settings } from 'lucide-react';
 import { store } from '../services/mockStore';
+import { BotConfig, BotType } from '../types';
 
 const BotManager = () => {
-  const [bots, setBots] = useState(store.bots);
+  const [bots, setBots] = useState<BotConfig[]>([]);
 
-  const toggleBot = (id: string) => {
-    setBots(store.toggleBot(id));
+  useEffect(() => {
+    store.getBots().then(setBots);
+  }, []);
+
+  const toggleBot = async (type: BotType) => {
+    const updated = await store.toggleBot(type);
+    setBots(updated);
   };
 
   return (
@@ -19,7 +24,7 @@ const BotManager = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
         {bots.map((bot) => (
-          <div key={bot.id} className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 relative overflow-hidden group hover:shadow-md transition-all">
+          <div key={bot.type} className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 relative overflow-hidden group hover:shadow-md transition-all">
             <div className={`absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity`}>
               <Bot size={120} />
             </div>
@@ -30,14 +35,14 @@ const BotManager = () => {
                   <Bot size={24} />
                 </div>
                 <button 
-                  onClick={() => toggleBot(bot.id)}
+                  onClick={() => toggleBot(bot.type)}
                   className={`p-2 rounded-full transition-colors ${bot.enabled ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-500'}`}
                 >
                   <Power size={20} />
                 </button>
               </div>
 
-              <h3 className="text-xl font-bold text-gray-900 mb-1">{bot.name}</h3>
+              <h3 className="text-xl font-bold text-gray-900 mb-1">{bot.type}</h3>
               <p className="text-sm font-medium text-gray-500 mb-4 flex items-center gap-2">
                 <span className={`w-2 h-2 rounded-full ${bot.status === 'Running' ? 'bg-green-500 animate-pulse' : 'bg-gray-300'}`} />
                 {bot.status}
@@ -47,12 +52,12 @@ const BotManager = () => {
                 <div className="bg-gray-50 p-3 rounded-lg">
                   <div className="flex justify-between text-xs font-bold text-gray-500 uppercase mb-1">
                     <span>Daily Capacity</span>
-                    <span>{bot.dailyUsage}/{bot.dailyLimit}</span>
+                    <span>{bot.stats.currentDailyActions}/{bot.stats.maxDailyActions}</span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-1.5">
                     <div 
                       className="bg-blue-500 h-1.5 rounded-full transition-all duration-500" 
-                      style={{ width: `${(bot.dailyUsage / bot.dailyLimit) * 100}%` }}
+                      style={{ width: `${Math.min((bot.stats.currentDailyActions / bot.stats.maxDailyActions) * 100, 100)}%` }}
                     />
                   </div>
                 </div>

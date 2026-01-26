@@ -1,7 +1,6 @@
-
 import { Request, Response, NextFunction } from 'express';
 
-export const authMiddleware = (req: Request, res: Response, next: NextFunction) => {
+export const authMiddleware = (req: any, res: any, next: NextFunction) => {
   // Mock Auth: Accept any Bearer token or skip check for dev
   const authHeader = req.headers.authorization;
   if (!authHeader && !req.path.includes('/auth/login')) {

@@ -1,29 +1,25 @@
 
-import { MediaItem, MediaVariant, Platform } from '../types';
-import { PLATFORM_RULES } from './platformRules';
+import { MediaItem, MediaVariant, PlatformConfig } from '../types';
 
-export const generateVariant = async (media: MediaItem, platform: string): Promise<MediaVariant> => {
-  const rule = PLATFORM_RULES[platform];
-  if (!rule) throw new Error(`Unknown platform: ${platform}`);
+export const generateVariant = async (media: MediaItem, platformConfig: PlatformConfig): Promise<MediaVariant> => {
+  const rules = platformConfig.validation;
 
   // Ideal target is the midpoint of the range or default to 1:1 if not flexible
-  const range = rule.aspectRatioRanges ? rule.aspectRatioRanges[0] : [1, 1];
-  // Target Aspect Ratio: Use a standard one within range. 
-  // E.g. Instagram (0.8, 1.91) -> target 1 (square) or 0.8 (4:5)
-  // Simple heuristic: If range allows 1:1, prefer 1:1. If range is vertical, use vertical max.
+  const range = rules.aspectRatioRanges ? rules.aspectRatioRanges[0] : [1, 1];
+  
+  // Target Aspect Ratio Heuristic
   let targetRatio = 1;
   if (range[1] < 1) targetRatio = range[1]; // Vertical only
   else if (range[0] > 1) targetRatio = range[0]; // Horizontal only
   else targetRatio = 1; // Square supported
 
   if (media.type === 'video') {
-    // Phase 3A: Mock Video Variant (Preview Only)
-    // In real implementation, this would trigger a server-side FFmpeg job
+    // Mock Video Variant (Preview Only)
     return {
       id: `var-${Date.now()}`,
       parentId: media.id,
-      platform,
-      url: media.url, // Re-use URL for mock, in reality this would be a processed URL
+      platform: platformConfig.id,
+      url: media.url, // Re-use URL for mock
       thumbnailUrl: media.thumbnailUrl || media.url,
       width: media.metadata?.width || 1920,
       height: media.metadata?.height || 1080,
@@ -92,7 +88,7 @@ export const generateVariant = async (media: MediaItem, platform: string): Promi
         resolve({
           id: `var-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
           parentId: media.id,
-          platform,
+          platform: platformConfig.id,
           url: variantUrl,
           thumbnailUrl: variantUrl,
           width: outWidth,

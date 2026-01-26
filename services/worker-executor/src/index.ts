@@ -1,24 +1,30 @@
 
-import { MockQueue } from './queue/mockQueue';
-import { runBotCycle } from './jobs/bot.jobs';
-import { processMediaQueue } from './jobs/media.jobs';
+import { Worker } from 'bullmq';
+import { connection } from './lib/redis';
+import { startScheduler } from './scheduler';
+import { botProcessor } from './processors/botProcessor';
 
-console.log('👷 Worker Executor Service Starting on Port 5000 (Virtual)...');
+console.log('👷 Worker Engine Starting...');
 
-// Initialize Queue System
-// Request said "bot execution cycles every 30 seconds"
-const botQueue = new MockQueue(30000); 
-botQueue.register(runBotCycle);
+// 1. Start the Scheduler (Producer)
+startScheduler();
 
-const mediaQueue = new MockQueue(10000); // Check media every 10s
-mediaQueue.register(processMediaQueue);
-
-botQueue.start();
-mediaQueue.start();
-
-// Keep process alive
-(process as any).on('SIGINT', () => {
-    botQueue.stop();
-    mediaQueue.stop();
-    (process as any).exit();
+// 2. Start the Worker (Consumer)
+const worker = new Worker('bot-execution', botProcessor, {
+  connection,
+  concurrency: 5, // Process 5 bots in parallel
+  limiter: {
+    max: 10,
+    duration: 1000
+  }
 });
+
+worker.on('completed', job => {
+  console.log(`[Job] ${job.id} completed successfully`);
+});
+
+worker.on('failed', (job, err) => {
+  console.error(`[Job] ${job?.id} failed with ${err.message}`);
+});
+
+console.log('🚀 Worker Engine Online & Listening for Jobs');
