@@ -312,7 +312,6 @@ const INITIAL_MEDIA = RAW_MEDIA.map(m => ({
 }));
 
 // ... (Helpers: generateThumbnail, extractMetadata, generateMockMetrics remain unchanged) ...
-// (Omitting helper implementations for brevity, assuming they exist as per previous turns)
 const generateThumbnail = async (file: File): Promise<string> => {
   return new Promise((resolve) => {
     const url = URL.createObjectURL(file);
@@ -1023,6 +1022,66 @@ class HybridStore {
       const newItem: MediaItem = { id, name: f.name, type: f.type.startsWith('video') ? 'video' : 'image', url: url, thumbnailUrl: f.type.startsWith('image') ? url : undefined, size: f.size, createdAt: new Date().toISOString(), dimensions: 'Pending...', processingStatus: 'uploading', usageCount: 0, tags: [f.type.startsWith('video') ? 'video' : 'image'], governance: { status: 'pending' }, aiMetadata: { generated: false, disclosureRequired: false }, variants: [], performanceScore: 50, performanceTrend: 'stable' };
       this.media = [newItem, ...this.media]; this.saveState(); logAudit({ id: Date.now().toString() + Math.random(), mediaId: newItem.id, action: 'UPLOAD', actor: 'Current User', timestamp: new Date().toISOString() }); this.processMediaInBackground(newItem, f); return newItem;
   }
+  
+  // New AI Generation Method
+  async generateAsset(prompt: string, type: 'image' | 'video'): Promise<MediaItem> {
+    if (!this.isSimulation) throw new Error("Generative features currently available in Simulation Mode only.");
+
+    // 1. Create a placeholder immediately for UI responsiveness
+    const id = `gen-${Date.now()}`;
+    // Using Pollinations.ai for deterministic but dynamic image generation
+    const seed = Math.floor(Math.random() * 1000);
+    const mockUrl = type === 'image'
+        ? `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?seed=${seed}&nologo=true`
+        : `https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4`; 
+
+    const newItem: MediaItem = {
+        id,
+        name: `${prompt.substring(0, 20).replace(/[^a-zA-Z0-9]/g, '_')}_${seed}.${type === 'image' ? 'jpg' : 'mp4'}`,
+        type,
+        url: mockUrl,
+        thumbnailUrl: type === 'image' ? mockUrl : 'https://storage.googleapis.com/gtv-videos-bucket/sample/images/ForBiggerJoyrides.jpg',
+        size: 1024 * 1024 * (type === 'image' ? 2 : 15), 
+        createdAt: new Date().toISOString(),
+        dimensions: type === 'image' ? '1024x1024' : '1920x1080',
+        processingStatus: 'ready',
+        usageCount: 0,
+        tags: ['ai-generated', type, ...prompt.split(' ').slice(0,3)],
+        governance: { status: 'approved' }, 
+        aiMetadata: {
+            generated: true,
+            tool: 'Pollinations AI (Mock)',
+            disclosureRequired: true,
+            originalPrompt: prompt
+        },
+        variants: [],
+        performanceScore: 50,
+        performanceTrend: 'stable',
+        // Mark compatibility as good immediately for the demo
+        platformCompatibility: type === 'image' ? { 
+            'Twitter': { compatible: true, issues: [] },
+            'Instagram': { compatible: true, issues: [] },
+            'LinkedIn': { compatible: true, issues: [] }
+        } : undefined
+    };
+
+    // 2. Add to store
+    this.media = [newItem, ...this.media];
+    this.saveState();
+
+    // 3. Log Audit
+    logAudit({
+        id: `audit-${Date.now()}`,
+        mediaId: newItem.id,
+        action: 'UPLOAD',
+        actor: 'AI Generator',
+        timestamp: new Date().toISOString(),
+        reason: `Generated from prompt: "${prompt}"`
+    });
+
+    return newItem;
+  }
+
   private async processMediaInBackground(item: MediaItem, file: File) {
       await new Promise(r => setTimeout(r, 800)); this.media = this.media.map(m => m.id === item.id ? { ...m, processingStatus: 'processing' } : m); this.saveState();
       try { await new Promise(r => setTimeout(r, 1200 + Math.random() * 800)); const [metadata, thumbnailUrl] = await Promise.all([extractMetadata(file, item.url), generateThumbnail(file)]); const mediaWithMeta = { ...item, metadata }; const compatibility = evaluateCompatibility(mediaWithMeta); this.media = this.media.map(m => m.id === item.id ? { ...m, processingStatus: 'ready', dimensions: `${metadata.width}x${metadata.height}`, metadata, thumbnailUrl: thumbnailUrl || (m.type === 'image' ? m.url : undefined), platformCompatibility: compatibility } : m); this.saveState(); } catch (error) { console.error("Media processing failed", error); this.media = this.media.map(m => m.id === item.id ? { ...m, processingStatus: 'failed' } : m); this.saveState(); }

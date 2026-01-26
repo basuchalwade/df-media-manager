@@ -12,6 +12,7 @@ import { getAuditForMedia } from '../services/auditStore';
 import { PLATFORM_RULES } from '../services/platformRules';
 import { getEnhancementSuggestions } from '../services/enhancementSuggestions';
 import { PlatformIcon } from '../components/PlatformIcon';
+import { CreativeGenerator } from '../components/CreativeGenerator';
 
 interface Collection {
   id: string;
@@ -44,6 +45,7 @@ export const MediaLibrary: React.FC = () => {
   const [isGeneratingVariant, setIsGeneratingVariant] = useState<string | null>(null);
   const [isEnhancing, setIsEnhancing] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<EnhancementType[]>([]);
+  const [isGeneratorOpen, setIsGeneratorOpen] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -130,6 +132,15 @@ export const MediaLibrary: React.FC = () => {
     }
     await loadMedia();
     if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleGeneratedAsset = (asset: MediaItem) => {
+      // Asset is already saved by the store
+      // We just need to ensure the list refreshes and maybe select it
+      loadMedia();
+      setSelectedItem(asset);
+      setIsDrawerOpen(true);
+      setIsGeneratorOpen(false);
   };
 
   const handleDelete = async (id: string) => {
@@ -234,10 +245,16 @@ export const MediaLibrary: React.FC = () => {
         
         {/* LEFT SIDEBAR */}
         <div className="w-64 bg-slate-50 border-r border-slate-200 flex flex-col shrink-0">
-            <div className="p-5 border-b border-slate-100">
+            <div className="p-5 border-b border-slate-100 space-y-2">
+                <button 
+                    onClick={() => setIsGeneratorOpen(true)}
+                    className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-sm shadow-md transition-all flex items-center justify-center gap-2"
+                >
+                    <Sparkles className="w-4 h-4 text-yellow-300" /> Generate with AI
+                </button>
                 <button 
                     onClick={() => fileInputRef.current?.click()}
-                    className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-sm shadow-sm transition-all flex items-center justify-center gap-2"
+                    className="w-full py-2.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-bold text-sm shadow-sm transition-all flex items-center justify-center gap-2"
                 >
                     <UploadCloud className="w-4 h-4" /> Upload Asset
                 </button>
@@ -726,6 +743,12 @@ export const MediaLibrary: React.FC = () => {
                 </div>
             </div>
         )}
+
+        <CreativeGenerator 
+            isOpen={isGeneratorOpen} 
+            onClose={() => setIsGeneratorOpen(false)} 
+            onSelect={handleGeneratedAsset} 
+        />
     </div>
   );
 };
@@ -761,6 +784,15 @@ const GridItem: React.FC<{
                         alt={item.name} 
                         loading="lazy"
                     />
+                )}
+
+                {/* AI Badge (List) */}
+                {item.aiMetadata?.generated && !processing && (
+                    <div className="absolute top-1 right-1 z-20">
+                        <div className="bg-indigo-600 text-white p-1 rounded-full shadow-sm">
+                            <Sparkles className="w-2 h-2" />
+                        </div>
+                    </div>
                 )}
 
                 {/* Performance Badge (New) */}
@@ -827,6 +859,7 @@ const GridItem: React.FC<{
                             <span className="text-xs text-slate-400">
                                 {processing ? 'Processing...' : formatBytes(item.size)}
                             </span>
+                            {item.aiMetadata?.generated && <span className="text-[10px] text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded font-bold uppercase">AI Generated</span>}
                             {governanceStatus === 'approved' && <span className="text-[10px] text-green-600 bg-green-50 px-1.5 py-0.5 rounded font-bold uppercase">Approved</span>}
                             {governanceStatus === 'pending' && <span className="text-[10px] text-yellow-600 bg-yellow-50 px-1.5 py-0.5 rounded font-bold uppercase">Pending</span>}
                         </div>

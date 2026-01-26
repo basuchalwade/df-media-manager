@@ -1,5 +1,7 @@
 
-import { CampaignService } from '../../modules/campaign/campaign.service';
+import { Request, Response } from 'express';
+import { CampaignService } from '../../services/campaign.service';
+
 const service = new CampaignService();
 
 export const getCampaigns = async (req: any, res: any) => {

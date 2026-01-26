@@ -1,4 +1,3 @@
-
 import axios from 'axios';
 import { BotConfig, Post, MediaItem, DashboardStats, User, UserSettings, BotType, BotActivity } from '../types';
 
@@ -43,7 +42,7 @@ class ApiStore {
   }
 
   async updateBot(bot: BotConfig): Promise<BotConfig[]> {
-    await this.client.patch(`/bots/${encodeURIComponent(bot.type)}/config`, {
+    await this.client.patch(`/bots/${bot.id || bot.type}/config`, {
       config: bot.config,
       learning: bot.learning
     });

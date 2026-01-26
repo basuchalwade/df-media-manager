@@ -1,37 +1,62 @@
 
-import { mockDb } from '../db/mockDb';
-import { v4 as uuidv4 } from 'uuid';
+import { PrismaClient, PostStatus } from '@prisma/client';
+import { queues } from '../jobs/queues';
+
+const prisma = new PrismaClient();
 
 export class PostService {
+
   async findAll(organizationId: string) {
-    return mockDb.posts;
+    // Filter by organizationId in future schema
+    return prisma.post.findMany({ 
+      orderBy: { createdAt: 'desc' },
+      include: { media: true } 
+    });
   }
 
   async createPost(organizationId: string, data: any) {
-    const newPost = {
-      id: uuidv4(),
-      content: data.content,
-      platforms: data.platforms || [], 
-      status: data.status || 'Draft',
-      scheduledFor: data.scheduledFor ? new Date(data.scheduledFor) : undefined,
-      createdAt: new Date(),
-      metricsJson: data.metricsJson || {},
-      botId: data.botId
-    };
-    mockDb.posts.unshift(newPost);
-    return newPost;
-  }
+    // 1. Create Record
+    const post = await prisma.post.create({
+      data: {
+        content: data.content,
+        platforms: [data.platform], 
+        status: data.status || PostStatus.Draft,
+        scheduledFor: data.scheduledFor ? new Date(data.scheduledFor) : undefined,
+        metricsJson: data.metricsJson || {},
+        botId: data.botId
+      }
+    });
 
-  async updatePost(organizationId: string, id: string, data: any) {
-    const idx = mockDb.posts.findIndex(p => p.id === id);
-    if (idx !== -1) {
-        mockDb.posts[idx] = { ...mockDb.posts[idx], ...data };
-        return mockDb.posts[idx];
+    // 2. Handle Scheduling/Publishing
+    if (post.status === PostStatus.Scheduled || post.status === PostStatus.Published) {
+      await this.schedulePublishJob(post);
     }
-    throw new Error('Post not found');
+
+    return post;
   }
 
-  async deletePost(organizationId: string, id: string) {
-    mockDb.posts = mockDb.posts.filter(p => p.id !== id);
+  async updateStatus(organizationId: string, postId: string, status: PostStatus) {
+    // Add check ownership logic
+    return prisma.post.update({
+      where: { id: postId },
+      data: { status }
+    });
+  }
+
+  private async schedulePublishJob(post: any) {
+    const delay = post.scheduledFor 
+      ? new Date(post.scheduledFor).getTime() - Date.now() 
+      : 0;
+    
+    const finalDelay = delay > 0 ? delay : 0;
+    
+    // Add to BullMQ
+    await queues.botExecution.add(
+      'publish-post', 
+      { postId: post.id }, 
+      { delay: finalDelay }
+    );
+    
+    console.log(`[PostService] Scheduled post ${post.id} with ${finalDelay}ms delay`);
   }
 }
